@@ -40,6 +40,20 @@ func New(name string, encoding Encoding, notifiers ...notifier.Notifier) NotifyL
 	}
 }
 
+func (l NotifyLog) With(fields map[string]string) NotifyLog {
+	ctx := l.Logger.With()
+
+	for k, v := range fields {
+		ctx = ctx.Str(k, v)
+	}
+
+	newLogger := ctx.Logger()
+
+	return NotifyLog{
+		Logger: newLogger,
+	}
+}
+
 func cbor(name string) zerolog.Logger {
 	output := zerolog.ConsoleWriter{
 		Out:                 os.Stdout,
