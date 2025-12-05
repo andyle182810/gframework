@@ -13,13 +13,15 @@ import (
 
 func Wrapper[TREQ any](wrapped func(echo.Context, *TREQ) (any, *echo.HTTPError)) echo.HandlerFunc {
 	return func(ectx echo.Context) error {
-		log := notifylog.New("wrapper", notifylog.JSON)
 		requestURI := ectx.Request().RequestURI
 		requestID := ectx.Request().Header.Get(middleware.HeaderXRequestID)
 		handlerName := runtime.FuncForPC(reflect.ValueOf(wrapped).Pointer()).Name()
+		log := notifylog.New("wrapper", notifylog.JSON).With(map[string]string{
+			"request_id": requestID,
+		})
 
 		// Log the start of the request
-		logRequestStart(&log, requestID, requestURI, handlerName)
+		logRequestStart(&log, requestURI, handlerName)
 
 		// Bind and validate the request
 		req, err := bindAndValidate[TREQ](ectx, &log, requestURI)
@@ -37,21 +39,19 @@ func Wrapper[TREQ any](wrapped func(echo.Context, *TREQ) (any, *echo.HTTPError))
 		}
 
 		// Send the response
-		return sendResponse(ectx, &log, requestID, ectx.Response().Status, res)
+		return sendResponse(ectx, &log, ectx.Response().Status, res)
 	}
 }
 
-func logRequestStart(log *notifylog.NotifyLog, requestID, path, handler string) {
+func logRequestStart(log *notifylog.NotifyLog, path, handler string) {
 	log.Info().
-		Str("request_id", requestID).
 		Str("path", path).
 		Str("handler", handler).
 		Msg("request started - processing incoming request")
 }
 
-func logRequestEnd(log *notifylog.NotifyLog, requestID string, status int) {
+func logRequestEnd(log *notifylog.NotifyLog, status int) {
 	log.Info().
-		Str("request_id", requestID).
 		Time("at", time.Now()).
 		Int("status", status).
 		Msg("request completed - response sent to client")
@@ -93,14 +93,14 @@ func bindAndValidate[TREQ any](ectx echo.Context, log *notifylog.NotifyLog, path
 	return &req, nil
 }
 
-func sendResponse(ectx echo.Context, log *notifylog.NotifyLog, requestID string, status int, res any) error {
+func sendResponse(ectx echo.Context, log *notifylog.NotifyLog, status int, res any) error {
 	if status != 0 {
-		logRequestEnd(log, requestID, status)
+		logRequestEnd(log, status)
 
 		return ectx.JSON(status, res)
 	}
 
-	logRequestEnd(log, requestID, status)
+	logRequestEnd(log, status)
 
 	return ectx.JSON(http.StatusOK, res)
 }
