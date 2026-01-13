@@ -21,6 +21,14 @@ type RedisTestContainer struct {
 	Port      nat.Port
 }
 
+func (c *RedisTestContainer) Address() string {
+	return c.Host + ":" + c.Port.Port()
+}
+
+func (c *RedisTestContainer) ConnectionString() string {
+	return "redis://" + c.Address()
+}
+
 func SetupRedisContainer(ctx context.Context, t *testing.T) *RedisTestContainer {
 	t.Helper()
 

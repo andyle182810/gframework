@@ -3,6 +3,7 @@ package metricserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -54,11 +55,29 @@ func New(cfg *Config) *Server {
 	}
 }
 
-func (s *Server) Run() {
-	log.Info().Str("address", s.address).Msg("Starting metrics server")
+func (s *Server) Run(ctx context.Context) error {
+	errCh := make(chan error, 1)
 
-	if err := s.echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
-		log.Panic().Err(err).Msg("Metrics server encountered a fatal error")
+	go func() {
+		log.Info().
+			Str("address", s.address).
+			Msg("The metrics server is being started.")
+
+		if err := s.echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("metrics server failed: %w", err)
+		} else {
+			errCh <- nil
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		log.Info().
+			Msg("The metrics server Run() context has been cancelled.")
+
+		return ctx.Err()
 	}
 }
 
@@ -66,15 +85,19 @@ func (s *Server) Stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, s.gracePeriod)
 	defer cancel()
 
-	log.Info().Msg("Initiating graceful shutdown of metrics server")
+	log.Info().
+		Msg("The graceful shutdown of metrics server is being initiated.")
 
 	if err := s.echo.Shutdown(shutdownCtx); err != nil {
-		log.Error().Err(err).Msg("Failed to gracefully shut down metrics server")
+		log.Error().
+			Err(err).
+			Msg("The metrics server failed to shut down gracefully.")
 
 		return err
 	}
 
-	log.Info().Msg("Metrics server shutdown complete")
+	log.Info().
+		Msg("The metrics server shutdown has been completed successfully.")
 
 	return nil
 }

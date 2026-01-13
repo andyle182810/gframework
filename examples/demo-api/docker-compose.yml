@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:18.0-alpine3.22
+    container_name: demo-api-postgres
+    ports:
+      - 5441:5432
+    volumes:
+      - ./data/postgres/:/var/lib/postgresql/18/docker
+      - ./migrations:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: admindb
+      PGDATA: /var/lib/postgresql/18/docker
+    networks:
+      demo-api:
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  valkey:
+    image: valkey/valkey:8.1.4-alpine3.22
+    container_name: demo-api-valkey
+    ports:
+      - 6379:6379
+    volumes:
+      - ./data/valkey:/data
+    command: valkey-server --requirepass password
+    networks:
+      demo-api:
+    healthcheck:
+      test: ['CMD', 'valkey-cli', '--raw', 'incr', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+networks:
+  demo-api:
+    name: demo-api
+    driver: bridge

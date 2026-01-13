@@ -6,22 +6,22 @@ type HandlerResponse[T any] struct {
 }
 
 type Pagination struct {
-	Page       int `json:"page" example:"1"`
-	PageSize   int `json:"pageSize" example:"10"`
-	TotalCount int `json:"totalCount" example:"42"`
-	TotalPages int `json:"totalPages" example:"5"`
+	Page       int `example:"1"  json:"page"`
+	PageSize   int `example:"10" json:"pageSize"`
+	TotalCount int `example:"42" json:"totalCount"`
+	TotalPages int `example:"5"  json:"totalPages"`
 }
 
 type APIResponse[T any] struct {
-	RequestID  string      `json:"requestId,omitempty" example:"3bf74527-8097-4217-8485-ffe05d16f82e"`
+	RequestID  string      `example:"3bf74527-8097-4217-8485-ffe05d16f82e" json:"requestId,omitempty"`
 	Data       T           `json:"data"`
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
-type ErrorResponse struct {
+type ResponseError struct {
 	Message string `json:"message"`
 }
 
-func (e ErrorResponse) Error() string {
+func (e ResponseError) Error() string {
 	return e.Message
 }

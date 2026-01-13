@@ -1,3 +1,4 @@
+//nolint:ireturn
 package keyprovider
 
 import (
@@ -6,18 +7,17 @@ import (
 	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
-	"github.com/andyle182810/gframework/notifylog"
+	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 )
 
 const (
-	// JWKSRateLimitBurst allows 5 new unknown KID refreshes per second.
 	JWKSRateLimitBurst  = 5
 	JWKSRefreshTimeout  = 10 * time.Second
 	JWKSRefreshInterval = 60 * time.Minute
 )
 
-func NewKeyFunc(ctx context.Context, log notifylog.NotifyLog, urls []string) (keyfunc.Keyfunc, error) {
+func NewKeyFunc(ctx context.Context, log zerolog.Logger, urls []string) (keyfunc.Keyfunc, error) {
 	rateLimiter := rate.NewLimiter(rate.Every(time.Second), JWKSRateLimitBurst)
 
 	var httpClient *http.Client
@@ -27,7 +27,7 @@ func NewKeyFunc(ctx context.Context, log notifylog.NotifyLog, urls []string) (ke
 			log.Error().
 				Err(err).
 				Str("jwks_url", url).
-				Msg("JWKS key refresh failed in background goroutine")
+				Msg("The JWKS key refresh has failed in the background goroutine.")
 		}
 	}
 
@@ -41,7 +41,7 @@ func NewKeyFunc(ctx context.Context, log notifylog.NotifyLog, urls []string) (ke
 		ValidationSkipAll:       false,
 	}
 
-	kf, err := keyfunc.NewDefaultOverrideCtx(
+	keyFunc, err := keyfunc.NewDefaultOverrideCtx(
 		ctx,
 		urls,
 		override,
@@ -49,9 +49,9 @@ func NewKeyFunc(ctx context.Context, log notifylog.NotifyLog, urls []string) (ke
 
 	if err == nil {
 		log.Info().
-			Strs("urls", urls).
-			Msg("Keyfunc initialized, background refresh started")
+			Strs("jwks_urls", urls).
+			Msg("The Keyfunc has been initialized successfully and the background refresh has been started.")
 	}
 
-	return kf, err
+	return keyFunc, err
 }

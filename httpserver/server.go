@@ -61,11 +61,29 @@ func New(cfg *Config) *Server {
 	}
 }
 
-func (s *Server) Run() {
-	log.Info().Str("address", s.address).Msg("Starting HTTP server")
+func (s *Server) Run(ctx context.Context) error {
+	errCh := make(chan error, 1)
 
-	if err := s.Echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
-		log.Panic().Err(err).Msg("HTTP server encountered a fatal error")
+	go func() {
+		log.Info().
+			Str("address", s.address).
+			Msg("The HTTP server is being started.")
+
+		if err := s.Echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("HTTP server failed: %w", err)
+		} else {
+			errCh <- nil
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		log.Info().
+			Msg("The HTTP server Run() context has been cancelled.")
+
+		return ctx.Err()
 	}
 }
 
@@ -73,10 +91,13 @@ func (s *Server) Stop(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, s.gracePeriod)
 	defer cancel()
 
-	log.Info().Msg("Initiating graceful shutdown of HTTP server")
+	log.Info().
+		Msg("The graceful shutdown of HTTP server is being initiated.")
 
 	if err := s.Echo.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Failed to gracefully shut down HTTP server")
+		log.Error().
+			Err(err).
+			Msg("The HTTP server failed to shut down gracefully.")
 
 		return err
 	}

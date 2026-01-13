@@ -19,6 +19,7 @@ const (
 	ConnectionTimeout = 10 * time.Second
 )
 
+//nolint:cyclop
 func MigrateUp(dbURI, source string) error {
 	db, err := sql.Open(DriverName, dbURI)
 	if err != nil {
@@ -27,16 +28,21 @@ func MigrateUp(dbURI, source string) error {
 
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
-			log.Error().Err(closeErr).Msg("Failed to close database connection after migration attempt")
+			log.Error().
+				Err(closeErr).
+				Msg("The database connection failed to close after migration attempt.")
 		}
 	}()
 
 	db.SetConnMaxLifetime(ConnectionTimeout)
+
 	if err = db.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database at %s: %w", dbURI, err)
 	}
 
-	log.Info().Str("source", source).Msg("Starting database migration")
+	log.Info().
+		Str("migration_source", source).
+		Msg("The database migration is being started.")
 
 	driver, err := pgx_migrate.WithInstance(db, &pgx_migrate.Config{})
 	if err != nil {
@@ -50,14 +56,20 @@ func MigrateUp(dbURI, source string) error {
 
 	err = migrator.Up()
 
-	if errors.Is(err, migrate.ErrNoChange) {
-		log.Info().Msg("Database migration completed: No new migrations to apply")
-	} else if err != nil {
-		log.Error().Err(err).Str("source", source).Msg("Database migration failed")
+	switch {
+	case errors.Is(err, migrate.ErrNoChange):
+		log.Info().
+			Msg("The database migration has been completed with no new migrations to apply.")
+	case err != nil:
+		log.Error().
+			Err(err).
+			Str("migration_source", source).
+			Msg("The database migration has failed.")
 
 		return fmt.Errorf("failed to run migrations up: %w", err)
-	} else {
-		log.Info().Msg("Database migration completed successfully")
+	default:
+		log.Info().
+			Msg("The database migration has been completed successfully.")
 	}
 
 	sourceErr, databaseErr := migrator.Close()

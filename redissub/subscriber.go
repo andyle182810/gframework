@@ -101,11 +101,16 @@ func (s *Subscriber) Topic() string {
 }
 
 func (s *Subscriber) Start() {
-	log.Info().Str("topic", s.Topic()).Msg("Starting subscription")
+	log.Info().
+		Str("topic", s.Topic()).
+		Msg("The subscription is being started.")
 
 	msgChan, err := s.Subscriber.Subscribe(context.Background(), s.Topic())
 	if err != nil {
-		log.Panic().Err(err).Str("topic", s.Topic()).Msg("Failed to subscribe to topic")
+		log.Panic().
+			Err(err).
+			Str("topic", s.Topic()).
+			Msg("The subscription to the topic has failed.")
 
 		return
 	}
@@ -113,18 +118,26 @@ func (s *Subscriber) Start() {
 	for {
 		select {
 		case <-s.shutdownSignal:
-			log.Info().Str("topic", s.Topic()).Msg("Subscription stopped")
+			log.Info().
+				Str("topic", s.Topic()).
+				Msg("The subscription has been stopped.")
 
 			return
 		case msg := <-msgChan:
 			if msg == nil || msg.UUID == "" {
-				log.Debug().Str("topic", s.Topic()).Msg("Received empty message")
+				log.Debug().
+					Str("topic", s.Topic()).
+					Msg("An empty message has been received.")
 
 				continue
 			}
 
 			if err := s.handleMessage(context.Background(), msg); err != nil {
-				log.Error().Err(err).Str("topic", s.Topic()).Str("message_id", msg.UUID).Msg("Failed to process message")
+				log.Error().
+					Err(err).
+					Str("topic", s.Topic()).
+					Str("message_id", msg.UUID).
+					Msg("The message processing has failed.")
 			}
 		}
 	}
@@ -143,9 +156,13 @@ func (s *Subscriber) handleMessage(ctx context.Context, msg *message.Message) er
 
 	// Acknowledge the message
 	if !msg.Ack() {
-		log.Debug().Str("message_id", msg.UUID).Msg("Message already acknowledged")
+		log.Debug().
+			Str("message_id", msg.UUID).
+			Msg("The message has already been acknowledged.")
 	} else {
-		log.Debug().Str("message_id", msg.UUID).Msg("Message acknowledged successfully")
+		log.Debug().
+			Str("message_id", msg.UUID).
+			Msg("The message has been acknowledged successfully.")
 	}
 
 	return nil

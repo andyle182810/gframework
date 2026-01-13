@@ -2,7 +2,8 @@ package postgres
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"strconv"
 	"time"
 
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
@@ -13,24 +14,32 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var ErrConnectionPoolNil = fmt.Errorf("postgres: connection pool is nil")
+var (
+	ErrConnectionPoolNil = errors.New("postgres: connection pool is nil")
+	ErrConfigNil         = errors.New("postgres: configuration must not be nil")
+)
 
 type Config struct {
-	URL                   string
-	MaxConnection         int32
-	MinConnection         int32
-	MaxConnectionIdleTime time.Duration
-	LogLevel              tracelog.LogLevel
+	URL                      string
+	MaxConnection            int32
+	MinConnection            int32
+	MaxConnectionIdleTime    time.Duration
+	MaxConnectionLifetime    time.Duration
+	HealthCheckPeriod        time.Duration
+	ConnectTimeout           time.Duration
+	LogLevel                 tracelog.LogLevel
+	StatementTimeout         time.Duration
+	LockTimeout              time.Duration
+	IdleInTransactionTimeout time.Duration
 }
 
 type Postgres struct {
 	DBPool
-	name string
 }
 
 func New(cfg *Config) (*Postgres, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("postgres: configuration must not be nil")
+		return nil, ErrConfigNil
 	}
 
 	pgConfig, err := pgxpool.ParseConfig(cfg.URL)
@@ -50,7 +59,23 @@ func New(cfg *Config) (*Postgres, error) {
 	pgConfig.MaxConns = cfg.MaxConnection
 	pgConfig.MinConns = cfg.MinConnection
 	pgConfig.MaxConnIdleTime = cfg.MaxConnectionIdleTime
+	pgConfig.MaxConnLifetime = cfg.MaxConnectionLifetime
+	pgConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
+	pgConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
 	pgConfig.ConnConfig.Tracer = tracer
+
+	if cfg.StatementTimeout > 0 {
+		pgConfig.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(cfg.StatementTimeout.Milliseconds(), 10)
+	}
+
+	if cfg.LockTimeout > 0 {
+		pgConfig.ConnConfig.RuntimeParams["lock_timeout"] = strconv.FormatInt(cfg.LockTimeout.Milliseconds(), 10)
+	}
+
+	if cfg.IdleInTransactionTimeout > 0 {
+		//nolint:lll
+		pgConfig.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = strconv.FormatInt(cfg.IdleInTransactionTimeout.Milliseconds(), 10)
+	}
 
 	pgConfig.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
@@ -65,23 +90,35 @@ func New(cfg *Config) (*Postgres, error) {
 
 	return &Postgres{
 		DBPool: pool,
-		name:   "postgres_infrastructure",
 	}, nil
 }
 
-func (p *Postgres) Run() {
-	log.Info().Str("service_name", p.Name()).Msg("PostgreSQL pool operational. Waiting for shutdown signal")
+func (p *Postgres) Run(ctx context.Context) error {
+	log.Info().
+		Str("service_name", p.Name()).
+		Msg("The PostgreSQL connection pool is operational and waiting for shutdown signal.")
+
+	<-ctx.Done()
+	log.Info().
+		Str("service_name", p.Name()).
+		Msg("The PostgreSQL Run() context has been cancelled.")
+
+	return nil
 }
 
-func (p *Postgres) Stop(ctx context.Context) error {
+func (p *Postgres) Stop(_ context.Context) error {
 	if p.DBPool == nil {
 		return ErrConnectionPoolNil
 	}
 
-	log.Info().Str("service_name", p.Name()).Msg("Closing PostgreSQL connection pool...")
+	log.Info().
+		Str("service_name", p.Name()).
+		Msg("The PostgreSQL connection pool is being closed.")
 	p.DBPool.Close()
 
-	log.Info().Str("service_name", p.Name()).Msg("PostgreSQL connection pool closed")
+	log.Info().
+		Str("service_name", p.Name()).
+		Msg("The PostgreSQL connection pool has been closed successfully.")
 
 	return nil
 }

@@ -8,7 +8,7 @@ lint: gci pre-lint
 	go mod tidy
 	gofumpt -l -w .
 	go vet ./...
-	golangci-lint run
+	golangci-lint run ./...
 
 .PHONY:pre-gci
 pre-gci:
