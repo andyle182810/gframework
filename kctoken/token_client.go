@@ -54,6 +54,7 @@ func WithTimeout(timeout time.Duration) TokenClienttOption {
 	}
 }
 
+//nolint:tagliatelle // Keycloak API returns snake_case
 type TokenResponse struct {
 	AccessToken      string `json:"access_token"`
 	ExpiresIn        int    `json:"expires_in"`

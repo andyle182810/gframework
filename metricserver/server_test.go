@@ -25,7 +25,9 @@ func startServer(t *testing.T) *metricserver.Server {
 	server := metricserver.New(opts)
 	require.NotNil(t, server)
 
-	go server.Run()
+	go func() {
+		_ = server.Run(t.Context())
+	}()
 
 	// Allow server to start
 	time.Sleep(500 * time.Millisecond)
@@ -43,7 +45,7 @@ func testEndpoint(t *testing.T, url string, expectedStatus int, expectedBody str
 		Jar:           nil,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -63,7 +65,7 @@ func testEndpoint(t *testing.T, url string, expectedStatus int, expectedBody str
 func shutdownServer(t *testing.T, server *metricserver.Server) {
 	t.Helper()
 
-	err := server.Stop(context.Background())
+	err := server.Stop(t.Context())
 	require.NoError(t, err)
 
 	time.Sleep(500 * time.Millisecond)
@@ -76,7 +78,7 @@ func shutdownServer(t *testing.T, server *metricserver.Server) {
 		Jar:           nil,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:9090/status", nil)

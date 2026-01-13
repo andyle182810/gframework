@@ -24,8 +24,11 @@ func WithCustomerID(customerID string) GetServiceTokenOption {
 	}
 }
 
-func (c *TokenClient) GetServiceToken(ctx context.Context, opts ...GetServiceTokenOption) (string, error) {
-	options := &GetServiceTokenOptions{}
+func (client *TokenClient) GetServiceToken(ctx context.Context, opts ...GetServiceTokenOption) (string, error) {
+	options := &GetServiceTokenOptions{
+		TenantID:   "",
+		CustomerID: "",
+	}
 
 	for _, opt := range opts {
 		opt(options)
@@ -33,8 +36,8 @@ func (c *TokenClient) GetServiceToken(ctx context.Context, opts ...GetServiceTok
 
 	formData := map[string]string{
 		"grant_type":    "client_credentials",
-		"client_id":     c.clientID,
-		"client_secret": c.clientSecret,
+		"client_id":     client.clientID,
+		"client_secret": client.clientSecret,
 	}
 
 	if options.TenantID != "" {
@@ -46,14 +49,15 @@ func (c *TokenClient) GetServiceToken(ctx context.Context, opts ...GetServiceTok
 	}
 
 	var tokenResp TokenResponse
+
 	var tokenErr KeycloakError
 
-	resp, err := c.restyClient.R().
+	resp, err := client.restyClient.R().
 		SetContext(ctx).
 		SetFormData(formData).
 		SetResult(&tokenResp).
 		SetError(&tokenErr).
-		Post(c.url)
+		Post(client.url)
 	if err != nil {
 		return "", err
 	}

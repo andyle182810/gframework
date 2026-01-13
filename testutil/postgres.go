@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,6 +38,18 @@ type PostgresTestContainer struct {
 	Host      string
 	Database  string
 	Port      nat.Port
+}
+
+func (c *PostgresTestContainer) ConnectionString() string {
+	hostPort := net.JoinHostPort(c.Host, c.Port.Port())
+
+	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable",
+		c.User, c.Password, hostPort, c.Database)
+}
+
+func (c *PostgresTestContainer) DSN() string {
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		c.Host, c.Port.Port(), c.User, c.Password, c.Database)
 }
 
 func SetupPostgresContainer(ctx context.Context, t *testing.T) *PostgresTestContainer {

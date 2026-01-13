@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/andyle182810/gframework/notifylog"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -20,7 +20,6 @@ type MultiSubscriber struct {
 	redisClient    goredis.UniversalClient
 	consumerGroup  string
 	subscribers    []*Subscriber
-	logger         notifylog.NotifyLog
 	waitGroup      sync.WaitGroup // WaitGroup to wait for all subscribers to stop
 	subscribersMux sync.Mutex     // Mutex to protect the subscribers slice
 }
@@ -30,7 +29,6 @@ func NewMultiSubscriber(redisClient goredis.UniversalClient, consumerGroup strin
 		redisClient:    redisClient,
 		consumerGroup:  consumerGroup,
 		subscribers:    make([]*Subscriber, 0),
-		logger:         notifylog.New("multisub", notifylog.JSON),
 		waitGroup:      sync.WaitGroup{},
 		subscribersMux: sync.Mutex{},
 	}
@@ -61,13 +59,16 @@ func (m *MultiSubscriber) Subscribe(topic string, messageHandler MessageHandler)
 		subscriber.Start()
 	}()
 
-	m.logger.Info().Str("topic", topic).Msg("Successfully subscribed to topic")
+	log.Info().
+		Str("topic", topic).
+		Msg("The subscription to the topic has been completed successfully.")
 
 	return nil
 }
 
 func (m *MultiSubscriber) Close() error {
-	m.logger.Info().Msg("Initiating shutdown of all subscribers")
+	log.Info().
+		Msg("The shutdown of all subscribers is being initiated.")
 
 	// Collect errors during closing
 	var errorMessages []string
@@ -82,9 +83,14 @@ func (m *MultiSubscriber) Close() error {
 				fmt.Sprintf("[%s/%s: %v]", subscriber.ConsumerGroup(), subscriber.Topic(), err),
 			)
 
-			m.logger.Error().Err(err).Str("topic", subscriber.Topic()).Msg("Failed to close subscriber")
+			log.Error().
+				Err(err).
+				Str("topic", subscriber.Topic()).
+				Msg("The subscriber failed to close.")
 		} else {
-			m.logger.Info().Str("topic", subscriber.Topic()).Msg("Subscriber closed successfully")
+			log.Info().
+				Str("topic", subscriber.Topic()).
+				Msg("The subscriber has been closed successfully.")
 		}
 	}
 
@@ -95,7 +101,8 @@ func (m *MultiSubscriber) Close() error {
 		return fmt.Errorf("%w: %s", ErrClosingSubcribers, strings.Join(errorMessages, ", "))
 	}
 
-	m.logger.Info().Msg("All subscribers shut down successfully")
+	log.Info().
+		Msg("All subscribers have been shut down successfully.")
 
 	return nil
 }
