@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *postgres.Postgres, *goredis.Redis) {
+func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *repo.Repository, *goredis.Redis) {
 	t.Helper()
 
 	pgContainer := testutil.SetupPostgresContainer(ctx, t)
@@ -44,7 +44,7 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *pos
 	err = testutil.RunMigrations(ctx, pg, "../../db/migrations")
 	require.NoError(t, err)
 
-	cleanupDatabase(t, ctx, pg)
+	testutil.CleanupDatabase(t, ctx, pg)
 
 	redis, err := goredis.New(&goredis.Config{
 		Host:     redisContainer.Host,
@@ -57,13 +57,7 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *pos
 	repository := repo.New(pg)
 	service := service.New(repository, pg, redis)
 
-	return service, pg, redis
-}
-
-func cleanupDatabase(t *testing.T, ctx context.Context, pg *postgres.Postgres) {
-	t.Helper()
-	_, err := pg.Exec(ctx, "TRUNCATE TABLE users CASCADE")
-	require.NoError(t, err)
+	return service, repository, redis
 }
 
 func TestService_CreateUser(t *testing.T) {
@@ -104,7 +98,7 @@ func TestService_CreateUser(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Name")
+				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Name'")
 			},
 		},
 		{
@@ -115,7 +109,7 @@ func TestService_CreateUser(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "email")
+				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Email'")
 			},
 		},
 		{
@@ -125,7 +119,7 @@ func TestService_CreateUser(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Name")
+				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Name'")
 			},
 		},
 		{
@@ -135,7 +129,7 @@ func TestService_CreateUser(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Email")
+				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Email'")
 			},
 		},
 	}
@@ -213,14 +207,13 @@ func TestService_GetUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, pg, _ := setupTestService(t, ctx)
+	svc, repository, _ := setupTestService(t, ctx)
 
-	userID := uuid.New()
 	email := testutil.RandomEmail()
-	_, err := pg.Exec(ctx, `
-		INSERT INTO users (id, name, email)
-		VALUES ($1, $2, $3)
-	`, userID, "Test User", email)
+	user, err := repository.User.CreateUser(ctx, "Test User", email)
+	require.NoError(t, err)
+
+	userID, err := uuid.Parse(user.ID)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -257,7 +250,7 @@ func TestService_GetUser(t *testing.T) {
 			userID:         "invalid-uuid",
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "UserID")
+				require.Contains(t, rec.Body.String(), "Error:Field validation for 'UserID'")
 			},
 		},
 	}
@@ -292,15 +285,17 @@ func TestService_ListUsers(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, pg, _ := setupTestService(t, ctx)
+	svc, repository, _ := setupTestService(t, ctx)
 
 	for i := range 15 {
-		_, err := pg.Exec(ctx, `
-			INSERT INTO users (id, name, email)
-			VALUES ($1, $2, $3)
-		`, uuid.New(), fmt.Sprintf("User %d", i), testutil.RandomEmail())
+		_, err := repository.User.CreateUser(ctx, fmt.Sprintf("User %d", i), testutil.RandomEmail())
 		require.NoError(t, err)
 		time.Sleep(10 * time.Millisecond)
+	}
+
+	type listUsersResponse struct {
+		Data       service.ListUsersResponse `json:"data"`
+		Pagination *httpserver.Pagination    `json:"pagination"`
 	}
 
 	tests := []struct {
@@ -314,10 +309,7 @@ func TestService_ListUsers(t *testing.T) {
 			queryParams:    map[string]string{},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				var resp struct {
-					Data       service.ListUsersResponse `json:"data"`
-					Pagination *httpserver.Pagination    `json:"pagination"`
-				}
+				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
 				require.LessOrEqual(t, len(resp.Data.Users), pagination.DefaultPageSize)
 				require.NotNil(t, resp.Pagination)
@@ -333,10 +325,7 @@ func TestService_ListUsers(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				var resp struct {
-					Data       service.ListUsersResponse `json:"data"`
-					Pagination *httpserver.Pagination    `json:"pagination"`
-				}
+				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
 				require.Equal(t, 5, len(resp.Data.Users))
 				require.Equal(t, 1, resp.Pagination.Page)
@@ -353,10 +342,7 @@ func TestService_ListUsers(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				var resp struct {
-					Data       service.ListUsersResponse `json:"data"`
-					Pagination *httpserver.Pagination    `json:"pagination"`
-				}
+				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
 				require.Equal(t, 5, len(resp.Data.Users))
 				require.Equal(t, 2, resp.Pagination.Page)
@@ -369,10 +355,7 @@ func TestService_ListUsers(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				var resp struct {
-					Data       service.ListUsersResponse `json:"data"`
-					Pagination *httpserver.Pagination    `json:"pagination"`
-				}
+				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
 				require.Equal(t, pagination.DefaultPage, resp.Pagination.Page)
 			},
@@ -384,10 +367,7 @@ func TestService_ListUsers(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				var resp struct {
-					Data       service.ListUsersResponse `json:"data"`
-					Pagination *httpserver.Pagination    `json:"pagination"`
-				}
+				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
 				require.Equal(t, pagination.MaxPageSize, resp.Pagination.PageSize)
 			},

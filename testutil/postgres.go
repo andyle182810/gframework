@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	ufrpostgres "github.com/andyle182810/gframework/postgres"
+	gfrpostgres "github.com/andyle182810/gframework/postgres"
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -91,7 +91,7 @@ func SetupPostgresContainer(ctx context.Context, t *testing.T) *PostgresTestCont
 
 var errNoMigrationFile = errors.New("no migration files found")
 
-func RunMigrations(ctx context.Context, pool *ufrpostgres.Postgres, migrationPath string) error {
+func RunMigrations(ctx context.Context, pool *gfrpostgres.Postgres, migrationPath string) error {
 	migrationFiles, err := filepath.Glob(filepath.Join(migrationPath, "*.up.sql"))
 	if err != nil {
 		return err
@@ -114,4 +114,39 @@ func RunMigrations(ctx context.Context, pool *ufrpostgres.Postgres, migrationPat
 	}
 
 	return nil
+}
+
+func CleanupDatabase(t *testing.T, ctx context.Context, pg *gfrpostgres.Postgres) { //nolint:revive
+	t.Helper()
+
+	query := `
+		SELECT tablename
+		FROM pg_tables
+		WHERE schemaname = 'public'
+	`
+
+	rows, err := pg.Query(ctx, query)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	var tables []string
+
+	for rows.Next() {
+		var tableName string
+		err := rows.Scan(&tableName)
+		require.NoError(t, err)
+
+		tables = append(tables, tableName)
+	}
+
+	require.NoError(t, rows.Err())
+
+	if len(tables) == 0 {
+		return
+	}
+
+	for _, table := range tables {
+		_, err := pg.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+		require.NoError(t, err)
+	}
 }

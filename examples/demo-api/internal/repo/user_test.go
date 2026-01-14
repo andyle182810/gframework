@@ -38,17 +38,11 @@ func setupTestRepo(t *testing.T, ctx context.Context) (*repo.UserRepo, *postgres
 	err = testutil.RunMigrations(ctx, pg, "../../db/migrations")
 	require.NoError(t, err)
 
-	cleanupDatabase(t, ctx, pg)
+	testutil.CleanupDatabase(t, ctx, pg)
 
 	repo := repo.NewUserRepo(pg.DBPool)
 
 	return repo, pg
-}
-
-func cleanupDatabase(t *testing.T, ctx context.Context, pg *postgres.Postgres) {
-	t.Helper()
-	_, err := pg.Exec(ctx, "TRUNCATE TABLE users CASCADE")
-	require.NoError(t, err)
 }
 
 func TestUserRepo_CreateUser(t *testing.T) {
