@@ -26,7 +26,7 @@ func startServer(t *testing.T) *metricserver.Server {
 	require.NotNil(t, server)
 
 	go func() {
-		_ = server.Run(t.Context())
+		_ = server.Start(t.Context())
 	}()
 
 	// Allow server to start
@@ -65,7 +65,7 @@ func testEndpoint(t *testing.T, url string, expectedStatus int, expectedBody str
 func shutdownServer(t *testing.T, server *metricserver.Server) {
 	t.Helper()
 
-	err := server.Stop(t.Context())
+	err := server.Stop()
 	require.NoError(t, err)
 
 	time.Sleep(500 * time.Millisecond)

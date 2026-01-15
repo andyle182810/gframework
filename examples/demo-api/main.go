@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"math/rand/v2"
+	"time"
 
 	"github.com/andyle182810/gframework/examples/demo-api/internal/config"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
@@ -13,6 +16,7 @@ import (
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/postgres"
 	"github.com/andyle182810/gframework/runner"
+	"github.com/andyle182810/gframework/workerpool"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
@@ -61,6 +65,7 @@ func run() error {
 		runner.WithInfrastructureService(redis),
 		runner.WithCoreService(app.newMetricServer()),
 		runner.WithCoreService(app.newHTTPServer()),
+		runner.WithCoreService(app.newWorkerPool()),
 	)
 
 	appRunner.Run()
@@ -102,6 +107,34 @@ func (app *application) newMetricServer() *metricserver.Server {
 	}
 
 	return metricserver.New(metricCfg)
+}
+
+func (app *application) newWorkerPool() *workerpool.WorkerPool {
+	executor := &dummyExecutor{}
+
+	return workerpool.New(
+		executor,
+		workerpool.WithWorkerCount(2),
+		workerpool.WithTickInterval(5*time.Second),
+		workerpool.WithExecutionTimeout(10*time.Second),
+	)
+}
+
+type dummyExecutor struct{}
+
+func (e *dummyExecutor) Execute(ctx context.Context) error {
+	sleepDuration := time.Duration(rand.IntN(10)+1) * time.Second
+	log.Info().Dur("sleep_duration", sleepDuration).Msg("Dummy executor running...")
+
+	select {
+	case <-time.After(sleepDuration):
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	log.Info().Msg("Dummy executor done")
+
+	return nil
 }
 
 func (app *application) registerRoutes(_ *echo.Echo, root *echo.Group) {

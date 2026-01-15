@@ -55,7 +55,7 @@ func New(cfg *Config) *Server {
 	}
 }
 
-func (s *Server) Run(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context) error {
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -81,8 +81,8 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 }
 
-func (s *Server) Stop(ctx context.Context) error {
-	shutdownCtx, cancel := context.WithTimeout(ctx, s.gracePeriod)
+func (s *Server) Stop() error {
+	shutdownCtx, cancel := context.WithTimeout(context.TODO(), s.gracePeriod)
 	defer cancel()
 
 	log.Info().
