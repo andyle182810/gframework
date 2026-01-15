@@ -215,7 +215,7 @@ func buildTLSConfig(cfg *Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func (rds *Redis) Run(ctx context.Context) error {
+func (rds *Redis) Start(ctx context.Context) error {
 	pingCtx, cancel := context.WithTimeout(ctx, initialPingTimeout)
 	defer cancel()
 
@@ -235,7 +235,7 @@ func (rds *Redis) Run(ctx context.Context) error {
 	return nil
 }
 
-func (rds *Redis) Stop(_ context.Context) error {
+func (rds *Redis) Stop() error {
 	if rds.Client == nil {
 		return ErrRedisPoolNil
 	}

@@ -24,8 +24,8 @@ var (
 )
 
 type Service interface {
-	Run(ctx context.Context) error
-	Stop(ctx context.Context) error
+	Start(ctx context.Context) error
+	Stop() error
 	Name() string
 }
 
@@ -111,13 +111,8 @@ func (r *Runner) Run() {
 		Msg("The shutdown signal has been received.")
 
 	// Stop core services first (stop accepting new work)
-	coreCtx, coreCancel := context.WithTimeout(context.Background(), r.shutdownTimeout)
-	r.concurrentStop(coreCtx, r.coreServices)
-	coreCancel()
-
-	infraCtx, infraCancel := context.WithTimeout(context.Background(), r.shutdownTimeout)
-	r.concurrentStop(infraCtx, r.infrastructureServices)
-	infraCancel()
+	r.concurrentStop(r.coreServices)
+	r.concurrentStop(r.infrastructureServices)
 
 	log.Info().
 		Msg("The graceful shutdown has been completed successfully.")
@@ -139,7 +134,7 @@ func (r *Runner) startServices(ctx context.Context, services []Service) error {
 				Str("service_name", service.Name()).
 				Msg("The service is being started.")
 
-			if err := service.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			if err := service.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- fmt.Errorf("%w: %s: %w", ErrServiceFailed, service.Name(), err)
 			}
 		}()
@@ -155,7 +150,7 @@ func (r *Runner) startServices(ctx context.Context, services []Service) error {
 	}
 }
 
-func (r *Runner) concurrentStop(ctx context.Context, services []Service) {
+func (r *Runner) concurrentStop(services []Service) {
 	var waitGroup sync.WaitGroup
 
 	for _, svc := range services {
@@ -168,7 +163,7 @@ func (r *Runner) concurrentStop(ctx context.Context, services []Service) {
 				Str("service_name", service.Name()).
 				Msg("An attempt is being made to stop the service.")
 
-			if err := service.Stop(ctx); err != nil {
+			if err := service.Stop(); err != nil {
 				log.Error().
 					Err(err).
 					Str("service_name", service.Name()).

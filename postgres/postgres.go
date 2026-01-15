@@ -93,7 +93,7 @@ func New(cfg *Config) (*Postgres, error) {
 	}, nil
 }
 
-func (p *Postgres) Run(ctx context.Context) error {
+func (p *Postgres) Start(ctx context.Context) error {
 	log.Info().
 		Str("service_name", p.Name()).
 		Msg("The PostgreSQL connection pool is operational and waiting for shutdown signal.")
@@ -106,7 +106,7 @@ func (p *Postgres) Run(ctx context.Context) error {
 	return nil
 }
 
-func (p *Postgres) Stop(_ context.Context) error {
+func (p *Postgres) Stop() error {
 	if p.DBPool == nil {
 		return ErrConnectionPoolNil
 	}
