@@ -44,15 +44,15 @@ func (s *Service) CheckReadiness(ctx echo.Context, req *ReadinessCheckRequest) (
 			}
 		}
 
-		if err := s.redis.HealthCheck(eCtx.Request().Context()); err != nil {
-			services["redis"] = ServiceInfo{
+		if err := s.valkey.HealthCheck(eCtx.Request().Context()); err != nil {
+			services["valkey"] = ServiceInfo{
 				Status: "not_ready",
 				Error:  err.Error(),
 			}
 			allReady = false
-			log.Error().Err(err).Msg("Redis health check failed")
+			log.Error().Err(err).Msg("Valkey health check failed")
 		} else {
-			services["redis"] = ServiceInfo{
+			services["valkey"] = ServiceInfo{
 				Status: "ready",
 			}
 		}

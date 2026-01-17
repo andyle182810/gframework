@@ -9,13 +9,13 @@ import (
 	"github.com/andyle182810/gframework/examples/demo-api/internal/config"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/service"
-	"github.com/andyle182810/gframework/goredis"
 	"github.com/andyle182810/gframework/httpserver"
 	"github.com/andyle182810/gframework/logutil"
 	"github.com/andyle182810/gframework/metricserver"
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/postgres"
 	"github.com/andyle182810/gframework/runner"
+	"github.com/andyle182810/gframework/valkey"
 	"github.com/andyle182810/gframework/workerpool"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/labstack/echo/v4"
@@ -44,25 +44,25 @@ func run() error {
 		return err
 	}
 
-	redis, err := initRedis(cfg)
+	valkey, err := initValkey(cfg)
 	if err != nil {
 		return err
 	}
 
 	repository := repo.New(db)
 
-	svc := service.New(repository, db, redis)
+	svc := service.New(repository, db, valkey)
 
 	app := &application{
-		cfg:   cfg,
-		svc:   svc,
-		db:    db,
-		redis: redis,
+		cfg:    cfg,
+		svc:    svc,
+		db:     db,
+		valkey: valkey,
 	}
 
 	appRunner := runner.New(
 		runner.WithInfrastructureService(db),
-		runner.WithInfrastructureService(redis),
+		runner.WithInfrastructureService(valkey),
 		runner.WithCoreService(app.newMetricServer()),
 		runner.WithCoreService(app.newHTTPServer()),
 		runner.WithCoreService(app.newWorkerPool()),
@@ -74,10 +74,10 @@ func run() error {
 }
 
 type application struct {
-	cfg   *config.Config
-	svc   *service.Service
-	db    *postgres.Postgres
-	redis *goredis.Redis
+	cfg    *config.Config
+	svc    *service.Service
+	db     *postgres.Postgres
+	valkey *valkey.Valkey
 }
 
 func (app *application) newHTTPServer() *httpserver.Server {
@@ -187,8 +187,8 @@ func initPostgres(cfg *config.Config) (*postgres.Postgres, error) {
 	return db, nil
 }
 
-func initRedis(cfg *config.Config) (*goredis.Redis, error) {
-	redisCfg := &goredis.Config{
+func initValkey(cfg *config.Config) (*valkey.Valkey, error) {
+	redisCfg := &valkey.Config{
 		Host:            cfg.ValkeyHost,
 		Port:            cfg.ValkeyPort,
 		Password:        cfg.ValkeyPassword,
@@ -210,7 +210,7 @@ func initRedis(cfg *config.Config) (*goredis.Redis, error) {
 		TLSCAFile:       "",
 	}
 
-	redis, err := goredis.New(redisCfg)
+	redis, err := valkey.New(redisCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize redis: %w", err)
 	}

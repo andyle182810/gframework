@@ -1,5 +1,5 @@
-//nolint:exhaustruct,paralleltest,tparallel,usetesting,testifylint // Test configuration
-package goredis_test
+//nolint:exhaustruct,paralleltest,tparallel,usetesting,testifylint
+package valkey_test
 
 import (
 	"context"
@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andyle182810/gframework/goredis"
 	"github.com/andyle182810/gframework/testutil"
+	"github.com/andyle182810/gframework/valkey"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRedisConnection(t *testing.T) {
+func TestValkeyConnection(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -23,7 +23,7 @@ func TestRedisConnection(t *testing.T) {
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)
 
-	opts := &goredis.Config{
+	opts := &valkey.Config{
 		Host:         container.Host,
 		Port:         port,
 		Password:     "",
@@ -34,25 +34,25 @@ func TestRedisConnection(t *testing.T) {
 		PingTimeout:  2 * time.Second,
 	}
 
-	redis, err := goredis.New(opts)
+	v, err := valkey.New(opts)
 	require.NoError(t, err)
 
-	_, err = redis.Ping(ctx).Result()
-	require.NoError(t, err, "failed to ping Redis")
+	_, err = v.Ping(ctx).Result()
+	require.NoError(t, err, "failed to ping Valkey")
 }
 
-func TestRedisConfigValidation(t *testing.T) {
+func TestValkeyConfigValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name        string
-		config      *goredis.Config
+		config      *valkey.Config
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "valid config",
-			config: &goredis.Config{
+			config: &valkey.Config{
 				Host: "localhost",
 				Port: 6379,
 				DB:   0,
@@ -61,7 +61,7 @@ func TestRedisConfigValidation(t *testing.T) {
 		},
 		{
 			name: "missing host",
-			config: &goredis.Config{
+			config: &valkey.Config{
 				Port: 6379,
 				DB:   0,
 			},
@@ -70,7 +70,7 @@ func TestRedisConfigValidation(t *testing.T) {
 		},
 		{
 			name: "invalid port - too low",
-			config: &goredis.Config{
+			config: &valkey.Config{
 				Host: "localhost",
 				Port: 0,
 				DB:   0,
@@ -80,7 +80,7 @@ func TestRedisConfigValidation(t *testing.T) {
 		},
 		{
 			name: "invalid port - too high",
-			config: &goredis.Config{
+			config: &valkey.Config{
 				Host: "localhost",
 				Port: 70000,
 				DB:   0,
@@ -90,7 +90,7 @@ func TestRedisConfigValidation(t *testing.T) {
 		},
 		{
 			name: "negative DB",
-			config: &goredis.Config{
+			config: &valkey.Config{
 				Host: "localhost",
 				Port: 6379,
 				DB:   -1,
@@ -113,10 +113,10 @@ func TestRedisConfigValidation(t *testing.T) {
 	}
 }
 
-func TestRedisConfigDefaults(t *testing.T) {
+func TestValkeyConfigDefaults(t *testing.T) {
 	t.Parallel()
 
-	cfg := &goredis.Config{
+	cfg := &valkey.Config{
 		Host: "localhost",
 		Port: 6379,
 	}
@@ -135,7 +135,7 @@ func TestRedisConfigDefaults(t *testing.T) {
 	require.Equal(t, 512*time.Millisecond, cfg.MaxRetryBackoff)
 }
 
-func TestRedisHealthCheck(t *testing.T) {
+func TestValkeyHealthCheck(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -146,20 +146,20 @@ func TestRedisHealthCheck(t *testing.T) {
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)
 
-	opts := &goredis.Config{
+	opts := &valkey.Config{
 		Host: container.Host,
 		Port: port,
 	}
 
-	redis, err := goredis.New(opts)
+	valkey, err := valkey.New(opts)
 	require.NoError(t, err)
 
 	// Test health check
-	err = redis.HealthCheck(ctx)
+	err = valkey.HealthCheck(ctx)
 	require.NoError(t, err)
 
 	// Test pool stats
-	stats := redis.PoolStats()
+	stats := valkey.PoolStats()
 	require.NotNil(t, stats)
 	require.Greater(t, stats.TotalConns, uint32(0))
 }

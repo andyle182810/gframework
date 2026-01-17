@@ -10,17 +10,17 @@ import (
 
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/service"
-	"github.com/andyle182810/gframework/goredis"
 	"github.com/andyle182810/gframework/httpserver"
 	"github.com/andyle182810/gframework/pagination"
 	"github.com/andyle182810/gframework/postgres"
 	"github.com/andyle182810/gframework/testutil"
+	"github.com/andyle182810/gframework/valkey"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *repo.Repository, *goredis.Redis) {
+func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *repo.Repository, *valkey.Valkey) {
 	t.Helper()
 
 	pgContainer := testutil.SetupPostgresContainer(ctx, t)
@@ -46,7 +46,7 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *rep
 
 	testutil.CleanupDatabase(t, ctx, pg)
 
-	redis, err := goredis.New(&goredis.Config{
+	valkey, err := valkey.New(&valkey.Config{
 		Host:     redisContainer.Host,
 		Port:     redisContainer.Port.Int(),
 		Password: "",
@@ -55,9 +55,9 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *rep
 	require.NoError(t, err)
 
 	repository := repo.New(pg)
-	service := service.New(repository, pg, redis)
+	service := service.New(repository, pg, valkey)
 
-	return service, repository, redis
+	return service, repository, valkey
 }
 
 func TestService_CreateUser(t *testing.T) {

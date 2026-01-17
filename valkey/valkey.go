@@ -1,4 +1,4 @@
-package goredis
+package valkey
 
 import (
 	"context"
@@ -32,14 +32,14 @@ const (
 )
 
 var (
-	ErrRedisPoolNil             = errors.New("redis: client connection is nil")
-	ErrInvalidHost              = errors.New("redis: host is required")
-	ErrInvalidPort              = errors.New("redis: port must be between 1 and 65535")
-	ErrInvalidDB                = errors.New("redis: database number must be non-negative")
-	ErrInvalidPoolSize          = errors.New("redis: pool size must be positive")
-	ErrConfigNil                = errors.New("redis: configuration must not be nil")
+	ErrValkeyPoolNil            = errors.New("valkey: client connection is nil")
+	ErrInvalidHost              = errors.New("valkey: host is required")
+	ErrInvalidPort              = errors.New("valkey: port must be between 1 and 65535")
+	ErrInvalidDB                = errors.New("valkey: database number must be non-negative")
+	ErrInvalidPoolSize          = errors.New("valkey: pool size must be positive")
+	ErrConfigNil                = errors.New("valkey: configuration must not be nil")
 	ErrCAParseFailure           = errors.New("failed to parse CA certificate")
-	ErrHealthCheckNoActiveConns = errors.New("redis health check failed: no active connections in pool")
+	ErrHealthCheckNoActiveConns = errors.New("valkey health check failed: no active connections in pool")
 )
 
 type Config struct {
@@ -64,7 +64,7 @@ type Config struct {
 	TLSCAFile       string
 }
 
-type Redis struct {
+type Valkey struct {
 	*redis.Client
 }
 
@@ -133,7 +133,7 @@ func (cfg *Config) WithDefaults() *Config {
 	return cfg
 }
 
-func New(cfg *Config) (*Redis, error) {
+func New(cfg *Config) (*Valkey, error) {
 	if cfg == nil {
 		return nil, ErrConfigNil
 	}
@@ -143,18 +143,18 @@ func New(cfg *Config) (*Redis, error) {
 		return nil, err
 	}
 
-	opt, err := buildRedisOptions(cfg)
+	opt, err := buildValkeyOptions(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build Redis options: %w", err)
+		return nil, fmt.Errorf("failed to build Valkey options: %w", err)
 	}
 
 	client := redis.NewClient(opt)
 
-	return &Redis{Client: client}, nil
+	return &Valkey{Client: client}, nil
 }
 
 //nolint:exhaustruct
-func buildRedisOptions(cfg *Config) (*redis.Options, error) {
+func buildValkeyOptions(cfg *Config) (*redis.Options, error) {
 	opt := &redis.Options{
 		Addr:            net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
 		Password:        cfg.Password,
@@ -215,68 +215,68 @@ func buildTLSConfig(cfg *Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func (rds *Redis) Start(ctx context.Context) error {
+func (v *Valkey) Start(ctx context.Context) error {
 	pingCtx, cancel := context.WithTimeout(ctx, initialPingTimeout)
 	defer cancel()
 
-	if _, err := rds.Client.Ping(pingCtx).Result(); err != nil {
-		return fmt.Errorf("redis ping failed: %w", err)
+	if _, err := v.Client.Ping(pingCtx).Result(); err != nil {
+		return fmt.Errorf("valkey ping failed: %w", err)
 	}
 
 	log.Info().
-		Str("service_name", rds.Name()).
-		Msg("The Redis client is operational and waiting for shutdown signal.")
+		Str("service_name", v.Name()).
+		Msg("The Valkey client is operational and waiting for shutdown signal.")
 
 	<-ctx.Done()
 	log.Info().
-		Str("service_name", rds.Name()).
-		Msg("The Redis Run() context has been cancelled.")
+		Str("service_name", v.Name()).
+		Msg("The Valkey Run() context has been cancelled.")
 
 	return nil
 }
 
-func (rds *Redis) Stop() error {
-	if rds.Client == nil {
-		return ErrRedisPoolNil
+func (v *Valkey) Stop() error {
+	if v.Client == nil {
+		return ErrValkeyPoolNil
 	}
 
 	log.Info().
-		Str("service_name", rds.Name()).
-		Msg("The Redis client pool is being closed.")
+		Str("service_name", v.Name()).
+		Msg("The Valkey client pool is being closed.")
 
-	if err := rds.Client.Close(); err != nil {
-		return fmt.Errorf("failed to close Redis client: %w", err)
+	if err := v.Client.Close(); err != nil {
+		return fmt.Errorf("failed to close Valkey client: %w", err)
 	}
 
 	log.Info().
-		Str("service_name", rds.Name()).
-		Msg("The Redis client pool has been closed successfully.")
+		Str("service_name", v.Name()).
+		Msg("The Valkey client pool has been closed successfully.")
 
 	return nil
 }
 
-func (rds *Redis) Name() string {
-	return "redis"
+func (v *Valkey) Name() string {
+	return "valkey"
 }
 
-func (rds *Redis) PoolStats() *redis.PoolStats {
-	if rds.Client == nil {
+func (v *Valkey) PoolStats() *redis.PoolStats {
+	if v.Client == nil {
 		return nil
 	}
 
-	return rds.Client.PoolStats()
+	return v.Client.PoolStats()
 }
 
-func (rds *Redis) HealthCheck(ctx context.Context) error {
-	if rds.Client == nil {
-		return ErrRedisPoolNil
+func (v *Valkey) HealthCheck(ctx context.Context) error {
+	if v.Client == nil {
+		return ErrValkeyPoolNil
 	}
 
-	if _, err := rds.Client.Ping(ctx).Result(); err != nil {
-		return fmt.Errorf("redis health check failed: %w", err)
+	if _, err := v.Client.Ping(ctx).Result(); err != nil {
+		return fmt.Errorf("valkey health check failed: %w", err)
 	}
 
-	stats := rds.PoolStats()
+	stats := v.PoolStats()
 	if stats != nil && stats.TotalConns == 0 {
 		return ErrHealthCheckNoActiveConns
 	}

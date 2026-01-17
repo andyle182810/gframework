@@ -64,7 +64,7 @@ func (s *Service) CreateUser(ctx echo.Context, req *CreateUserRequest) (any, *ec
 		cacheKey := "user:email:" + req.Email
 
 		const cacheExpiration = 5 * time.Minute
-		if err := s.redis.Set(ctx.Request().Context(), cacheKey, user.ID, cacheExpiration).Err(); err != nil {
+		if err := s.valkey.Set(ctx.Request().Context(), cacheKey, user.ID, cacheExpiration).Err(); err != nil {
 			log.Warn().Err(err).Msg("Failed to cache user email")
 		}
 

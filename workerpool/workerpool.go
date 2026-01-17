@@ -217,6 +217,11 @@ func (pool *WorkerPool) executeWithTimeout(ctx context.Context, workerID int) {
 
 	defer cancel()
 
+	log.Debug().
+		Int("worker_id", workerID).
+		Dur("timeout", pool.execTimeout).
+		Msg("Starting execution for worker.")
+
 	err := pool.executor.Execute(execCtx)
 	if err != nil {
 		log.Error().
