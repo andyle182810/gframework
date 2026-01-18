@@ -19,10 +19,10 @@ const (
 )
 
 const (
-	HeaderXAPIKey         = "X-Api-Key" //nolint:gosec
-	HeaderXRequestID      = "X-Request-ID"
-	HeaderXGaianSignature = "X-Gaian-Signature"
-	HeaderXGaianTimestamp = "X-Gaian-Timestamp"
+	HeaderXAPIKey    = "X-Api-Key" //nolint:gosec
+	HeaderXRequestID = "X-Request-ID"
+	HeaderXSignature = "X-Signature"
+	HeaderXTimestamp = "X-Timestamp"
 )
 
 const (

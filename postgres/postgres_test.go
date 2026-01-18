@@ -37,6 +37,7 @@ func TestPostgresConnection(t *testing.T) {
 		MaxConnection:         5,
 		MinConnection:         1,
 		MaxConnectionIdleTime: 60 * time.Second,
+		HealthCheckPeriod:     10 * time.Second,
 		LogLevel:              tracelog.LogLevelTrace,
 	}
 

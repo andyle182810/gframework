@@ -15,8 +15,10 @@ import (
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/postgres"
 	"github.com/andyle182810/gframework/runner"
+	"github.com/andyle182810/gframework/taskqueue"
 	"github.com/andyle182810/gframework/valkey"
 	"github.com/andyle182810/gframework/workerpool"
+	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
@@ -53,11 +55,17 @@ func run() error {
 
 	svc := service.New(repository, db, valkey)
 
+	taskQueue, err := initTaskQueue(valkey)
+	if err != nil {
+		return err
+	}
+
 	app := &application{
-		cfg:    cfg,
-		svc:    svc,
-		db:     db,
-		valkey: valkey,
+		cfg:       cfg,
+		svc:       svc,
+		db:        db,
+		valkey:    valkey,
+		taskQueue: taskQueue,
 	}
 
 	appRunner := runner.New(
@@ -66,6 +74,7 @@ func run() error {
 		runner.WithCoreService(app.newMetricServer()),
 		runner.WithCoreService(app.newHTTPServer()),
 		runner.WithCoreService(app.newWorkerPool()),
+		runner.WithCoreService(taskQueue),
 	)
 
 	appRunner.Run()
@@ -74,10 +83,11 @@ func run() error {
 }
 
 type application struct {
-	cfg    *config.Config
-	svc    *service.Service
-	db     *postgres.Postgres
-	valkey *valkey.Valkey
+	cfg       *config.Config
+	svc       *service.Service
+	db        *postgres.Postgres
+	valkey    *valkey.Valkey
+	taskQueue *taskqueue.Queue
 }
 
 func (app *application) newHTTPServer() *httpserver.Server {
@@ -110,29 +120,38 @@ func (app *application) newMetricServer() *metricserver.Server {
 }
 
 func (app *application) newWorkerPool() *workerpool.WorkerPool {
-	executor := &dummyExecutor{}
+	producer := &taskProducer{taskQueue: app.taskQueue}
 
 	return workerpool.New(
-		executor,
+		producer,
 		workerpool.WithWorkerCount(2),
 		workerpool.WithTickInterval(5*time.Second),
 		workerpool.WithExecutionTimeout(10*time.Second),
 	)
 }
 
-type dummyExecutor struct{}
+type taskProducer struct {
+	taskQueue *taskqueue.Queue
+}
 
-func (e *dummyExecutor) Execute(ctx context.Context) error {
-	sleepDuration := time.Duration(rand.IntN(10)+1) * time.Second
-	log.Info().Dur("sleep_duration", sleepDuration).Msg("Dummy executor running...")
+func (p *taskProducer) Execute(ctx context.Context) error {
+	taskCount := rand.IntN(5) + 1 //nolint:gosec
+	taskIDs := make([]string, taskCount)
 
-	select {
-	case <-time.After(sleepDuration):
-	case <-ctx.Done():
-		return ctx.Err()
+	for i := range taskCount {
+		taskIDs[i] = uuid.New().String()
 	}
 
-	log.Info().Msg("Dummy executor done")
+	log.Info().
+		Int("task_count", taskCount).
+		Strs("task_ids", taskIDs).
+		Msg("Task producer pushing tasks to queue")
+
+	if err := p.taskQueue.Push(ctx, taskIDs...); err != nil {
+		return fmt.Errorf("failed to push tasks: %w", err)
+	}
+
+	log.Info().Msg("Task producer done")
 
 	return nil
 }
@@ -218,4 +237,44 @@ func initValkey(cfg *config.Config) (*valkey.Valkey, error) {
 	log.Info().Msg("Redis client initialized successfully")
 
 	return redis, nil
+}
+
+type taskConsumer struct{}
+
+func (c *taskConsumer) Handle(ctx context.Context, taskID string) error {
+	sleepDuration := time.Duration(rand.IntN(3)+1) * time.Second //nolint:gosec
+
+	log.Info().
+		Str("task_id", taskID).
+		Dur("sleep_duration", sleepDuration).
+		Msg("Processing task...")
+
+	select {
+	case <-time.After(sleepDuration):
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	log.Info().Str("task_id", taskID).Msg("Task completed")
+
+	return nil
+}
+
+func initTaskQueue(valkeyClient *valkey.Valkey) (*taskqueue.Queue, error) {
+	consumer := &taskConsumer{}
+
+	queue, err := taskqueue.New(
+		valkeyClient.Client,
+		"demo-api:tasks",
+		consumer.Handle,
+		taskqueue.WithWorkerCount(3),
+		taskqueue.WithExecTimeout(10*time.Second),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize task queue: %w", err)
+	}
+
+	log.Info().Msg("Task queue initialized successfully")
+
+	return queue, nil
 }

@@ -63,13 +63,14 @@ func TestRequestIDMiddleware(t *testing.T) {
 
 			// Set up test context
 			ctx, _, req := testutil.SetupEchoContext(t, &testutil.Options{
-				Method:      http.MethodPost,
-				Path:        "/test",
-				Body:        nil,
-				Headers:     nil,
-				QueryParams: nil,
-				PathParams:  nil,
-				ContentType: "",
+				Method:        http.MethodPost,
+				Path:          "/test",
+				Body:          nil,
+				Headers:       nil,
+				QueryParams:   nil,
+				PathParams:    nil,
+				ContentType:   "",
+				SkipRequestID: true,
 			})
 
 			// Set header if provided

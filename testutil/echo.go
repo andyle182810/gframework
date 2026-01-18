@@ -17,13 +17,14 @@ import (
 )
 
 type Options struct {
-	Method      string            // HTTP method (GET, POST, etc.)
-	Path        string            // Request path
-	Body        []byte            // Request body
-	Headers     map[string]string // Custom headers
-	QueryParams map[string]string // Query parameters
-	PathParams  map[string]string // Path parameters (e.g., :id)
-	ContentType string            // Content-Type header (defaults to application/json)
+	Method        string            // HTTP method (GET, POST, etc.)
+	Path          string            // Request path
+	Body          []byte            // Request body
+	Headers       map[string]string // Custom headers
+	QueryParams   map[string]string // Query parameters
+	PathParams    map[string]string // Path parameters (e.g., :id)
+	ContentType   string            // Content-Type header (defaults to application/json)
+	SkipRequestID bool              // Skip auto-generating X-Request-ID header
 }
 
 func SetupEchoContext(
@@ -49,8 +50,10 @@ func SetupEchoContext(
 
 	req := httptest.NewRequest(opts.Method, requestPath, bytes.NewBuffer(opts.Body))
 
-	requestID := uuid.New().String()
-	req.Header.Set(middleware.HeaderXRequestID, requestID)
+	if !opts.SkipRequestID {
+		requestID := uuid.New().String()
+		req.Header.Set(middleware.HeaderXRequestID, requestID)
+	}
 
 	contentType := opts.ContentType
 	if contentType == "" {
@@ -118,12 +121,13 @@ func SetupEchoContextWithJSON(
 	}
 
 	return SetupEchoContext(t, &Options{
-		Method:      method,
-		Path:        path,
-		Body:        bodyBytes,
-		Headers:     nil,
-		QueryParams: nil,
-		PathParams:  nil,
-		ContentType: "",
+		Method:        method,
+		Path:          path,
+		Body:          bodyBytes,
+		Headers:       nil,
+		QueryParams:   nil,
+		PathParams:    nil,
+		ContentType:   "",
+		SkipRequestID: false,
 	})
 }

@@ -19,13 +19,14 @@ func TestErrorHandler_HTTPError(t *testing.T) {
 
 	// Set up test context
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
-		Method:      http.MethodPost,
-		Path:        "/test",
-		Body:        nil,
-		Headers:     nil,
-		QueryParams: nil,
-		PathParams:  nil,
-		ContentType: "",
+		Method:        http.MethodPost,
+		Path:          "/test",
+		Body:          nil,
+		Headers:       nil,
+		QueryParams:   nil,
+		PathParams:    nil,
+		ContentType:   "",
+		SkipRequestID: false,
 	})
 
 	// Mock next error handler
@@ -60,13 +61,14 @@ func TestErrorHandler_GenericError(t *testing.T) {
 
 	// Set up test context
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
-		Method:      http.MethodPost,
-		Path:        "/test",
-		Body:        nil,
-		Headers:     nil,
-		QueryParams: nil,
-		PathParams:  nil,
-		ContentType: "",
+		Method:        http.MethodPost,
+		Path:          "/test",
+		Body:          nil,
+		Headers:       nil,
+		QueryParams:   nil,
+		PathParams:    nil,
+		ContentType:   "",
+		SkipRequestID: false,
 	})
 
 	// Track if next handler was called

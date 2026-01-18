@@ -41,5 +41,5 @@ func TestService_ReadinessCheck(t *testing.T) {
 	require.NotNil(t, resp.Data.Services)
 
 	require.Contains(t, resp.Data.Services, "postgres")
-	require.Contains(t, resp.Data.Services, "redis")
+	require.Contains(t, resp.Data.Services, "valkey")
 }
