@@ -241,7 +241,7 @@ func initValkey(cfg *config.Config) (*valkey.Valkey, error) {
 
 type taskConsumer struct{}
 
-func (c *taskConsumer) Handle(ctx context.Context, taskID string) error {
+func (c *taskConsumer) Execute(ctx context.Context, taskID string) error {
 	sleepDuration := time.Duration(rand.IntN(3)+1) * time.Second //nolint:gosec
 
 	log.Info().
@@ -266,7 +266,7 @@ func initTaskQueue(valkeyClient *valkey.Valkey) (*taskqueue.Queue, error) {
 	queue, err := taskqueue.New(
 		valkeyClient.Client,
 		"demo-api:tasks",
-		consumer.Handle,
+		consumer,
 		taskqueue.WithWorkerCount(3),
 		taskqueue.WithExecTimeout(10*time.Second),
 	)

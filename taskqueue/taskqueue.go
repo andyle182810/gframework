@@ -22,18 +22,20 @@ var (
 	ErrQueueAlreadyRunning = errors.New("taskqueue: queue is already running")
 	ErrQueueNotRunning     = errors.New("taskqueue: queue is not running")
 	ErrNilClient           = errors.New("taskqueue: redis client is nil")
-	ErrNilHandler          = errors.New("taskqueue: task handler is nil")
+	ErrNilExecutor         = errors.New("taskqueue: task executor is nil")
 	ErrEmptyQueueKey       = errors.New("taskqueue: queue key is empty")
 	ErrMaxAgeTooSmall      = errors.New("taskqueue: maxAge must be greater than execTimeout")
 )
 
-type TaskHandler func(ctx context.Context, taskID string) error
+type Executor interface {
+	Execute(ctx context.Context, taskID string) error
+}
 
 type Queue struct {
 	client        redis.UniversalClient
 	queueKey      string
 	processingKey string
-	handler       TaskHandler
+	executor      Executor
 	workerCount   int
 	bufferSize    int
 	execTimeout   time.Duration
@@ -47,7 +49,7 @@ type Queue struct {
 
 type Option func(*Queue)
 
-func New(client redis.UniversalClient, queueKey string, handler TaskHandler, opts ...Option) (*Queue, error) {
+func New(client redis.UniversalClient, queueKey string, executor Executor, opts ...Option) (*Queue, error) {
 	if client == nil {
 		return nil, ErrNilClient
 	}
@@ -56,15 +58,15 @@ func New(client redis.UniversalClient, queueKey string, handler TaskHandler, opt
 		return nil, ErrEmptyQueueKey
 	}
 
-	if handler == nil {
-		return nil, ErrNilHandler
+	if executor == nil {
+		return nil, ErrNilExecutor
 	}
 
 	queue := &Queue{
 		client:        client,
 		queueKey:      queueKey,
 		processingKey: queueKey + ":processing",
-		handler:       handler,
+		executor:      executor,
 		workerCount:   defaultWorkerCount,
 		bufferSize:    defaultBufferSize,
 		execTimeout:   defaultExecTimeout,
@@ -287,7 +289,7 @@ func (q *Queue) processTask(ctx context.Context, workerID int, taskID string) {
 	execCtx, cancel := context.WithTimeout(ctx, q.execTimeout)
 	defer cancel()
 
-	err := q.handler(execCtx, taskID)
+	err := q.executor.Execute(execCtx, taskID)
 
 	if err != nil {
 		if errors.Is(execCtx.Err(), context.DeadlineExceeded) {

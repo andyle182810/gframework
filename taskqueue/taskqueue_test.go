@@ -16,6 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mockExecutor struct {
+	fn func(ctx context.Context, taskID string) error
+}
+
+func (m *mockExecutor) Execute(ctx context.Context, taskID string) error {
+	return m.fn(ctx, taskID)
+}
+
 func setupTestQueue(ctx context.Context, t *testing.T) *valkey.Valkey {
 	t.Helper()
 
@@ -39,44 +47,46 @@ func TestNew(t *testing.T) {
 	ctx := context.Background()
 	valkeyClient := setupTestQueue(ctx, t)
 
-	handler := func(_ context.Context, _ string) error {
-		return nil
+	executor := &mockExecutor{
+		fn: func(_ context.Context, _ string) error {
+			return nil
+		},
 	}
 
 	tests := []struct {
 		name        string
 		client      func() *valkey.Valkey
 		queueKey    string
-		handler     taskqueue.TaskHandler
+		executor    taskqueue.Executor
 		expectError error
 	}{
 		{
 			name:        "valid configuration",
 			client:      func() *valkey.Valkey { return valkeyClient },
 			queueKey:    "test:queue",
-			handler:     handler,
+			executor:    executor,
 			expectError: nil,
 		},
 		{
 			name:        "nil client",
 			client:      func() *valkey.Valkey { return nil },
 			queueKey:    "test:queue",
-			handler:     handler,
+			executor:    executor,
 			expectError: taskqueue.ErrNilClient,
 		},
 		{
 			name:        "empty queue key",
 			client:      func() *valkey.Valkey { return valkeyClient },
 			queueKey:    "",
-			handler:     handler,
+			executor:    executor,
 			expectError: taskqueue.ErrEmptyQueueKey,
 		},
 		{
-			name:        "nil handler",
+			name:        "nil executor",
 			client:      func() *valkey.Valkey { return valkeyClient },
 			queueKey:    "test:queue",
-			handler:     nil,
-			expectError: taskqueue.ErrNilHandler,
+			executor:    nil,
+			expectError: taskqueue.ErrNilExecutor,
 		},
 	}
 
@@ -89,9 +99,9 @@ func TestNew(t *testing.T) {
 			var err error
 
 			if redisClient != nil {
-				queue, err = taskqueue.New(redisClient.Client, testCase.queueKey, testCase.handler)
+				queue, err = taskqueue.New(redisClient.Client, testCase.queueKey, testCase.executor)
 			} else {
-				queue, err = taskqueue.New(nil, testCase.queueKey, testCase.handler)
+				queue, err = taskqueue.New(nil, testCase.queueKey, testCase.executor)
 			}
 
 			if testCase.expectError != nil {
@@ -111,11 +121,13 @@ func TestQueueStartStop(t *testing.T) {
 	ctx := context.Background()
 	valkeyClient := setupTestQueue(ctx, t)
 
-	handler := func(_ context.Context, _ string) error {
-		return nil
+	executor := &mockExecutor{
+		fn: func(_ context.Context, _ string) error {
+			return nil
+		},
 	}
 
-	queue, err := taskqueue.New(valkeyClient, "test:start-stop", handler)
+	queue, err := taskqueue.New(valkeyClient, "test:start-stop", executor)
 	require.NoError(t, err)
 
 	err = queue.Start(ctx)
@@ -141,17 +153,19 @@ func TestQueuePushAndProcess(t *testing.T) {
 
 	var processedCount atomic.Int32
 
-	handler := func(_ context.Context, taskID string) error {
-		processedTasks.Store(taskID, true)
-		processedCount.Add(1)
+	executor := &mockExecutor{
+		fn: func(_ context.Context, taskID string) error {
+			processedTasks.Store(taskID, true)
+			processedCount.Add(1)
 
-		return nil
+			return nil
+		},
 	}
 
 	queue, err := taskqueue.New(
 		valkeyClient,
 		"test:push-process",
-		handler,
+		executor,
 		taskqueue.WithWorkerCount(3),
 		taskqueue.WithExecTimeout(5*time.Second),
 	)
@@ -194,21 +208,23 @@ func TestQueueExecTimeout(t *testing.T) {
 
 	var timedOut atomic.Bool
 
-	handler := func(ctx context.Context, _ string) error {
-		select {
-		case <-ctx.Done():
-			timedOut.Store(true)
+	executor := &mockExecutor{
+		fn: func(ctx context.Context, _ string) error {
+			select {
+			case <-ctx.Done():
+				timedOut.Store(true)
 
-			return ctx.Err()
-		case <-time.After(10 * time.Second):
-			return nil
-		}
+				return ctx.Err()
+			case <-time.After(10 * time.Second):
+				return nil
+			}
+		},
 	}
 
 	queue, err := taskqueue.New(
 		valkeyClient,
 		"test:timeout",
-		handler,
+		executor,
 		taskqueue.WithWorkerCount(1),
 		taskqueue.WithExecTimeout(500*time.Millisecond),
 	)
@@ -238,31 +254,33 @@ func TestQueueConcurrentProcessing(t *testing.T) {
 
 	var totalProcessed atomic.Int32
 
-	handler := func(_ context.Context, _ string) error {
-		current := currentConcurrent.Add(1)
+	executor := &mockExecutor{
+		fn: func(_ context.Context, _ string) error {
+			current := currentConcurrent.Add(1)
 
-		// Track max concurrent workers
-		for {
-			peak := peakConcurrent.Load()
-			if current <= peak || peakConcurrent.CompareAndSwap(peak, current) {
-				break
+			// Track max concurrent workers
+			for {
+				peak := peakConcurrent.Load()
+				if current <= peak || peakConcurrent.CompareAndSwap(peak, current) {
+					break
+				}
 			}
-		}
 
-		// Simulate work
-		time.Sleep(100 * time.Millisecond)
+			// Simulate work
+			time.Sleep(100 * time.Millisecond)
 
-		currentConcurrent.Add(-1)
-		totalProcessed.Add(1)
+			currentConcurrent.Add(-1)
+			totalProcessed.Add(1)
 
-		return nil
+			return nil
+		},
 	}
 
 	workerCount := 5
 	queue, err := taskqueue.New(
 		valkeyClient,
 		"test:concurrent",
-		handler,
+		executor,
 		taskqueue.WithWorkerCount(workerCount),
 		taskqueue.WithExecTimeout(5*time.Second),
 	)
@@ -313,11 +331,13 @@ func TestQueueRecoverStale(t *testing.T) {
 	}).Err()
 	require.NoError(t, err)
 
-	handler := func(_ context.Context, _ string) error {
-		return nil
+	executor := &mockExecutor{
+		fn: func(_ context.Context, _ string) error {
+			return nil
+		},
 	}
 
-	queue, err := taskqueue.New(valkeyClient, queueKey, handler)
+	queue, err := taskqueue.New(valkeyClient, queueKey, executor)
 	require.NoError(t, err)
 
 	recovered, err := queue.RecoverStale(ctx, time.Minute)
@@ -341,24 +361,26 @@ func TestQueueUniqueTaskProcessing(t *testing.T) {
 
 	var taskProcessCount sync.Map
 
-	handler := func(_ context.Context, taskID string) error {
-		// Count how many times each task is processed
-		val, _ := taskProcessCount.LoadOrStore(taskID, new(atomic.Int32))
+	executor := &mockExecutor{
+		fn: func(_ context.Context, taskID string) error {
+			// Count how many times each task is processed
+			val, _ := taskProcessCount.LoadOrStore(taskID, new(atomic.Int32))
 
-		counter, ok := val.(*atomic.Int32)
-		if ok {
-			counter.Add(1)
-		}
+			counter, ok := val.(*atomic.Int32)
+			if ok {
+				counter.Add(1)
+			}
 
-		time.Sleep(50 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 
-		return nil
+			return nil
+		},
 	}
 
 	queue, err := taskqueue.New(
 		valkeyClient,
 		"test:unique",
-		handler,
+		executor,
 		taskqueue.WithWorkerCount(5),
 	)
 	require.NoError(t, err)
@@ -393,11 +415,13 @@ func TestQueueName(t *testing.T) {
 	ctx := context.Background()
 	valkeyClient := setupTestQueue(ctx, t)
 
-	handler := func(_ context.Context, _ string) error {
-		return nil
+	executor := &mockExecutor{
+		fn: func(_ context.Context, _ string) error {
+			return nil
+		},
 	}
 
-	queue, err := taskqueue.New(valkeyClient, "my-tasks", handler)
+	queue, err := taskqueue.New(valkeyClient, "my-tasks", executor)
 	require.NoError(t, err)
 
 	require.Equal(t, "taskqueue:my-tasks", queue.Name())
@@ -411,16 +435,18 @@ func TestQueueOptions(t *testing.T) {
 
 	var processedCount atomic.Int32
 
-	handler := func(_ context.Context, _ string) error {
-		processedCount.Add(1)
+	executor := &mockExecutor{
+		fn: func(_ context.Context, _ string) error {
+			processedCount.Add(1)
 
-		return nil
+			return nil
+		},
 	}
 
 	queue, err := taskqueue.New(
 		valkeyClient,
 		"test:options",
-		handler,
+		executor,
 		taskqueue.WithWorkerCount(2),
 		taskqueue.WithBufferSize(50),
 		taskqueue.WithExecTimeout(10*time.Second),
