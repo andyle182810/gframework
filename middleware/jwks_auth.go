@@ -73,7 +73,7 @@ func (j *JwksAuth) Middleware() echo.MiddlewareFunc {
 					token, ok := echoCtx.Get("user").(*jwt.Token)
 					if !ok {
 						log.Error().
-							Msg("The JWT token failed to be retrieved from the context.")
+							Msg("The JWT token failed to be retrieved from the context")
 
 						return
 					}
@@ -83,19 +83,19 @@ func (j *JwksAuth) Middleware() echo.MiddlewareFunc {
 					if claims, ok := token.Claims.(*ExtendedClaims); ok {
 						echoCtx.Set(ContextKeyClaims, claims)
 						log.Debug().
-							Msg("The JWT token and claims have been set successfully.")
+							Msg("The JWT token and claims have been set successfully")
 					} else {
 						log.Error().
-							Msg("The token claims failed to be asserted as ExtendedClaims.")
+							Msg("The token claims failed to be asserted as ExtendedClaims")
 					}
 
 					log.Debug().
-						Msg("The JWT token has been verified successfully.")
+						Msg("The JWT token has been verified successfully")
 				},
 				ErrorHandler: func(_ echo.Context, err error) error {
 					log.Error().
 						Err(err).
-						Msg("The JWT verification has failed.")
+						Msg("The JWT verification has failed")
 
 					if err.Error() == "missing value in request header" {
 						return ErrTokenRequired

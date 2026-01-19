@@ -225,12 +225,12 @@ func (v *Valkey) Start(ctx context.Context) error {
 
 	log.Info().
 		Str("service_name", v.Name()).
-		Msg("The Valkey client is operational and waiting for shutdown signal.")
+		Msg("The Valkey client is operational and waiting for shutdown signal")
 
 	<-ctx.Done()
 	log.Info().
 		Str("service_name", v.Name()).
-		Msg("The Valkey Run() context has been cancelled.")
+		Msg("The Valkey Run() context has been cancelled")
 
 	return nil
 }
@@ -242,7 +242,7 @@ func (v *Valkey) Stop() error {
 
 	log.Info().
 		Str("service_name", v.Name()).
-		Msg("The Valkey client pool is being closed.")
+		Msg("The Valkey client pool is being closed")
 
 	if err := v.Client.Close(); err != nil {
 		return fmt.Errorf("failed to close Valkey client: %w", err)
@@ -250,7 +250,7 @@ func (v *Valkey) Stop() error {
 
 	log.Info().
 		Str("service_name", v.Name()).
-		Msg("The Valkey client pool has been closed successfully.")
+		Msg("The Valkey client pool has been closed successfully")
 
 	return nil
 }

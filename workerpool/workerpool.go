@@ -106,7 +106,7 @@ func (pool *WorkerPool) Start(ctx context.Context) error {
 		Int("worker_count", pool.workerCount).
 		Dur("tick_interval", pool.tickInterval).
 		Dur("exec_timeout", pool.execTimeout).
-		Msg("Worker pool is starting.")
+		Msg("Worker pool is starting")
 
 	for workerID := range pool.workerCount {
 		pool.wg.Add(1)
@@ -132,7 +132,7 @@ func (pool *WorkerPool) Stop() error {
 	pool.running = false
 	pool.mu.Unlock()
 
-	log.Info().Msg("Worker pool is stopping.")
+	log.Info().Msg("Worker pool is stopping")
 
 	if pool.cancel != nil {
 		pool.cancel()
@@ -140,7 +140,7 @@ func (pool *WorkerPool) Stop() error {
 
 	pool.wg.Wait()
 
-	log.Info().Msg("Worker pool has stopped.")
+	log.Info().Msg("Worker pool has stopped")
 
 	return nil
 }
@@ -151,14 +151,14 @@ func (pool *WorkerPool) dispatcher(ctx context.Context) {
 	ticker := time.NewTicker(pool.tickInterval)
 	defer ticker.Stop()
 
-	log.Info().Msg("Dispatcher has started.")
+	log.Info().Msg("Dispatcher has started")
 
 	for {
 		select {
 		case <-ctx.Done():
 			close(pool.jobChan)
 
-			log.Info().Msg("Dispatcher is shutting down.")
+			log.Info().Msg("Dispatcher is shutting down")
 
 			return
 		case <-ticker.C:
@@ -167,7 +167,7 @@ func (pool *WorkerPool) dispatcher(ctx context.Context) {
 			case <-ctx.Done():
 				close(pool.jobChan)
 
-				log.Info().Msg("Dispatcher is shutting down.")
+				log.Info().Msg("Dispatcher is shutting down")
 
 				return
 			}
@@ -180,21 +180,21 @@ func (pool *WorkerPool) worker(ctx context.Context, id int) {
 
 	log.Info().
 		Int("worker_id", id).
-		Msg("Worker has started.")
+		Msg("Worker has started")
 
 	for {
 		select {
 		case <-ctx.Done():
 			log.Info().
 				Int("worker_id", id).
-				Msg("Worker is shutting down.")
+				Msg("Worker is shutting down")
 
 			return
 		case _, ok := <-pool.jobChan:
 			if !ok {
 				log.Info().
 					Int("worker_id", id).
-					Msg("Worker is shutting down.")
+					Msg("Worker is shutting down")
 
 				return
 			}
@@ -220,13 +220,13 @@ func (pool *WorkerPool) executeWithTimeout(ctx context.Context, workerID int) {
 	log.Debug().
 		Int("worker_id", workerID).
 		Dur("timeout", pool.execTimeout).
-		Msg("Starting execution for worker.")
+		Msg("Starting execution for worker")
 
 	err := pool.executor.Execute(execCtx)
 	if err != nil {
 		log.Error().
 			Err(err).
 			Int("worker_id", workerID).
-			Msg("Executor failed.")
+			Msg("Executor failed")
 	}
 }

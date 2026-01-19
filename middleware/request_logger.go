@@ -73,15 +73,15 @@ func logRequest(log zerolog.Logger, fields map[string]interface{}, err error, st
 	switch {
 	case status >= http.StatusInternalServerError:
 		logger.Error().
-			Msg("The request has resulted in a server error.")
+			Msg("The request has resulted in a server error")
 	case status >= http.StatusBadRequest:
 		logger.Error().
-			Msg("The request has resulted in a client error.")
+			Msg("The request has resulted in a client error")
 	case status >= http.StatusMultipleChoices:
 		logger.Info().
-			Msg("The request has resulted in a redirection.")
+			Msg("The request has resulted in a redirection")
 	default:
 		logger.Info().
-			Msg("The request has completed successfully.")
+			Msg("The request has completed successfully")
 	}
 }

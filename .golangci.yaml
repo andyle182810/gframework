@@ -146,6 +146,7 @@ linters-settings:
       - err
       - v1
       - pg
+      - wg
   lll:
     line-length: 130
     tab-width: 1

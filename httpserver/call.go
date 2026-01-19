@@ -26,7 +26,7 @@ func ExecuteStandardized[REQ any, RES any](
 			Int("status_code", delegateError.Code).
 			Interface("error_cause", delegateError.Internal).
 			Interface("error_message", delegateError.Message).
-			Msg("The request has failed with an HTTP error.")
+			Msg("The request has failed with an HTTP error")
 
 		return nil, delegateError
 	}

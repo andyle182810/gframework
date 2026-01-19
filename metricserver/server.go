@@ -61,7 +61,7 @@ func (s *Server) Start(ctx context.Context) error {
 	go func() {
 		log.Info().
 			Str("address", s.address).
-			Msg("The metrics server is being started.")
+			Msg("The metrics server is being started")
 
 		if err := s.echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("metrics server failed: %w", err)
@@ -75,7 +75,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	case <-ctx.Done():
 		log.Info().
-			Msg("The metrics server Run() context has been cancelled.")
+			Msg("The metrics server Run() context has been cancelled")
 
 		return ctx.Err()
 	}
@@ -86,18 +86,18 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	log.Info().
-		Msg("The graceful shutdown of metrics server is being initiated.")
+		Msg("The graceful shutdown of metrics server is being initiated")
 
 	if err := s.echo.Shutdown(shutdownCtx); err != nil {
 		log.Error().
 			Err(err).
-			Msg("The metrics server failed to shut down gracefully.")
+			Msg("The metrics server failed to shut down gracefully")
 
 		return err
 	}
 
 	log.Info().
-		Msg("The metrics server shutdown has been completed successfully.")
+		Msg("The metrics server shutdown has been completed successfully")
 
 	return nil
 }

@@ -48,14 +48,14 @@ func Wrapper[TREQ any](wrapped func(echo.Context, *TREQ) (any, *echo.HTTPError))
 func logRequestStart(log zerolog.Logger, path string) {
 	log.Info().
 		Str("path", path).
-		Msg("The request has been started and is being processed.")
+		Msg("The request has been started and is being processed")
 }
 
 func logRequestEnd(log zerolog.Logger, status int) {
 	log.Info().
 		Time("completed_at", time.Now()).
 		Int("status_code", status).
-		Msg("The request has been completed and the response has been sent to the client.")
+		Msg("The request has been completed and the response has been sent to the client")
 }
 
 func logError(log zerolog.Logger, err error, path string, req any, msg string) {
@@ -70,7 +70,7 @@ func bindAndValidate[TREQ any](ectx echo.Context, log zerolog.Logger, path strin
 	var req TREQ
 
 	if err := ectx.Bind(&req); err != nil {
-		logError(log, err, path, req, "The request body failed to bind to the expected structure.")
+		logError(log, err, path, req, "The request body failed to bind to the expected structure")
 
 		return nil, &echo.HTTPError{
 			Code:     http.StatusBadRequest,
@@ -80,7 +80,7 @@ func bindAndValidate[TREQ any](ectx echo.Context, log zerolog.Logger, path strin
 	}
 
 	if err := ectx.Validate(&req); err != nil {
-		logError(log, err, path, req, "The request validation has failed.")
+		logError(log, err, path, req, "The request validation has failed")
 
 		return nil, &echo.HTTPError{
 			Code:     http.StatusBadRequest,

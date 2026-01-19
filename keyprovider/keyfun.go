@@ -26,7 +26,7 @@ func NewKeyFunc(ctx context.Context, log zerolog.Logger, urls []string) (keyfunc
 			log.Error().
 				Err(err).
 				Str("jwks_url", url).
-				Msg("The JWKS key refresh has failed in the background goroutine.")
+				Msg("The JWKS key refresh has failed in the background goroutine")
 		}
 	}
 
@@ -49,7 +49,7 @@ func NewKeyFunc(ctx context.Context, log zerolog.Logger, urls []string) (keyfunc
 	if err == nil {
 		log.Info().
 			Strs("jwks_urls", urls).
-			Msg("The Keyfunc has been initialized successfully and the background refresh has been started.")
+			Msg("The Keyfunc has been initialized successfully and the background refresh has been started")
 	}
 
 	return keyFunc, err

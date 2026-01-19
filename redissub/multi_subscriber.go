@@ -61,14 +61,14 @@ func (m *MultiSubscriber) Subscribe(topic string, messageHandler MessageHandler)
 
 	log.Info().
 		Str("topic", topic).
-		Msg("The subscription to the topic has been completed successfully.")
+		Msg("The subscription to the topic has been completed successfully")
 
 	return nil
 }
 
 func (m *MultiSubscriber) Close() error {
 	log.Info().
-		Msg("The shutdown of all subscribers is being initiated.")
+		Msg("The shutdown of all subscribers is being initiated")
 
 	// Collect errors during closing
 	var errorMessages []string
@@ -86,11 +86,11 @@ func (m *MultiSubscriber) Close() error {
 			log.Error().
 				Err(err).
 				Str("topic", subscriber.Topic()).
-				Msg("The subscriber failed to close.")
+				Msg("The subscriber failed to close")
 		} else {
 			log.Info().
 				Str("topic", subscriber.Topic()).
-				Msg("The subscriber has been closed successfully.")
+				Msg("The subscriber has been closed successfully")
 		}
 	}
 
@@ -102,7 +102,7 @@ func (m *MultiSubscriber) Close() error {
 	}
 
 	log.Info().
-		Msg("All subscribers have been shut down successfully.")
+		Msg("All subscribers have been shut down successfully")
 
 	return nil
 }

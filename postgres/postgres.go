@@ -96,12 +96,12 @@ func New(cfg *Config) (*Postgres, error) {
 func (p *Postgres) Start(ctx context.Context) error {
 	log.Info().
 		Str("service_name", p.Name()).
-		Msg("The PostgreSQL connection pool is operational and waiting for shutdown signal.")
+		Msg("The PostgreSQL connection pool is operational and waiting for shutdown signal")
 
 	<-ctx.Done()
 	log.Info().
 		Str("service_name", p.Name()).
-		Msg("The PostgreSQL Run() context has been cancelled.")
+		Msg("The PostgreSQL Run() context has been cancelled")
 
 	return nil
 }
@@ -113,12 +113,12 @@ func (p *Postgres) Stop() error {
 
 	log.Info().
 		Str("service_name", p.Name()).
-		Msg("The PostgreSQL connection pool is being closed.")
+		Msg("The PostgreSQL connection pool is being closed")
 	p.DBPool.Close()
 
 	log.Info().
 		Str("service_name", p.Name()).
-		Msg("The PostgreSQL connection pool has been closed successfully.")
+		Msg("The PostgreSQL connection pool has been closed successfully")
 
 	return nil
 }

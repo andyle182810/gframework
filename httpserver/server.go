@@ -67,7 +67,7 @@ func (s *Server) Start(ctx context.Context) error {
 	go func() {
 		log.Info().
 			Str("address", s.address).
-			Msg("The HTTP server is being started.")
+			Msg("The HTTP server is being started")
 
 		if err := s.Echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("HTTP server failed: %w", err)
@@ -81,7 +81,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	case <-ctx.Done():
 		log.Info().
-			Msg("The HTTP server Run() context has been cancelled.")
+			Msg("The HTTP server Run() context has been cancelled")
 
 		return ctx.Err()
 	}
@@ -92,12 +92,12 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	log.Info().
-		Msg("The graceful shutdown of HTTP server is being initiated.")
+		Msg("The graceful shutdown of HTTP server is being initiated")
 
 	if err := s.Echo.Shutdown(ctx); err != nil {
 		log.Error().
 			Err(err).
-			Msg("The HTTP server failed to shut down gracefully.")
+			Msg("The HTTP server failed to shut down gracefully")
 
 		return err
 	}

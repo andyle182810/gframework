@@ -30,7 +30,7 @@ func MigrateUp(dbURI, source string) error {
 		if closeErr := db.Close(); closeErr != nil {
 			log.Error().
 				Err(closeErr).
-				Msg("The database connection failed to close after migration attempt.")
+				Msg("The database connection failed to close after migration attempt")
 		}
 	}()
 
@@ -42,7 +42,7 @@ func MigrateUp(dbURI, source string) error {
 
 	log.Info().
 		Str("migration_source", source).
-		Msg("The database migration is being started.")
+		Msg("The database migration is being started")
 
 	driver, err := pgx_migrate.WithInstance(db, &pgx_migrate.Config{})
 	if err != nil {
@@ -59,17 +59,17 @@ func MigrateUp(dbURI, source string) error {
 	switch {
 	case errors.Is(err, migrate.ErrNoChange):
 		log.Info().
-			Msg("The database migration has been completed with no new migrations to apply.")
+			Msg("The database migration has been completed with no new migrations to apply")
 	case err != nil:
 		log.Error().
 			Err(err).
 			Str("migration_source", source).
-			Msg("The database migration has failed.")
+			Msg("The database migration has failed")
 
 		return fmt.Errorf("failed to run migrations up: %w", err)
 	default:
 		log.Info().
-			Msg("The database migration has been completed successfully.")
+			Msg("The database migration has been completed successfully")
 	}
 
 	sourceErr, databaseErr := migrator.Close()
