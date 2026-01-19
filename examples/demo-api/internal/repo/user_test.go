@@ -1,3 +1,4 @@
+//nolint:paralleltest,varnamelen
 package repo_test
 
 import (
@@ -15,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestRepo(t *testing.T, ctx context.Context) (*repo.UserRepo, *postgres.Postgres) {
+func setupTestRepo(ctx context.Context, t *testing.T) (*repo.UserRepo, *postgres.Postgres) { //nolint:unparam
 	t.Helper()
 
 	pgContainer := testutil.SetupPostgresContainer(ctx, t)
 
-	pg, err := postgres.New(&postgres.Config{
+	pg, err := postgres.New(&postgres.Config{ //nolint:contextcheck
 		URL:                      pgContainer.ConnectionString(),
 		MaxConnection:            10,
 		MinConnection:            2,
@@ -49,7 +50,7 @@ func TestUserRepo_CreateUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	tests := []struct {
 		name      string
@@ -76,10 +77,10 @@ func TestUserRepo_CreateUser(t *testing.T) {
 			user, err := repo.CreateUser(ctx, tt.userName, tt.userEmail)
 
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Nil(t, user)
+				require.Error(t, err)
+				require.Nil(t, user)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.NotEmpty(t, user.ID)
 				assert.Equal(t, tt.userName, user.Name)
@@ -98,7 +99,7 @@ func TestUserRepo_CreateUser_DuplicateEmail(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	email := testutil.RandomEmail()
 
@@ -107,15 +108,15 @@ func TestUserRepo_CreateUser_DuplicateEmail(t *testing.T) {
 	require.NotNil(t, user1)
 
 	user2, err := repo.CreateUser(ctx, "Second User", email)
-	assert.Error(t, err)
-	assert.Nil(t, user2)
+	require.Error(t, err)
+	require.Nil(t, user2)
 }
 
 func TestUserRepo_GetUserByID(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	createdUser, err := repo.CreateUser(ctx, "Test User", testutil.RandomEmail())
 	require.NoError(t, err)
@@ -142,10 +143,10 @@ func TestUserRepo_GetUserByID(t *testing.T) {
 			user, err := repo.GetUserByID(ctx, tt.userID)
 
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.True(t, pgxscan.NotFound(err))
+				require.Error(t, err)
+				require.True(t, pgxscan.NotFound(err))
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, tt.userID, user.ID)
 				assert.Equal(t, createdUser.Name, user.Name)
@@ -159,7 +160,7 @@ func TestUserRepo_GetUserByEmail(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	email := testutil.RandomEmail()
 	createdUser, err := repo.CreateUser(ctx, "Test User", email)
@@ -187,10 +188,10 @@ func TestUserRepo_GetUserByEmail(t *testing.T) {
 			user, err := repo.GetUserByEmail(ctx, tt.userEmail)
 
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.True(t, pgxscan.NotFound(err))
+				require.Error(t, err)
+				require.True(t, pgxscan.NotFound(err))
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, createdUser.ID, user.ID)
 				assert.Equal(t, createdUser.Name, user.Name)
@@ -204,7 +205,7 @@ func TestUserRepo_ListUsers(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	const userCount = 25
 	for range userCount {
@@ -253,11 +254,11 @@ func TestUserRepo_ListUsers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			users, err := repo.ListUsers(ctx, tt.limit, tt.offset)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, users, tt.expectedCount)
 
 			if len(users) > 1 {
-				for i := 0; i < len(users)-1; i++ {
+				for i := range len(users) - 1 {
 					assert.True(t, users[i].CreatedAt.After(users[i+1].CreatedAt) ||
 						users[i].CreatedAt.Equal(users[i+1].CreatedAt),
 						"Users should be ordered by created_at DESC")
@@ -271,7 +272,7 @@ func TestUserRepo_CountUsers(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	count, err := repo.CountUsers(ctx)
 	require.NoError(t, err)
@@ -292,7 +293,7 @@ func TestUserRepo_UpdateUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	originalEmail := testutil.RandomEmail()
 	createdUser, err := repo.CreateUser(ctx, "Original Name", originalEmail)
@@ -302,7 +303,7 @@ func TestUserRepo_UpdateUser(t *testing.T) {
 	newEmail := testutil.RandomEmail()
 
 	updatedUser, err := repo.UpdateUser(ctx, createdUser.ID, newName, newEmail)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, createdUser.ID, updatedUser.ID)
 	assert.Equal(t, newName, updatedUser.Name)
@@ -312,7 +313,7 @@ func TestUserRepo_UpdateUser(t *testing.T) {
 		updatedUser.UpdatedAt.Equal(updatedUser.CreatedAt))
 
 	fetchedUser, err := repo.GetUserByID(ctx, createdUser.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, newName, fetchedUser.Name)
 	assert.Equal(t, newEmail, fetchedUser.Email)
 }
@@ -321,11 +322,11 @@ func TestUserRepo_UpdateUser_NonExistent(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	updatedUser, err := repo.UpdateUser(ctx, uuid.NewString(), "Name", testutil.RandomEmail())
-	assert.Error(t, err)
-	assert.Nil(t, updatedUser)
+	require.Error(t, err)
+	require.Nil(t, updatedUser)
 	assert.True(t, pgxscan.NotFound(err))
 }
 
@@ -333,25 +334,25 @@ func TestUserRepo_DeleteUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	createdUser, err := repo.CreateUser(ctx, "Test User", testutil.RandomEmail())
 	require.NoError(t, err)
 
 	err = repo.DeleteUser(ctx, createdUser.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	fetchedUser, err := repo.GetUserByID(ctx, createdUser.ID)
-	assert.Error(t, err)
-	assert.Nil(t, fetchedUser)
-	assert.True(t, pgxscan.NotFound(err))
+	require.Error(t, err)
+	require.Nil(t, fetchedUser)
+	require.True(t, pgxscan.NotFound(err))
 }
 
 func TestUserRepo_DeleteUser_NonExistent(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	err := repo.DeleteUser(ctx, uuid.NewString())
 	assert.NoError(t, err)
@@ -361,7 +362,7 @@ func TestUserRepo_ConcurrentCreation(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(t, ctx)
+	repo, _ := setupTestRepo(ctx, t)
 
 	const concurrentUsers = 10
 	errChan := make(chan error, concurrentUsers)
@@ -375,10 +376,10 @@ func TestUserRepo_ConcurrentCreation(t *testing.T) {
 
 	for range concurrentUsers {
 		err := <-errChan
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	count, err := repo.CountUsers(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, concurrentUsers, count)
 }

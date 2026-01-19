@@ -124,9 +124,9 @@ func (app *application) newWorkerPool() *workerpool.WorkerPool {
 
 	return workerpool.New(
 		producer,
-		workerpool.WithWorkerCount(2),
-		workerpool.WithTickInterval(5*time.Second),
-		workerpool.WithExecutionTimeout(10*time.Second),
+		workerpool.WithWorkerCount(2), //nolint:mnd
+		workerpool.WithTickInterval(5*time.Second),      //nolint:mnd
+		workerpool.WithExecutionTimeout(10*time.Second), //nolint:mnd
 	)
 }
 
@@ -135,7 +135,7 @@ type taskProducer struct {
 }
 
 func (p *taskProducer) Execute(ctx context.Context) error {
-	taskCount := rand.IntN(5) + 1 //nolint:gosec
+	taskCount := rand.IntN(5) + 1 //nolint:gosec,mnd
 	taskIDs := make([]string, taskCount)
 
 	for i := range taskCount {
@@ -242,7 +242,7 @@ func initValkey(cfg *config.Config) (*valkey.Valkey, error) {
 type taskConsumer struct{}
 
 func (c *taskConsumer) Execute(ctx context.Context, taskID string) error {
-	sleepDuration := time.Duration(rand.IntN(3)+1) * time.Second //nolint:gosec
+	sleepDuration := time.Duration(rand.IntN(3)+1) * time.Second //nolint:gosec,mnd
 
 	log.Info().
 		Str("task_id", taskID).
@@ -267,8 +267,8 @@ func initTaskQueue(valkeyClient *valkey.Valkey) (*taskqueue.Queue, error) {
 		valkeyClient.Client,
 		"demo-api:tasks",
 		consumer,
-		taskqueue.WithWorkerCount(3),
-		taskqueue.WithExecTimeout(10*time.Second),
+		taskqueue.WithWorkerCount(3), //nolint:mnd
+		taskqueue.WithExecTimeout(10*time.Second), //nolint:mnd
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize task queue: %w", err)

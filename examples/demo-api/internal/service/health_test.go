@@ -1,3 +1,4 @@
+//nolint:paralleltest
 package service_test
 
 import (
@@ -11,9 +12,9 @@ import (
 
 func TestService_HealthCheck(t *testing.T) {
 	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(t, ctx)
+	svc, _, _ := setupTestService(ctx, t)
 
-	echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
+	echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodGet,
 		Path:   "/health",
 	})
@@ -33,6 +34,7 @@ func TestService_HealthCheck(t *testing.T) {
 			Status string `json:"status"`
 		} `json:"data"`
 	}
+
 	testutil.AssertJSONResponse(t, rec, &resp)
 	require.Equal(t, "healthy", resp.Data.Status)
 }

@@ -11,11 +11,11 @@ import (
 type ReadinessCheckRequest struct{}
 
 type ReadinessCheckResponse struct {
-	Status   string                 `json:"status"`
-	Services map[string]ServiceInfo `json:"services"`
+	Status   string          `json:"status"`
+	Services map[string]Info `json:"services"`
 }
 
-type ServiceInfo struct {
+type Info struct {
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
@@ -28,32 +28,36 @@ func (s *Service) CheckReadiness(ctx echo.Context, req *ReadinessCheckRequest) (
 	) (*httpserver.HandlerResponse[ReadinessCheckResponse], *echo.HTTPError) {
 		log.Info().Msg("Readiness check requested")
 
-		services := make(map[string]ServiceInfo)
+		services := make(map[string]Info)
 		allReady := true
 
 		if err := s.db.HealthCheck(eCtx.Request().Context()); err != nil {
-			services["postgres"] = ServiceInfo{
+			services["postgres"] = Info{
 				Status: "not_ready",
 				Error:  err.Error(),
 			}
 			allReady = false
+
 			log.Error().Err(err).Msg("Postgres health check failed")
 		} else {
-			services["postgres"] = ServiceInfo{
+			services["postgres"] = Info{
 				Status: "ready",
+				Error:  "",
 			}
 		}
 
 		if err := s.valkey.HealthCheck(eCtx.Request().Context()); err != nil {
-			services["valkey"] = ServiceInfo{
+			services["valkey"] = Info{
 				Status: "not_ready",
 				Error:  err.Error(),
 			}
 			allReady = false
+
 			log.Error().Err(err).Msg("Valkey health check failed")
 		} else {
-			services["valkey"] = ServiceInfo{
+			services["valkey"] = Info{
 				Status: "ready",
+				Error:  "",
 			}
 		}
 
@@ -67,6 +71,7 @@ func (s *Service) CheckReadiness(ctx echo.Context, req *ReadinessCheckRequest) (
 
 		if !allReady {
 			response.Data.Status = "not_ready"
+
 			return response, echo.NewHTTPError(http.StatusServiceUnavailable, "Service not ready")
 		}
 

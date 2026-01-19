@@ -1,3 +1,4 @@
+//nolint:paralleltest
 package service_test
 
 import (
@@ -13,9 +14,9 @@ func TestService_ReadinessCheck(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(t, ctx)
+	svc, _, _ := setupTestService(ctx, t)
 
-	echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
+	echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodGet,
 		Path:   "/ready",
 	})
@@ -36,6 +37,7 @@ func TestService_ReadinessCheck(t *testing.T) {
 			Services map[string]any `json:"services"`
 		} `json:"data"`
 	}
+
 	testutil.AssertJSONResponse(t, rec, &resp)
 	require.Equal(t, "ready", resp.Data.Status)
 	require.NotNil(t, resp.Data.Services)

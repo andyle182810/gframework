@@ -1,3 +1,4 @@
+//nolint:paralleltest,thelper,varnamelen
 package service_test
 
 import (
@@ -20,13 +21,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *repo.Repository, *valkey.Valkey) {
+func setupTestService(ctx context.Context, t *testing.T) (*service.Service, *repo.Repository, *valkey.Valkey) {
 	t.Helper()
 
 	pgContainer := testutil.SetupPostgresContainer(ctx, t)
 	valkeyContainer := testutil.SetupValkeyContainer(ctx, t)
 
-	pg, err := postgres.New(&postgres.Config{
+	pg, err := postgres.New(&postgres.Config{ //nolint:contextcheck
 		URL:                      pgContainer.ConnectionString(),
 		MaxConnection:            10,
 		MinConnection:            2,
@@ -46,7 +47,7 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *rep
 
 	testutil.CleanupDatabase(t, ctx, pg)
 
-	valkey, err := valkey.New(&valkey.Config{
+	valkey, err := valkey.New(&valkey.Config{ //nolint:exhaustruct
 		Host:     valkeyContainer.Host,
 		Port:     valkeyContainer.Port.Int(),
 		Password: "",
@@ -60,11 +61,11 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *rep
 	return service, repository, valkey
 }
 
-func TestService_CreateUser(t *testing.T) {
+func TestService_CreateUser(t *testing.T) { //nolint:funlen
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(t, ctx)
+	svc, _, _ := setupTestService(ctx, t)
 
 	tests := []struct {
 		name           string
@@ -115,6 +116,7 @@ func TestService_CreateUser(t *testing.T) {
 		{
 			name: "validation error - missing name",
 			requestBody: service.CreateUserRequest{
+				Name:  "",
 				Email: testutil.RandomEmail(),
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -125,7 +127,8 @@ func TestService_CreateUser(t *testing.T) {
 		{
 			name: "validation error - missing email",
 			requestBody: service.CreateUserRequest{
-				Name: "John Doe",
+				Name:  "John Doe",
+				Email: "",
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
@@ -162,7 +165,7 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(t, ctx)
+	svc, _, _ := setupTestService(ctx, t)
 
 	email := testutil.RandomEmail()
 
@@ -178,10 +181,12 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 	)
 
 	handler := httpserver.Wrapper(svc.CreateUser)
+
 	err := handler(echoCtx1)
 	if err != nil {
 		echoCtx1.Echo().HTTPErrorHandler(err, echoCtx1)
 	}
+
 	testutil.AssertStatusCode(t, rec1, http.StatusOK)
 
 	req2 := service.CreateUserRequest{
@@ -207,7 +212,7 @@ func TestService_GetUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, repository, _ := setupTestService(t, ctx)
+	svc, repository, _ := setupTestService(ctx, t)
 
 	email := testutil.RandomEmail()
 	user, err := repository.User.CreateUser(ctx, "Test User", email)
@@ -257,7 +262,7 @@ func TestService_GetUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
+			echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 				Method: http.MethodGet,
 				Path:   "/v1/users/:userId",
 				PathParams: map[string]string{
@@ -281,11 +286,11 @@ func TestService_GetUser(t *testing.T) {
 	}
 }
 
-func TestService_ListUsers(t *testing.T) {
+func TestService_ListUsers(t *testing.T) { //nolint:funlen
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, repository, _ := setupTestService(t, ctx)
+	svc, repository, _ := setupTestService(ctx, t)
 
 	for i := range 15 {
 		_, err := repository.User.CreateUser(ctx, fmt.Sprintf("User %d", i), testutil.RandomEmail())
@@ -327,7 +332,7 @@ func TestService_ListUsers(t *testing.T) {
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
-				require.Equal(t, 5, len(resp.Data.Users))
+				require.Len(t, resp.Data.Users, 5)
 				require.Equal(t, 1, resp.Pagination.Page)
 				require.Equal(t, 5, resp.Pagination.PageSize)
 				require.Equal(t, 15, resp.Pagination.TotalCount)
@@ -344,7 +349,7 @@ func TestService_ListUsers(t *testing.T) {
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
-				require.Equal(t, 5, len(resp.Data.Users))
+				require.Len(t, resp.Data.Users, 5)
 				require.Equal(t, 2, resp.Pagination.Page)
 			},
 		},
@@ -376,7 +381,7 @@ func TestService_ListUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
+			echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 				Method:      http.MethodGet,
 				Path:        "/v1/users",
 				QueryParams: tt.queryParams,
@@ -402,7 +407,7 @@ func TestService_GetUser_WithCache(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, _, redis := setupTestService(t, ctx)
+	svc, _, redis := setupTestService(ctx, t)
 
 	createReq := service.CreateUserRequest{
 		Name:  "Cached User",
@@ -416,15 +421,18 @@ func TestService_GetUser_WithCache(t *testing.T) {
 	)
 
 	createHandler := httpserver.Wrapper(svc.CreateUser)
+
 	err := createHandler(echoCtxCreate)
 	if err != nil {
 		echoCtxCreate.Echo().HTTPErrorHandler(err, echoCtxCreate)
 	}
+
 	testutil.AssertStatusCode(t, recCreate, http.StatusOK)
 
 	testutil.Eventually(t, func() bool {
 		cacheKey := "user:email:" + createReq.Email
 		cachedID, err := redis.Get(ctx, cacheKey).Result()
+
 		return err == nil && cachedID != ""
 	}, 2*time.Second, 100*time.Millisecond)
 }
