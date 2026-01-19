@@ -24,7 +24,7 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *rep
 	t.Helper()
 
 	pgContainer := testutil.SetupPostgresContainer(ctx, t)
-	redisContainer := testutil.SetupRedisContainer(ctx, t)
+	valkeyContainer := testutil.SetupValkeyContainer(ctx, t)
 
 	pg, err := postgres.New(&postgres.Config{
 		URL:                      pgContainer.ConnectionString(),
@@ -47,8 +47,8 @@ func setupTestService(t *testing.T, ctx context.Context) (*service.Service, *rep
 	testutil.CleanupDatabase(t, ctx, pg)
 
 	valkey, err := valkey.New(&valkey.Config{
-		Host:     redisContainer.Host,
-		Port:     redisContainer.Port.Int(),
+		Host:     valkeyContainer.Host,
+		Port:     valkeyContainer.Port.Int(),
 		Password: "",
 		DB:       0,
 	})

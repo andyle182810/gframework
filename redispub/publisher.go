@@ -17,62 +17,85 @@ const (
 )
 
 var (
-	ErrPublisherInitialization = errors.New("failed to initialize Redis stream publisher")
-	ErrPublishFailed           = errors.New("failed to publish messages")
-	ErrStreamTrimFailed        = errors.New("failed to trim stream")
+	ErrPublisherInitialization = errors.New("publisher: failed to initialize redis stream publisher")
+	ErrPublishFailed           = errors.New("publisher: failed to publish messages")
+	ErrNilRedisClient          = errors.New("publisher: redis client is required")
+	ErrInvalidMaxStreamEntries = errors.New("publisher: maxStreamEntries cannot be negative")
 )
 
+type Publisher interface {
+	PublishToTopic(ctx context.Context, topic string, messageContents ...string) error
+	Close() error
+}
+
 type Options struct {
-	MaxStreamEntries int64
+	MaxStreamEntries int64 ``
+	Timeout          time.Duration
+	Logger           watermill.LoggerAdapter
 }
 
 type RedisPublisher struct {
-	redisStreamPublisher *redisstream.Publisher
-	redisClient          goredis.UniversalClient
-	maxStreamEntries     int64
+	publisher *redisstream.Publisher
+	timeout   time.Duration
 }
 
+var _ Publisher = (*RedisPublisher)(nil)
+
 func New(redisClient goredis.UniversalClient, opts Options) (*RedisPublisher, error) {
-	redisStreamPublisher, err := redisstream.NewPublisher(
+	if redisClient == nil {
+		return nil, ErrNilRedisClient
+	}
+
+	if opts.MaxStreamEntries < 0 {
+		return nil, ErrInvalidMaxStreamEntries
+	}
+
+	publisher, err := redisstream.NewPublisher(
 		redisstream.PublisherConfig{
 			Client:        redisClient,
 			Marshaller:    redisstream.DefaultMarshallerUnmarshaller{},
 			Maxlens:       map[string]int64{},
-			DefaultMaxlen: 0,
+			DefaultMaxlen: opts.MaxStreamEntries,
 		},
-		nil,
+		opts.Logger,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrPublisherInitialization, err)
 	}
 
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = defaultPublishTimeout
+	}
+
 	return &RedisPublisher{
-		redisStreamPublisher: redisStreamPublisher,
-		redisClient:          redisClient,
-		maxStreamEntries:     opts.MaxStreamEntries,
+		publisher: publisher,
+		timeout:   timeout,
 	}, nil
 }
 
-func (p *RedisPublisher) PublishToTopic(topic string, messageContents ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultPublishTimeout)
-	defer cancel()
+func (p *RedisPublisher) PublishToTopic(ctx context.Context, topic string, messageContents ...string) error {
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.timeout)
+		defer cancel()
+	}
 
 	messages := make([]*message.Message, 0, len(messageContents))
 
 	for _, content := range messageContents {
 		msg := message.NewMessage(watermill.NewUUID(), []byte(content))
+		msg.SetContext(ctx)
 		messages = append(messages, msg)
 	}
 
-	if err := p.redisStreamPublisher.Publish(topic, messages...); err != nil {
+	if err := p.publisher.Publish(topic, messages...); err != nil {
 		return fmt.Errorf("%w to topic %s: %w", ErrPublishFailed, topic, err)
 	}
 
-	if p.maxStreamEntries > 0 {
-		if err := p.redisClient.XTrimMaxLen(ctx, topic, p.maxStreamEntries).Err(); err != nil {
-			return fmt.Errorf("%w for topic %s: %w", ErrStreamTrimFailed, topic, err)
-		}
-	}
-
 	return nil
+}
+
+func (p *RedisPublisher) Close() error {
+	return p.publisher.Close()
 }

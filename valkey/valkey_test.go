@@ -18,7 +18,7 @@ func TestValkeyConnection(t *testing.T) {
 	ctx := context.Background()
 
 	// Start the test container
-	container := testutil.SetupRedisContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(ctx, t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestValkeyHealthCheck(t *testing.T) {
 	ctx := context.Background()
 
 	// Start the test container
-	container := testutil.SetupRedisContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(ctx, t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)

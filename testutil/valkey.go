@@ -12,31 +12,27 @@ import (
 )
 
 const (
-	defaultRedisPort = "6379/tcp"
+	defaultValkeyPort = "6379/tcp"
 )
 
-type RedisTestContainer struct {
+type ValkeyTestContainer struct {
 	Container testcontainers.Container
 	Host      string
 	Port      nat.Port
 }
 
-func (c *RedisTestContainer) Address() string {
+func (c *ValkeyTestContainer) Address() string {
 	return c.Host + ":" + c.Port.Port()
 }
 
-func (c *RedisTestContainer) ConnectionString() string {
-	return "redis://" + c.Address()
-}
-
-func SetupRedisContainer(ctx context.Context, t *testing.T) *RedisTestContainer {
+func SetupValkeyContainer(ctx context.Context, t *testing.T) *ValkeyTestContainer {
 	t.Helper()
 
 	//nolint:exhaustruct
 	req := testcontainers.ContainerRequest{
-		Image:        "redis:latest",
-		ExposedPorts: []string{defaultRedisPort},
-		WaitingFor:   wait.ForListeningPort(defaultRedisPort).WithStartupTimeout(startupTimeout),
+		Image:        "valkey/valkey:latest",
+		ExposedPorts: []string{defaultValkeyPort},
+		WaitingFor:   wait.ForListeningPort(defaultValkeyPort).WithStartupTimeout(startupTimeout),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -59,7 +55,7 @@ func SetupRedisContainer(ctx context.Context, t *testing.T) *RedisTestContainer 
 	port, err := container.MappedPort(ctx, "6379")
 	require.NoError(t, err)
 
-	return &RedisTestContainer{
+	return &ValkeyTestContainer{
 		Container: container,
 		Host:      host,
 		Port:      port,

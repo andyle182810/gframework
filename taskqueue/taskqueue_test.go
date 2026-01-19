@@ -27,7 +27,7 @@ func (m *mockExecutor) Execute(ctx context.Context, taskID string) error {
 func setupTestQueue(ctx context.Context, t *testing.T) *valkey.Valkey {
 	t.Helper()
 
-	container := testutil.SetupRedisContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(ctx, t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)
