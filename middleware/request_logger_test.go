@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/middleware"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog/log"
 )
 
@@ -23,14 +23,12 @@ func BenchmarkRequestLogger(b *testing.B) {
 	b.ResetTimer()
 
 	for range make([]struct{}, b.N) {
-		// Simulate the next handler
-		handler := middleware(func(c echo.Context) error {
+		handler := middleware(func(c *echo.Context) error {
 			time.Sleep(5 * time.Millisecond)
 
 			return c.String(http.StatusOK, "OK")
 		})
 
-		// Run the handler
 		if err := handler(ctx); err != nil {
 			b.Fatal(err)
 		}

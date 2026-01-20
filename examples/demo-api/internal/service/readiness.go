@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/andyle182810/gframework/httpserver"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
 
@@ -20,10 +20,10 @@ type Info struct {
 	Error  string `json:"error,omitempty"`
 }
 
-func (s *Service) CheckReadiness(ctx echo.Context, req *ReadinessCheckRequest) (any, *echo.HTTPError) {
+func (s *Service) CheckReadiness(ctx *echo.Context, req *ReadinessCheckRequest) (any, *echo.HTTPError) {
 	delegator := func(
 		log zerolog.Logger,
-		eCtx echo.Context,
+		eCtx *echo.Context,
 		_ *ReadinessCheckRequest,
 	) (*httpserver.HandlerResponse[ReadinessCheckResponse], *echo.HTTPError) {
 		log.Info().Msg("Readiness check requested")

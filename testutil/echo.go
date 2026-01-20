@@ -1,4 +1,3 @@
-//nolint:ireturn
 package testutil
 
 import (
@@ -13,7 +12,7 @@ import (
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/validator"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Options struct {
@@ -30,12 +29,12 @@ type Options struct {
 func SetupEchoContext(
 	t *testing.T,
 	opts *Options,
-) (echo.Context, *httptest.ResponseRecorder, *http.Request) {
+) (*echo.Context, *httptest.ResponseRecorder, *http.Request) {
 	t.Helper()
 
 	iecho := echo.New()
 	iecho.Validator = validator.DefaultRestValidator()
-	iecho.HTTPErrorHandler = middleware.ErrorHandler(iecho.DefaultHTTPErrorHandler)
+	iecho.HTTPErrorHandler = middleware.ErrorHandler(iecho.HTTPErrorHandler)
 
 	requestPath := opts.Path
 
@@ -70,16 +69,16 @@ func SetupEchoContext(
 	ctx := iecho.NewContext(req, rec)
 
 	if len(opts.PathParams) > 0 {
-		names := make([]string, 0, len(opts.PathParams))
-		values := make([]string, 0, len(opts.PathParams))
+		pathValues := make([]echo.PathValue, 0, len(opts.PathParams))
 
 		for name, value := range opts.PathParams {
-			names = append(names, name)
-			values = append(values, value)
+			pathValues = append(pathValues, echo.PathValue{
+				Name:  name,
+				Value: value,
+			})
 		}
 
-		ctx.SetParamNames(names...)
-		ctx.SetParamValues(values...)
+		ctx.SetPathValues(pathValues)
 	}
 
 	return ctx, rec, req
@@ -89,7 +88,7 @@ func SetupEchoContextWithAuth(
 	t *testing.T,
 	opts *Options,
 	token string,
-) (echo.Context, *httptest.ResponseRecorder, *http.Request) {
+) (*echo.Context, *httptest.ResponseRecorder, *http.Request) {
 	t.Helper()
 
 	if opts.Headers == nil {
@@ -106,7 +105,7 @@ func SetupEchoContextWithJSON(
 	method string,
 	path string,
 	body interface{},
-) (echo.Context, *httptest.ResponseRecorder, *http.Request) {
+) (*echo.Context, *httptest.ResponseRecorder, *http.Request) {
 	t.Helper()
 
 	var bodyBytes []byte

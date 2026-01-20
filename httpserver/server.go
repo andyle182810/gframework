@@ -12,8 +12,8 @@ import (
 
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/validator"
-	"github.com/labstack/echo/v4"
-	echomiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	echomiddleware "github.com/labstack/echo/v5/middleware"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,6 +21,7 @@ type Config struct {
 	Host         string
 	Port         int
 	EnableCors   bool
+	AllowOrigins []string
 	BodyLimit    string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -28,79 +29,113 @@ type Config struct {
 }
 
 type Server struct {
-	address     string
-	gracePeriod time.Duration
-	Echo        *echo.Echo
-	Root        *echo.Group
+	address      string
+	gracePeriod  time.Duration
+	readTimeout  time.Duration
+	writeTimeout time.Duration
+	Echo         *echo.Echo
+	Root         *echo.Group
+	httpServer   *http.Server
 }
 
 func New(cfg *Config) *Server {
-	echo := echo.New()
-	echo.Server.ReadTimeout = cfg.ReadTimeout
-	echo.Server.WriteTimeout = cfg.WriteTimeout
-	echo.HidePort = true
-	echo.HideBanner = true
-	echo.Validator = validator.DefaultRestValidator()
-	echo.HTTPErrorHandler = middleware.ErrorHandler(echo.DefaultHTTPErrorHandler)
+	e := echo.New()
+	e.Validator = validator.DefaultRestValidator()
+	e.HTTPErrorHandler = middleware.ErrorHandler(echo.DefaultHTTPErrorHandler(false))
 
-	echo.Pre(middleware.RequestLogger(log.Logger, RestLogFieldsExtractor))
-	echo.Pre(echomiddleware.BodyLimit(cfg.BodyLimit))
+	e.Pre(middleware.RequestLogger(log.Logger, RestLogFieldsExtractor))
+
+	// Parse body limit string (e.g., "10M") to bytes
+	bodyLimitBytes := parseBodyLimit(cfg.BodyLimit)
+	e.Pre(echomiddleware.BodyLimit(bodyLimitBytes))
 
 	if cfg.EnableCors {
-		echo.Use(echomiddleware.CORS())
+		e.Use(echomiddleware.CORS(cfg.AllowOrigins...))
 	}
 
-	root := echo.Group("")
+	root := e.Group("")
 	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 
-	return &Server{
-		gracePeriod: cfg.GracePeriod,
-		address:     address,
-		Echo:        echo,
-		Root:        root,
+	return &Server{ //nolint:exhaustruct
+		gracePeriod:  cfg.GracePeriod,
+		address:      address,
+		Echo:         e,
+		Root:         root,
+		readTimeout:  cfg.ReadTimeout,
+		writeTimeout: cfg.WriteTimeout,
 	}
 }
 
-func (s *Server) Start(ctx context.Context) error {
-	errCh := make(chan error, 1)
+func parseBodyLimit(limit string) int64 {
+	if limit == "" {
+		// Default 10MB
+		return 10 << 20 //nolint:mnd
+	}
+
+	multiplier := int64(1)
+	unit := limit[len(limit)-1:]
+
+	switch unit {
+	case "K", "k":
+		multiplier = 1 << 10 //nolint:mnd
+		limit = limit[:len(limit)-1]
+	case "M", "m":
+		multiplier = 1 << 20 //nolint:mnd
+		limit = limit[:len(limit)-1]
+	case "G", "g":
+		multiplier = 1 << 30 //nolint:mnd
+		limit = limit[:len(limit)-1]
+	}
+
+	size, err := strconv.ParseInt(limit, 10, 64)
+	if err != nil {
+		// Default 10MB on error
+		return 10 << 20 //nolint:mnd
+	}
+
+	return size * multiplier
+}
+
+func (s *Server) Start(_ context.Context) error {
+	s.httpServer = &http.Server{ //nolint:exhaustruct
+		Addr:         s.address,
+		Handler:      s.Echo,
+		ReadTimeout:  s.readTimeout,
+		WriteTimeout: s.writeTimeout,
+	}
+
+	log.Info().
+		Str("address", s.address).
+		Msg("The HTTP server is being started")
 
 	go func() {
-		log.Info().
-			Str("address", s.address).
-			Msg("The HTTP server is being started")
-
-		if err := s.Echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
-			errCh <- fmt.Errorf("HTTP server failed: %w", err)
-		} else {
-			errCh <- nil
+		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Err(err).Msg("HTTP server failed to start")
 		}
 	}()
 
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		log.Info().
-			Msg("The HTTP server Run() context has been cancelled")
-
-		return ctx.Err()
-	}
+	return nil
 }
 
 func (s *Server) Stop() error {
-	ctx, cancel := context.WithTimeout(context.TODO(), s.gracePeriod)
-	defer cancel()
-
 	log.Info().
 		Msg("The graceful shutdown of HTTP server is being initiated")
 
-	if err := s.Echo.Shutdown(ctx); err != nil {
-		log.Error().
-			Err(err).
-			Msg("The HTTP server failed to shut down gracefully")
-
-		return err
+	if s.httpServer == nil {
+		return errors.New("HTTP server is not running") //nolint:err113
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), s.gracePeriod)
+	defer cancel()
+
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to gracefully stop HTTP server")
+
+		return fmt.Errorf("failed to stop HTTP server: %w", err)
+	}
+
+	log.Info().
+		Msg("The HTTP server shutdown has been completed successfully")
 
 	return nil
 }
@@ -109,7 +144,7 @@ func (s *Server) Name() string {
 	return "http"
 }
 
-func RestLogFieldsExtractor(ctx echo.Context) map[string]any {
+func RestLogFieldsExtractor(ctx *echo.Context) map[string]any {
 	if req := ctx.Get(middleware.ContextKeyBody); req != nil {
 		var requestPayload string
 
@@ -126,7 +161,7 @@ func RestLogFieldsExtractor(ctx echo.Context) map[string]any {
 }
 
 func RequestIDSkipper(skip bool) echomiddleware.Skipper {
-	return func(_ echo.Context) bool {
+	return func(_ *echo.Context) bool {
 		return skip
 	}
 }

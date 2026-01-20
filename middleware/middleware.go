@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 const (
@@ -36,7 +36,7 @@ var (
 	ErrClaimsTypeAssertionFailed = errors.New("claims type assertion failed")
 )
 
-func GetTenantID(c echo.Context) string {
+func GetTenantID(c *echo.Context) string {
 	if tenantID, ok := c.Get(ContextKeyTenantID).(string); ok {
 		return tenantID
 	}
@@ -44,7 +44,7 @@ func GetTenantID(c echo.Context) string {
 	return ""
 }
 
-func GetRateLimitRequests(c echo.Context) int {
+func GetRateLimitRequests(c *echo.Context) int {
 	if requests, ok := c.Get(ContextKeyRateLimitReqs).(int); ok {
 		return requests
 	}
@@ -52,7 +52,7 @@ func GetRateLimitRequests(c echo.Context) int {
 	return 0
 }
 
-func GetRateLimitWindow(c echo.Context) int {
+func GetRateLimitWindow(c *echo.Context) int {
 	if window, ok := c.Get(ContextKeyRateLimitWin).(int); ok {
 		return window
 	}
@@ -60,7 +60,7 @@ func GetRateLimitWindow(c echo.Context) int {
 	return 0
 }
 
-func GetAPIKey(c echo.Context) string {
+func GetAPIKey(c *echo.Context) string {
 	if apiKey, ok := c.Get(ContextKeyAPIKey).(string); ok {
 		return apiKey
 	}
@@ -68,7 +68,7 @@ func GetAPIKey(c echo.Context) string {
 	return ""
 }
 
-func GetRequestID(c echo.Context) string {
+func GetRequestID(c *echo.Context) string {
 	if requestID, ok := c.Get(ContextKeyRequestID).(string); ok {
 		return requestID
 	}
@@ -76,7 +76,7 @@ func GetRequestID(c echo.Context) string {
 	return uuid.NewString()
 }
 
-func GetToken(c echo.Context) string {
+func GetToken(c *echo.Context) string {
 	if token, ok := c.Get(ContextKeyToken).(string); ok {
 		return token
 	}
@@ -84,7 +84,7 @@ func GetToken(c echo.Context) string {
 	return ""
 }
 
-func GetExtendedClaimsFromContext(c echo.Context) (*ExtendedClaims, error) {
+func GetExtendedClaimsFromContext(c *echo.Context) (*ExtendedClaims, error) {
 	claimsValue := c.Get(ContextKeyClaims)
 
 	if claimsValue == nil {

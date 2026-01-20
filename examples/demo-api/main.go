@@ -23,7 +23,7 @@ import (
 	"github.com/andyle182810/gframework/workerpool"
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -112,6 +112,7 @@ func (app *application) newHTTPServer() *httpserver.Server {
 		Host:         app.cfg.HTTPServerHost,
 		Port:         app.cfg.HTTPServerPort,
 		EnableCors:   app.cfg.HTTPEnableCORS,
+		AllowOrigins: app.cfg.HTTPAllowOrigins,
 		BodyLimit:    app.cfg.HTTPBodyLimit,
 		ReadTimeout:  app.cfg.HTTPServerReadTimeout,
 		WriteTimeout: app.cfg.HTTPServerWriteTimeout,

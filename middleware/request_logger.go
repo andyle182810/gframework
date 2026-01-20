@@ -1,49 +1,56 @@
 package middleware
 
 import (
+	"maps"
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
 
-type LogFieldExtractor func(echo.Context) map[string]any
+type LogFieldExtractor func(*echo.Context) map[string]any
 
 func RequestLogger(log zerolog.Logger, extraLogFieldExtractor ...LogFieldExtractor) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(ectx echo.Context) error {
+		return func(ctx *echo.Context) error {
 			start := time.Now()
 
-			err := next(ectx)
+			err := next(ctx)
 			if err != nil {
-				ectx.Error(err)
+				return err
 			}
 
-			fields := extractLogFields(ectx, start)
+			res, extractErr := echo.UnwrapResponse(ctx.Response())
+			if extractErr != nil {
+				return extractErr
+			}
 
-			// Add request ID if available
-			if id, ok := ectx.Get(ContextKeyRequestID).(string); ok && id != "" {
+			fields := extractLogFields(ctx, start, res)
+
+			if id, ok := ctx.Get(ContextKeyRequestID).(string); ok && id != "" {
 				fields["request_id"] = id
 			}
 
-			// Extract extra log fields
-			addExtraLogFields(fields, ectx, extraLogFieldExtractor)
+			addExtraLogFields(fields, ctx, extraLogFieldExtractor)
 
-			logRequest(log, fields, err, ectx.Response().Status)
+			status := 0
+			if res != nil {
+				status = res.Status
+			}
+
+			logRequest(log, fields, err, status)
 
 			return nil
 		}
 	}
 }
 
-// extractLogFields extracts basic request/response log fields.
-func extractLogFields(ectx echo.Context, start time.Time) map[string]any {
-	req := ectx.Request()
-	res := ectx.Response()
+func extractLogFields(ctx *echo.Context, start time.Time, res *echo.Response) map[string]any {
+	req := ctx.Request()
 
 	return map[string]any{
-		"remote_ip":   ectx.RealIP(),
+		"remote_ip":   ctx.RealIP(),
 		"latency":     time.Since(start).String(),
 		"host":        req.Host,
 		"request":     req.Method + " " + req.URL.String(),
@@ -54,16 +61,12 @@ func extractLogFields(ectx echo.Context, start time.Time) map[string]any {
 	}
 }
 
-// addExtraLogFields adds additional fields from LogFieldExtractors.
-func addExtraLogFields(fields map[string]interface{}, ectx echo.Context, extractors []LogFieldExtractor) {
+func addExtraLogFields(fields map[string]any, ctx *echo.Context, extractors []LogFieldExtractor) {
 	for _, extractor := range extractors {
-		for k, v := range extractor(ectx) {
-			fields[k] = v
-		}
+		maps.Copy(fields, extractor(ctx))
 	}
 }
 
-// logRequest logs the request based on the status code.
 func logRequest(log zerolog.Logger, fields map[string]interface{}, err error, status int) {
 	logger := log.With().Fields(fields).Logger()
 	if err != nil {

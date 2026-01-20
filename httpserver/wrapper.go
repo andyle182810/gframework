@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/middleware"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
 
-func Wrapper[TREQ any](wrapped func(echo.Context, *TREQ) (any, *echo.HTTPError)) echo.HandlerFunc {
-	return func(ectx echo.Context) error {
+func Wrapper[TREQ any](wrapped func(*echo.Context, *TREQ) (any, *echo.HTTPError)) echo.HandlerFunc {
+	return func(ectx *echo.Context) error {
 		requestURI := ectx.Request().RequestURI
 		requestID := ectx.Request().Header.Get(middleware.HeaderXRequestID)
 
@@ -41,7 +41,18 @@ func Wrapper[TREQ any](wrapped func(echo.Context, *TREQ) (any, *echo.HTTPError))
 			return err
 		}
 
-		return sendResponse(ectx, logCtx, ectx.Response().Status, res)
+		response, errx := echo.UnwrapResponse(ectx.Response())
+		if errx != nil {
+			return errx
+		}
+
+		status := 0
+
+		if response != nil {
+			status = response.Status
+		}
+
+		return sendResponse(ectx, logCtx, status, res)
 	}
 }
 
@@ -66,33 +77,31 @@ func logError(log zerolog.Logger, err error, path string, req any, msg string) {
 		Msg(msg)
 }
 
-func bindAndValidate[TREQ any](ectx echo.Context, log zerolog.Logger, path string) (*TREQ, *echo.HTTPError) {
+func bindAndValidate[TREQ any](ectx *echo.Context, log zerolog.Logger, path string) (*TREQ, *echo.HTTPError) {
 	var req TREQ
 
 	if err := ectx.Bind(&req); err != nil {
 		logError(log, err, path, req, "The request body failed to bind to the expected structure")
 
-		return nil, &echo.HTTPError{
-			Code:     http.StatusBadRequest,
-			Message:  err.Error(),
-			Internal: err,
-		}
+		httpErr := echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		_ = httpErr.Wrap(err)
+
+		return nil, httpErr
 	}
 
 	if err := ectx.Validate(&req); err != nil {
 		logError(log, err, path, req, "The request validation has failed")
 
-		return nil, &echo.HTTPError{
-			Code:     http.StatusBadRequest,
-			Message:  err.Error(),
-			Internal: err,
-		}
+		httpErr := echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		_ = httpErr.Wrap(err)
+
+		return nil, httpErr
 	}
 
 	return &req, nil
 }
 
-func sendResponse(ectx echo.Context, log zerolog.Logger, status int, res any) error {
+func sendResponse(ectx *echo.Context, log zerolog.Logger, status int, res any) error {
 	if status != 0 {
 		logRequestEnd(log, status)
 

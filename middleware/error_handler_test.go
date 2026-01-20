@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,8 @@ import (
 
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/testutil"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +19,6 @@ var ErrGeneric = errors.New("generic error")
 func TestErrorHandler_HTTPError(t *testing.T) {
 	t.Parallel()
 
-	// Set up test context
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodPost,
 		Path:          "/test",
@@ -29,37 +30,30 @@ func TestErrorHandler_HTTPError(t *testing.T) {
 		SkipRequestID: false,
 	})
 
-	// Mock next error handler
 	var nextCalled bool
 
-	next := func(_ error, _ echo.Context) {
+	next := func(_ *echo.Context, _ error) {
 		nextCalled = true
 	}
 
-	// Middleware with the mock next handler
 	errorHandler := middleware.ErrorHandler(next)
 
-	// Test case: Handle *echo.HTTPError
 	httpErr := &echo.HTTPError{
-		Code:     http.StatusBadRequest,
-		Message:  "Bad Request",
-		Internal: nil,
+		Code:    http.StatusBadRequest,
+		Message: "Bad Request",
 	}
-	errorHandler(httpErr, ctx)
+	errorHandler(ctx, httpErr)
 
-	// Expected JSON response
 	expectedResponse := `{"message":"Bad Request"}` + "\n"
 
-	// Verify response
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.JSONEq(t, expectedResponse, rec.Body.String()) // Compare JSON
-	require.False(t, nextCalled)                           // Next handler should not be called for HTTPError
+	require.False(t, nextCalled)                           // Next handler
 }
 
 func TestErrorHandler_GenericError(t *testing.T) {
 	t.Parallel()
 
-	// Set up test context
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodPost,
 		Path:          "/test",
@@ -71,24 +65,19 @@ func TestErrorHandler_GenericError(t *testing.T) {
 		SkipRequestID: false,
 	})
 
-	// Track if next handler was called
 	var nextCalled bool
 
-	next := func(_ error, _ echo.Context) {
+	next := func(_ *echo.Context, _ error) {
 		nextCalled = true
 	}
 
-	// Middleware with the next handler
 	errorHandler := middleware.ErrorHandler(next)
 
-	// Test case: Handle a generic error (not *echo.HTTPError)
-	errorHandler(ErrGeneric, ctx)
+	errorHandler(ctx, ErrGeneric)
 
-	// Assertions
-	require.True(t, nextCalled) // Ensure next handler was called
+	require.True(t, nextCalled)
 }
 
-// BenchmarkErrorHandler_HTTPError benchmarks handling of *echo.HTTPError.
 func BenchmarkErrorHandler_HTTPError(b *testing.B) {
 	e := echo.New()
 	rec := httptest.NewRecorder()
@@ -98,32 +87,150 @@ func BenchmarkErrorHandler_HTTPError(b *testing.B) {
 	errorHandler := middleware.ErrorHandler(nil)
 
 	httpErr := &echo.HTTPError{
-		Code:     400,
-		Message:  "Bad Request",
-		Internal: nil,
+		Code:    400,
+		Message: "Bad Request",
 	}
 
 	b.ResetTimer()
 
 	for range make([]struct{}, b.N) {
-		rec.Body.Reset() // Reset response recorder for each iteration
-		errorHandler(httpErr, ctx)
+		rec.Body.Reset()
+		errorHandler(ctx, httpErr)
 	}
 }
 
-// BenchmarkErrorHandler_GenericError benchmarks handling of generic errors.
 func BenchmarkErrorHandler_GenericError(b *testing.B) {
 	e := echo.New()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := e.NewContext(req, rec)
 
-	next := func(_ error, _ echo.Context) {}
+	next := func(_ *echo.Context, _ error) {}
 	errorHandler := middleware.ErrorHandler(next)
 
 	b.ResetTimer()
 
 	for range make([]struct{}, b.N) {
-		errorHandler(ErrGeneric, ctx)
+		errorHandler(ctx, ErrGeneric)
 	}
+}
+
+func TestErrorHandler_WithLogging(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	logger := zerolog.New(&buf)
+
+	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+		Method: http.MethodGet,
+		Path:   "/test",
+	})
+
+	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
+		Logger:    &logger,
+		LogErrors: true,
+	}
+	errorHandler := middleware.ErrorHandler(nil, config)
+
+	httpErr := &echo.HTTPError{
+		Code:    http.StatusInternalServerError,
+		Message: "Internal Server Error",
+	}
+	errorHandler(ctx, httpErr)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+
+	require.Contains(t, buf.String(), "HTTP error: server error")
+	require.Contains(t, buf.String(), "Internal Server Error")
+}
+
+func TestErrorHandler_WithWrappedError(t *testing.T) {
+	t.Parallel()
+
+	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+		Method: http.MethodPost,
+		Path:   "/test",
+	})
+
+	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
+		IncludeInternalErrors: true,
+	}
+	errorHandler := middleware.ErrorHandler(nil, config)
+
+	internalErr := errors.New("database connection failed") //nolint:err113
+	baseErr := echo.NewHTTPError(http.StatusServiceUnavailable, "Service Unavailable")
+
+	wrappedErr := baseErr.Wrap(internalErr)
+
+	var httpErr *echo.HTTPError
+
+	ok := errors.As(wrappedErr, &httpErr)
+	require.True(t, ok)
+
+	errorHandler(ctx, httpErr)
+
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	require.Contains(t, rec.Body.String(), "Service Unavailable")
+	require.Contains(t, rec.Body.String(), "database connection failed")
+}
+
+func TestErrorHandler_CustomErrorResponse(t *testing.T) {
+	t.Parallel()
+
+	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+		Method: http.MethodGet,
+		Path:   "/test",
+	})
+
+	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
+		CustomErrorResponse: func(_ *echo.Context, err error, code int) map[string]any {
+			return map[string]any{
+				"error":  err.Error(),
+				"status": code,
+				"custom": "field",
+			}
+		},
+	}
+	errorHandler := middleware.ErrorHandler(nil, config)
+
+	httpErr := &echo.HTTPError{
+		Code:    http.StatusBadRequest,
+		Message: "Bad Request",
+	}
+	errorHandler(ctx, httpErr)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "\"custom\":\"field\"")
+	require.Contains(t, rec.Body.String(), "\"status\":400")
+}
+
+func TestErrorHandler_NonHTTPError_WithLogging(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	logger := zerolog.New(&buf)
+
+	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+		Method: http.MethodPost,
+		Path:   "/test",
+	})
+
+	var nextCalled bool
+
+	next := func(_ *echo.Context, _ error) {
+		nextCalled = true
+	}
+
+	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
+		Logger:    &logger,
+		LogErrors: true,
+	}
+	errorHandler := middleware.ErrorHandler(next, config)
+
+	errorHandler(ctx, ErrGeneric)
+
+	require.True(t, nextCalled)
+
+	require.Contains(t, buf.String(), "Unhandled error")
+	require.Contains(t, buf.String(), "generic error")
 }

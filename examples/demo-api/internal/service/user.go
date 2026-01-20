@@ -7,7 +7,7 @@ import (
 	"github.com/andyle182810/gframework/httpserver"
 	"github.com/andyle182810/gframework/pagination"
 	"github.com/georgysavva/scany/v2/pgxscan"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
 
@@ -43,10 +43,10 @@ type ListUsersResponse struct {
 	Users []GetUserResponse `json:"users"`
 }
 
-func (s *Service) CreateUser(ctx echo.Context, req *CreateUserRequest) (any, *echo.HTTPError) {
+func (s *Service) CreateUser(ctx *echo.Context, req *CreateUserRequest) (any, *echo.HTTPError) {
 	delegator := func(
 		log zerolog.Logger,
-		ctx echo.Context,
+		ctx *echo.Context,
 		req *CreateUserRequest,
 	) (*httpserver.HandlerResponse[CreateUserResponse], *echo.HTTPError) {
 		log.Info().
@@ -84,10 +84,10 @@ func (s *Service) CreateUser(ctx echo.Context, req *CreateUserRequest) (any, *ec
 	return httpserver.ExecuteStandardized(ctx, req, "CreateUser", delegator)
 }
 
-func (s *Service) GetUser(ctx echo.Context, req *GetUserRequest) (any, *echo.HTTPError) {
+func (s *Service) GetUser(ctx *echo.Context, req *GetUserRequest) (any, *echo.HTTPError) {
 	delegator := func(
 		log zerolog.Logger,
-		ctx echo.Context,
+		ctx *echo.Context,
 		req *GetUserRequest,
 	) (*httpserver.HandlerResponse[GetUserResponse], *echo.HTTPError) {
 		log.Info().Str("user_id", req.UserID).Msg("Fetching user")
@@ -121,10 +121,10 @@ func (s *Service) GetUser(ctx echo.Context, req *GetUserRequest) (any, *echo.HTT
 	return httpserver.ExecuteStandardized(ctx, req, "GetUser", delegator)
 }
 
-func (s *Service) ListUsers(ctx echo.Context, req *ListUsersRequest) (any, *echo.HTTPError) {
+func (s *Service) ListUsers(ctx *echo.Context, req *ListUsersRequest) (any, *echo.HTTPError) {
 	delegator := func(
 		log zerolog.Logger,
-		ctx echo.Context,
+		ctx *echo.Context,
 		req *ListUsersRequest,
 	) (*httpserver.HandlerResponse[ListUsersResponse], *echo.HTTPError) {
 		page, pageSize, offset := pagination.Normalize(req.Page, req.PageSize)

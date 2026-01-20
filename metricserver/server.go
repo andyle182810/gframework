@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo-contrib/echoprometheus"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog/log"
 )
 
@@ -28,19 +28,18 @@ type Config struct {
 }
 
 type Server struct {
-	gracePeriod time.Duration
-	address     string
-	echo        *echo.Echo
+	gracePeriod  time.Duration
+	readTimeout  time.Duration
+	writeTimeout time.Duration
+	address      string
+	echo         *echo.Echo
+	httpServer   *http.Server
 }
 
 func New(cfg *Config) *Server {
 	ech := echo.New()
-	ech.Server.ReadTimeout = cfg.ReadTimeout
-	ech.Server.WriteTimeout = cfg.WriteTimeout
-	ech.HideBanner = true
-	ech.HidePort = true
 
-	ech.GET(statusPath, func(ctx echo.Context) error {
+	ech.GET(statusPath, func(ctx *echo.Context) error {
 		return ctx.JSON(http.StatusOK, map[string]any{"status": "ok"})
 	})
 
@@ -48,52 +47,51 @@ func New(cfg *Config) *Server {
 
 	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 
-	return &Server{
-		gracePeriod: cfg.GracePeriod,
-		address:     address,
-		echo:        ech,
+	return &Server{ //nolint:exhaustruct
+		gracePeriod:  cfg.GracePeriod,
+		readTimeout:  cfg.ReadTimeout,
+		writeTimeout: cfg.WriteTimeout,
+		address:      address,
+		echo:         ech,
 	}
 }
 
-func (s *Server) Start(ctx context.Context) error {
-	errCh := make(chan error, 1)
+func (s *Server) Start(_ context.Context) error {
+	s.httpServer = &http.Server{ //nolint:exhaustruct
+		Addr:         s.address,
+		Handler:      s.echo,
+		ReadTimeout:  s.readTimeout,
+		WriteTimeout: s.writeTimeout,
+	}
+
+	log.Info().
+		Str("address", s.address).
+		Msg("The metrics server is being started")
 
 	go func() {
-		log.Info().
-			Str("address", s.address).
-			Msg("The metrics server is being started")
-
-		if err := s.echo.Start(s.address); !errors.Is(err, http.ErrServerClosed) {
-			errCh <- fmt.Errorf("metrics server failed: %w", err)
-		} else {
-			errCh <- nil
+		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Err(err).Msg("Metrics server failed to start")
 		}
 	}()
 
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		log.Info().
-			Msg("The metrics server Run() context has been cancelled")
-
-		return ctx.Err()
-	}
+	return nil
 }
 
 func (s *Server) Stop() error {
-	shutdownCtx, cancel := context.WithTimeout(context.TODO(), s.gracePeriod)
-	defer cancel()
-
 	log.Info().
 		Msg("The graceful shutdown of metrics server is being initiated")
 
-	if err := s.echo.Shutdown(shutdownCtx); err != nil {
-		log.Error().
-			Err(err).
-			Msg("The metrics server failed to shut down gracefully")
+	if s.httpServer == nil {
+		return errors.New("metrics server is not running") //nolint:err113
+	}
 
-		return err
+	ctx, cancel := context.WithTimeout(context.Background(), s.gracePeriod)
+	defer cancel()
+
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to gracefully stop metrics server")
+
+		return fmt.Errorf("failed to stop metrics server: %w", err)
 	}
 
 	log.Info().

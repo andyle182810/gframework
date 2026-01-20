@@ -23,7 +23,7 @@ func TestService_HealthCheck(t *testing.T) {
 
 	err := handler(echoCtx)
 	if err != nil {
-		echoCtx.Echo().HTTPErrorHandler(err, echoCtx)
+		echoCtx.Echo().HTTPErrorHandler(echoCtx, err)
 	}
 
 	testutil.AssertStatusCode(t, rec, http.StatusOK)

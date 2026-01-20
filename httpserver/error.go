@@ -3,7 +3,7 @@ package httpserver
 import (
 	"fmt"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 func HTTPError(code int, err error, details ...string) *echo.HTTPError {
@@ -13,5 +13,8 @@ func HTTPError(code int, err error, details ...string) *echo.HTTPError {
 		message = fmt.Sprintf("%s: %s", message, details[0])
 	}
 
-	return &echo.HTTPError{Code: code, Internal: err, Message: message}
+	httpErr := echo.NewHTTPError(code, message)
+	_ = httpErr.Wrap(err)
+
+	return httpErr
 }

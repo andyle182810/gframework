@@ -5,8 +5,8 @@ import (
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
-	echojwt "github.com/labstack/echo-jwt/v4"
-	"github.com/labstack/echo/v4"
+	echojwt "github.com/labstack/echo-jwt/v5"
+	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
 
@@ -45,7 +45,7 @@ func NewJwksAuth(
 
 func (j *JwksAuth) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(ctx echo.Context) error {
+		return func(ctx *echo.Context) error {
 			requestID := ctx.Request().Header.Get(HeaderXRequestID)
 			log := zerolog.Ctx(ctx.Request().Context()).With().
 				Str("middleware", "jwks_auth").
@@ -65,17 +65,17 @@ func (j *JwksAuth) Middleware() echo.MiddlewareFunc {
 				KeyFunc: func(token *jwt.Token) (any, error) {
 					return j.keyfunc.Keyfunc(token)
 				},
-				NewClaimsFunc: func(_ echo.Context) jwt.Claims {
+				NewClaimsFunc: func(_ *echo.Context) jwt.Claims {
 					//nolint:exhaustruct // Claims fields are populated by JWT parser
 					return &ExtendedClaims{}
 				},
-				SuccessHandler: func(echoCtx echo.Context) {
+				SuccessHandler: func(echoCtx *echo.Context) error {
 					token, ok := echoCtx.Get("user").(*jwt.Token)
 					if !ok {
 						log.Error().
 							Msg("The JWT token failed to be retrieved from the context")
 
-						return
+						return nil
 					}
 
 					echoCtx.Set(ContextKeyToken, token.Raw)
@@ -91,8 +91,10 @@ func (j *JwksAuth) Middleware() echo.MiddlewareFunc {
 
 					log.Debug().
 						Msg("The JWT token has been verified successfully")
+
+					return nil
 				},
-				ErrorHandler: func(_ echo.Context, err error) error {
+				ErrorHandler: func(_ *echo.Context, err error) error {
 					log.Error().
 						Err(err).
 						Msg("The JWT verification has failed")

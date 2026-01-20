@@ -149,7 +149,7 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 
 			err := handler(echoCtx)
 			if err != nil {
-				echoCtx.Echo().HTTPErrorHandler(err, echoCtx)
+				echoCtx.Echo().HTTPErrorHandler(echoCtx, err)
 			}
 
 			testutil.AssertStatusCode(t, rec, tt.expectedStatus)
@@ -184,7 +184,7 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 
 	err := handler(echoCtx1)
 	if err != nil {
-		echoCtx1.Echo().HTTPErrorHandler(err, echoCtx1)
+		echoCtx1.Echo().HTTPErrorHandler(echoCtx1, err)
 	}
 
 	testutil.AssertStatusCode(t, rec1, http.StatusOK)
@@ -202,7 +202,7 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 
 	err = handler(echoCtx2)
 	if err != nil {
-		echoCtx2.Echo().HTTPErrorHandler(err, echoCtx2)
+		echoCtx2.Echo().HTTPErrorHandler(echoCtx2, err)
 	}
 
 	require.NotEqual(t, http.StatusOK, rec2.Code)
@@ -274,7 +274,7 @@ func TestService_GetUser(t *testing.T) {
 
 			err := handler(echoCtx)
 			if err != nil {
-				echoCtx.Echo().HTTPErrorHandler(err, echoCtx)
+				echoCtx.Echo().HTTPErrorHandler(echoCtx, err)
 			}
 
 			testutil.AssertStatusCode(t, rec, tt.expectedStatus)
@@ -391,7 +391,7 @@ func TestService_ListUsers(t *testing.T) { //nolint:funlen
 
 			err := handler(echoCtx)
 			if err != nil {
-				echoCtx.Echo().HTTPErrorHandler(err, echoCtx)
+				echoCtx.Echo().HTTPErrorHandler(echoCtx, err)
 			}
 
 			testutil.AssertStatusCode(t, rec, tt.expectedStatus)
@@ -424,7 +424,7 @@ func TestService_GetUser_WithCache(t *testing.T) {
 
 	err := createHandler(echoCtxCreate)
 	if err != nil {
-		echoCtxCreate.Echo().HTTPErrorHandler(err, echoCtxCreate)
+		echoCtxCreate.Echo().HTTPErrorHandler(echoCtxCreate, err)
 	}
 
 	testutil.AssertStatusCode(t, recCreate, http.StatusOK)
