@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/examples/demo-api/internal/config"
+	"github.com/andyle182810/gframework/examples/demo-api/internal/msghandler"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/service"
 	"github.com/andyle182810/gframework/httpserver"
@@ -14,6 +15,8 @@ import (
 	"github.com/andyle182810/gframework/metricserver"
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/postgres"
+	"github.com/andyle182810/gframework/redispub"
+	"github.com/andyle182810/gframework/redissub"
 	"github.com/andyle182810/gframework/runner"
 	"github.com/andyle182810/gframework/taskqueue"
 	"github.com/andyle182810/gframework/valkey"
@@ -60,12 +63,23 @@ func run() error {
 		return err
 	}
 
+	publisher, err := initValkeyPublisher(valkey)
+	if err != nil {
+		return err
+	}
+
+	multiSubscriber, err := initMultiSubscriber(valkey)
+	if err != nil {
+		return err
+	}
+
 	app := &application{
 		cfg:       cfg,
 		svc:       svc,
 		db:        db,
 		valkey:    valkey,
 		taskQueue: taskQueue,
+		publisher: publisher,
 	}
 
 	appRunner := runner.New(
@@ -75,6 +89,8 @@ func run() error {
 		runner.WithCoreService(app.newHTTPServer()),
 		runner.WithCoreService(app.newWorkerPool()),
 		runner.WithCoreService(taskQueue),
+		runner.WithCoreService(app.newMessagePublisherPool()),
+		runner.WithCoreService(multiSubscriber),
 	)
 
 	appRunner.Run()
@@ -88,6 +104,7 @@ type application struct {
 	db        *postgres.Postgres
 	valkey    *valkey.Valkey
 	taskQueue *taskqueue.Queue
+	publisher *redispub.RedisPublisher
 }
 
 func (app *application) newHTTPServer() *httpserver.Server {
@@ -127,6 +144,18 @@ func (app *application) newWorkerPool() *workerpool.WorkerPool {
 		workerpool.WithWorkerCount(2), //nolint:mnd
 		workerpool.WithTickInterval(5*time.Second),      //nolint:mnd
 		workerpool.WithExecutionTimeout(10*time.Second), //nolint:mnd
+	)
+}
+
+func (app *application) newMessagePublisherPool() *workerpool.WorkerPool {
+	msgPublisher := &messagePublisher{publisher: app.publisher}
+
+	return workerpool.New(
+		msgPublisher,
+		workerpool.WithName("message-publisher-pool"),
+		workerpool.WithWorkerCount(1),
+		workerpool.WithTickInterval(10*time.Second),     //nolint:mnd
+		workerpool.WithExecutionTimeout(30*time.Second), //nolint:mnd
 	)
 }
 
@@ -239,6 +268,49 @@ func initValkey(cfg *config.Config) (*valkey.Valkey, error) {
 	return redis, nil
 }
 
+const (
+	topicOrders        = "demo-api:orders"
+	topicNotifications = "demo-api:notifications"
+	topicAnalytics     = "demo-api:analytics"
+)
+
+type messagePublisher struct {
+	publisher redispub.Publisher
+}
+
+func (p *messagePublisher) Execute(ctx context.Context) error {
+	topics := []string{topicOrders, topicNotifications, topicAnalytics}
+
+	for _, topic := range topics {
+		messageCount := rand.IntN(3) + 1 //nolint:gosec,mnd
+		messages := make([]string, messageCount)
+
+		for i := range messageCount {
+			messages[i] = fmt.Sprintf(
+				`{"id":"%s","topic":"%s","timestamp":"%s"}`,
+				uuid.New().String(),
+				topic,
+				time.Now().Format(time.RFC3339),
+			)
+		}
+
+		log.Info().
+			Str("topic", topic).
+			Int("message_count", messageCount).
+			Msg("Publishing messages to topic")
+
+		if err := p.publisher.PublishToTopic(ctx, topic, messages...); err != nil {
+			log.Error().Err(err).Str("topic", topic).Msg("Failed to publish messages")
+
+			return fmt.Errorf("failed to publish to topic %s: %w", topic, err)
+		}
+	}
+
+	log.Info().Msg("Message publisher completed publishing to all topics")
+
+	return nil
+}
+
 type taskConsumer struct{}
 
 func (c *taskConsumer) Execute(ctx context.Context, taskID string) error {
@@ -277,4 +349,50 @@ func initTaskQueue(valkeyClient *valkey.Valkey) (*taskqueue.Queue, error) {
 	log.Info().Msg("Task queue initialized successfully")
 
 	return queue, nil
+}
+
+func initValkeyPublisher(valkeyClient *valkey.Valkey) (*redispub.RedisPublisher, error) {
+	publisher, err := redispub.New(valkeyClient.Client, redispub.Options{
+		MaxStreamEntries: 1000,            //nolint:mnd
+		Timeout:          5 * time.Second, //nolint:mnd
+		Logger:           nil,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize redis publisher: %w", err)
+	}
+
+	log.Info().Msg("Valkey publisher initialized successfully")
+
+	return publisher, nil
+}
+
+func initMultiSubscriber(valkeyClient *valkey.Valkey) (*redissub.MultiSubscriber, error) {
+	multiSub := redissub.NewMultiSubscriber(
+		"demo-api-subscriber",
+		valkeyClient.Client,
+		"demo-api-consumer-group",
+		redissub.WithExecTimeout(30*time.Second),                    //nolint:mnd
+		redissub.WithShutdownTimeout(10*time.Second),                //nolint:mnd
+		redissub.WithRetry(3, 100*time.Millisecond, "demo-api:dlq"), //nolint:mnd
+	)
+
+	handler := msghandler.New()
+
+	if err := multiSub.Subscribe(topicOrders, handler.HandleOrder); err != nil {
+		return nil, fmt.Errorf("failed to subscribe to orders topic: %w", err)
+	}
+
+	if err := multiSub.Subscribe(topicNotifications, handler.HandleNotification); err != nil {
+		return nil, fmt.Errorf("failed to subscribe to notifications topic: %w", err)
+	}
+
+	if err := multiSub.Subscribe(topicAnalytics, handler.HandleAnalytics); err != nil {
+		return nil, fmt.Errorf("failed to subscribe to analytics topic: %w", err)
+	}
+
+	log.Info().
+		Int("subscriber_count", multiSub.SubscriberCount()).
+		Msg("Multi subscriber initialized successfully")
+
+	return multiSub, nil
 }
