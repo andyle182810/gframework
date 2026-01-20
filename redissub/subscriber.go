@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultShutdownTimeout = 5 * time.Second
+	defaultShutdownTimeout = 20 * time.Second
 	defaultExecTimeout     = 30 * time.Second
 )
 
@@ -265,15 +265,17 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 		case <-ctx.Done():
 			s.healthy.Store(false)
 			log.Info().
+				Str("service_name", s.Name()).
 				Str("topic", s.Topic()).
-				Msg("The subscription has been stopped due to context cancellation")
+				Msg("Subscriber stopped: context cancelled")
 
 			return ctx.Err()
 		case <-s.shutdownSignal:
 			s.healthy.Store(false)
 			log.Info().
+				Str("service_name", s.Name()).
 				Str("topic", s.Topic()).
-				Msg("The subscription has been stopped")
+				Msg("Subscriber stopped: graceful shutdown initiated")
 
 			return nil
 		case msg := <-msgChan:

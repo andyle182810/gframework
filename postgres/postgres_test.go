@@ -1,5 +1,4 @@
 //nolint:exhaustruct,usetesting
-//nolint:usetesting
 package postgres_test
 
 import (

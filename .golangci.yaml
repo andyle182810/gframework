@@ -149,6 +149,7 @@ linters-settings:
       - wg
       - c
       - e
+      - v
   lll:
     line-length: 130
     tab-width: 1

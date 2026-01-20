@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -12,6 +13,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/rs/zerolog/log"
+)
+
+const (
+	initialPingTimeout = 5 * time.Second
 )
 
 var (
@@ -94,14 +99,12 @@ func New(cfg *Config) (*Postgres, error) {
 }
 
 func (p *Postgres) Start(ctx context.Context) error {
-	log.Info().
-		Str("service_name", p.Name()).
-		Msg("The PostgreSQL connection pool is operational and waiting for shutdown signal")
+	pingCtx, cancel := context.WithTimeout(ctx, initialPingTimeout)
+	defer cancel()
 
-	<-ctx.Done()
-	log.Info().
-		Str("service_name", p.Name()).
-		Msg("The PostgreSQL Run() context has been cancelled")
+	if err := p.Ping(pingCtx); err != nil {
+		return fmt.Errorf("postgres ping failed: %w", err)
+	}
 
 	return nil
 }

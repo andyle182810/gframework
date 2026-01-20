@@ -99,7 +99,7 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Name'")
+				require.Contains(t, rec.Body.String(), "name must be at least 2")
 			},
 		},
 		{
@@ -110,7 +110,7 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Email'")
+				require.Contains(t, rec.Body.String(), "email must be a valid email address")
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Name'")
+				require.Contains(t, rec.Body.String(), "name is required")
 			},
 		},
 		{
@@ -132,7 +132,7 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 			},
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Error:Field validation for 'Email'")
+				require.Contains(t, rec.Body.String(), "email is required")
 			},
 		},
 	}
@@ -255,7 +255,7 @@ func TestService_GetUser(t *testing.T) {
 			userID:         "invalid-uuid",
 			expectedStatus: http.StatusBadRequest,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				require.Contains(t, rec.Body.String(), "Error:Field validation for 'UserID'")
+				require.Contains(t, rec.Body.String(), "UserID must be a valid UUID")
 			},
 		},
 	}

@@ -32,8 +32,8 @@ const (
 )
 
 var (
-	ErrClaimsNotFound            = errors.New("jwt claims not found in context")
-	ErrClaimsTypeAssertionFailed = errors.New("claims type assertion failed")
+	ErrClaimsNotFound            = errors.New("jwt claims: not found in context")
+	ErrClaimsTypeAssertionFailed = errors.New("jwt claims: type assertion failed")
 )
 
 func GetTenantID(c *echo.Context) string {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
@@ -30,6 +31,8 @@ type MultiSubscriber struct {
 	healthy        atomic.Bool
 	running        atomic.Bool
 	opts           []SubscriberOption
+	shutdownSignal chan struct{}
+	stoppedSignal  chan struct{}
 }
 
 func NewMultiSubscriber(
@@ -40,11 +43,13 @@ func NewMultiSubscriber(
 ) *MultiSubscriber {
 	//nolint:exhaustruct
 	multiSub := &MultiSubscriber{
-		name:          name,
-		redisClient:   redisClient,
-		consumerGroup: consumerGroup,
-		subscribers:   make([]*Subscriber, 0),
-		opts:          opts,
+		name:           name,
+		redisClient:    redisClient,
+		consumerGroup:  consumerGroup,
+		subscribers:    make([]*Subscriber, 0),
+		opts:           opts,
+		shutdownSignal: make(chan struct{}),
+		stoppedSignal:  make(chan struct{}),
 	}
 	multiSub.healthy.Store(false)
 
@@ -81,6 +86,8 @@ func (m *MultiSubscriber) Start(ctx context.Context) error {
 		return ErrMultiSubscriberAlreadyRunning
 	}
 
+	defer close(m.stoppedSignal)
+
 	m.subscribersMux.Lock()
 	subscribers := make([]*Subscriber, len(m.subscribers))
 	copy(subscribers, m.subscribers)
@@ -113,7 +120,26 @@ func (m *MultiSubscriber) Start(ctx context.Context) error {
 		}(subscriber)
 	}
 
-	return nil
+	for {
+		select {
+		case <-ctx.Done():
+			m.healthy.Store(false)
+			log.Info().
+				Str("service_name", m.Name()).
+				Int("subscriber_count", len(subscribers)).
+				Msg("Multi-subscriber stopped: context cancelled")
+
+			return ctx.Err()
+		case <-m.shutdownSignal:
+			m.healthy.Store(false)
+			log.Info().
+				Str("service_name", m.Name()).
+				Int("subscriber_count", len(subscribers)).
+				Msg("Multi-subscriber stopped: graceful shutdown initiated")
+
+			return nil
+		}
+	}
 }
 
 func (m *MultiSubscriber) Stop() error {
@@ -125,6 +151,10 @@ func (m *MultiSubscriber) Stop() error {
 		Msg("The shutdown of all subscribers is being initiated")
 
 	m.healthy.Store(false)
+
+	if m.shutdownSignal != nil {
+		close(m.shutdownSignal)
+	}
 
 	var errorMessages []string
 
@@ -157,7 +187,22 @@ func (m *MultiSubscriber) Stop() error {
 		return fmt.Errorf("%w: %s", ErrClosingSubscribers, strings.Join(errorMessages, ", "))
 	}
 
+	shutdownStart := time.Now()
+	select {
+	case <-m.stoppedSignal:
+		log.Info().
+			Str("service_name", m.Name()).
+			Dur("shutdown_duration", time.Since(shutdownStart)).
+			Msg("Multi-subscriber stopped cleanly")
+	case <-time.After(defaultShutdownTimeout):
+		log.Error().
+			Str("service_name", m.Name()).
+			Dur("timeout", defaultShutdownTimeout).
+			Msg("Timeout waiting for multi-subscriber to stop gracefully")
+	}
+
 	log.Info().
+		Str("service_name", m.Name()).
 		Msg("All subscribers have been shut down successfully")
 
 	return nil

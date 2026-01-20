@@ -223,15 +223,6 @@ func (v *Valkey) Start(ctx context.Context) error {
 		return fmt.Errorf("valkey ping failed: %w", err)
 	}
 
-	log.Info().
-		Str("service_name", v.Name()).
-		Msg("The Valkey client is operational and waiting for shutdown signal")
-
-	<-ctx.Done()
-	log.Info().
-		Str("service_name", v.Name()).
-		Msg("The Valkey Run() context has been cancelled")
-
 	return nil
 }
 
