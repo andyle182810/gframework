@@ -1,37 +1,54 @@
 package redissub
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
 var (
-	ErrEmptyTopic         = errors.New("topic cannot be empty")
-	ErrSubscriberCreation = errors.New("failed to create subscriber")
-	ErrClosingSubcribers  = errors.New("errors while closing subscribers")
+	ErrEmptyTopic                    = errors.New("multi_subscriber: topic cannot be empty")
+	ErrSubscriberCreation            = errors.New("multi_subscriber: failed to create subscriber")
+	ErrClosingSubscribers            = errors.New("multi_subscriber: errors while closing subscribers")
+	ErrNoSubscribers                 = errors.New("multi_subscriber: no subscribers registered")
+	ErrMultiSubscriberAlreadyRunning = errors.New("multi_subscriber: already running")
 )
 
 type MultiSubscriber struct {
+	name           string
 	redisClient    goredis.UniversalClient
 	consumerGroup  string
 	subscribers    []*Subscriber
-	waitGroup      sync.WaitGroup // WaitGroup to wait for all subscribers to stop
-	subscribersMux sync.Mutex     // Mutex to protect the subscribers slice
+	waitGroup      sync.WaitGroup
+	subscribersMux sync.Mutex
+	healthy        atomic.Bool
+	running        atomic.Bool
+	opts           []SubscriberOption
 }
 
-func NewMultiSubscriber(redisClient goredis.UniversalClient, consumerGroup string) *MultiSubscriber {
-	return &MultiSubscriber{
-		redisClient:    redisClient,
-		consumerGroup:  consumerGroup,
-		subscribers:    make([]*Subscriber, 0),
-		waitGroup:      sync.WaitGroup{},
-		subscribersMux: sync.Mutex{},
+func NewMultiSubscriber(
+	name string,
+	redisClient goredis.UniversalClient,
+	consumerGroup string,
+	opts ...SubscriberOption,
+) *MultiSubscriber {
+	//nolint:exhaustruct
+	multiSub := &MultiSubscriber{
+		name:          name,
+		redisClient:   redisClient,
+		consumerGroup: consumerGroup,
+		subscribers:   make([]*Subscriber, 0),
+		opts:          opts,
 	}
+	multiSub.healthy.Store(false)
+
+	return multiSub
 }
 
 func (m *MultiSubscriber) Subscribe(topic string, messageHandler MessageHandler) error {
@@ -43,7 +60,7 @@ func (m *MultiSubscriber) Subscribe(topic string, messageHandler MessageHandler)
 		return ErrNilMessageHandler
 	}
 
-	subscriber, err := NewSubscriber(m.redisClient, m.consumerGroup, topic, messageHandler)
+	subscriber, err := NewSubscriber(m.redisClient, m.consumerGroup, topic, messageHandler, m.opts...)
 	if err != nil {
 		return fmt.Errorf("%w for topic %s: %w", ErrSubscriberCreation, topic, err)
 	}
@@ -52,32 +69,70 @@ func (m *MultiSubscriber) Subscribe(topic string, messageHandler MessageHandler)
 	m.subscribers = append(m.subscribers, subscriber)
 	m.subscribersMux.Unlock()
 
-	m.waitGroup.Add(1)
-
-	go func() {
-		defer m.waitGroup.Done()
-		subscriber.Start()
-	}()
-
 	log.Info().
 		Str("topic", topic).
-		Msg("The subscription to the topic has been completed successfully")
+		Msg("The subscription to the topic has been registered")
 
 	return nil
 }
 
-func (m *MultiSubscriber) Close() error {
+func (m *MultiSubscriber) Start(ctx context.Context) error {
+	if !m.running.CompareAndSwap(false, true) {
+		return ErrMultiSubscriberAlreadyRunning
+	}
+
+	m.subscribersMux.Lock()
+	subscribers := make([]*Subscriber, len(m.subscribers))
+	copy(subscribers, m.subscribers)
+	m.subscribersMux.Unlock()
+
+	if len(subscribers) == 0 {
+		log.Warn().Msg("No subscribers registered, waiting for stop signal")
+
+		return nil
+	}
+
+	log.Info().
+		Int("count", len(subscribers)).
+		Msg("Starting all subscribers")
+
+	m.healthy.Store(true)
+
+	for _, subscriber := range subscribers {
+		m.waitGroup.Add(1)
+
+		go func(sub *Subscriber) {
+			defer m.waitGroup.Done()
+
+			if err := sub.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error().
+					Err(err).
+					Str("topic", sub.Topic()).
+					Msg("Subscriber failed")
+			}
+		}(subscriber)
+	}
+
+	return nil
+}
+
+func (m *MultiSubscriber) Stop() error {
+	if !m.running.CompareAndSwap(true, false) {
+		return nil
+	}
+
 	log.Info().
 		Msg("The shutdown of all subscribers is being initiated")
 
-	// Collect errors during closing
+	m.healthy.Store(false)
+
 	var errorMessages []string
 
 	m.subscribersMux.Lock()
 	defer m.subscribersMux.Unlock()
 
 	for _, subscriber := range m.subscribers {
-		if err := subscriber.Close(); err != nil {
+		if err := subscriber.Stop(); err != nil {
 			errorMessages = append(
 				errorMessages,
 				fmt.Sprintf("[%s/%s: %v]", subscriber.ConsumerGroup(), subscriber.Topic(), err),
@@ -86,23 +141,52 @@ func (m *MultiSubscriber) Close() error {
 			log.Error().
 				Err(err).
 				Str("topic", subscriber.Topic()).
-				Msg("The subscriber failed to close")
+				Str("name", subscriber.Name()).
+				Msg("The subscriber failed to stop")
 		} else {
 			log.Info().
 				Str("topic", subscriber.Topic()).
-				Msg("The subscriber has been closed successfully")
+				Str("name", subscriber.Name()).
+				Msg("The subscriber has been stopped successfully")
 		}
 	}
 
-	// Wait for all subscribers to stop
-	m.waitGroup.Wait()
+	m.waitGroup.Wait() // Wait for all goroutines to finish
 
 	if len(errorMessages) > 0 {
-		return fmt.Errorf("%w: %s", ErrClosingSubcribers, strings.Join(errorMessages, ", "))
+		return fmt.Errorf("%w: %s", ErrClosingSubscribers, strings.Join(errorMessages, ", "))
 	}
 
 	log.Info().
 		Msg("All subscribers have been shut down successfully")
 
 	return nil
+}
+
+func (m *MultiSubscriber) Name() string {
+	return m.name
+}
+
+func (m *MultiSubscriber) IsHealthy() bool {
+	if !m.healthy.Load() {
+		return false
+	}
+
+	m.subscribersMux.Lock()
+	defer m.subscribersMux.Unlock()
+
+	for _, sub := range m.subscribers {
+		if !sub.IsHealthy() {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (m *MultiSubscriber) SubscriberCount() int {
+	m.subscribersMux.Lock()
+	defer m.subscribersMux.Unlock()
+
+	return len(m.subscribers)
 }

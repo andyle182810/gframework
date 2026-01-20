@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -25,13 +26,13 @@ type WorkerPool struct {
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
 	mu           sync.Mutex
-	running      bool
+	running      atomic.Bool
 }
 
 type Option func(*WorkerPool)
 
 func New(executor Executor, opts ...Option) *WorkerPool {
-	pool := &WorkerPool{
+	pool := &WorkerPool{ //nolint:exhaustruct
 		name:         "worker-pool",
 		executor:     executor,
 		workerCount:  1,
@@ -41,7 +42,6 @@ func New(executor Executor, opts ...Option) *WorkerPool {
 		cancel:       nil,
 		wg:           sync.WaitGroup{},
 		mu:           sync.Mutex{},
-		running:      false,
 	}
 
 	for _, opt := range opts {
@@ -88,14 +88,11 @@ func (pool *WorkerPool) Name() string {
 }
 
 func (pool *WorkerPool) Start(ctx context.Context) error {
-	pool.mu.Lock()
-	if pool.running {
-		pool.mu.Unlock()
-
+	if !pool.running.CompareAndSwap(false, true) {
 		return ErrAlreadyRunning
 	}
 
-	pool.running = true
+	pool.mu.Lock()
 	pool.jobChan = make(chan struct{})
 
 	workerCtx, cancel := context.WithCancel(ctx)
@@ -122,15 +119,9 @@ func (pool *WorkerPool) Start(ctx context.Context) error {
 }
 
 func (pool *WorkerPool) Stop() error {
-	pool.mu.Lock()
-	if !pool.running {
-		pool.mu.Unlock()
-
+	if !pool.running.CompareAndSwap(true, false) {
 		return nil
 	}
-
-	pool.running = false
-	pool.mu.Unlock()
 
 	log.Info().Msg("Worker pool is stopping")
 

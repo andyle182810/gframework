@@ -29,7 +29,7 @@ type Publisher interface {
 }
 
 type Options struct {
-	MaxStreamEntries int64 ``
+	MaxStreamEntries int64
 	Timeout          time.Duration
 	Logger           watermill.LoggerAdapter
 }

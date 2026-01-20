@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -44,7 +45,7 @@ type Queue struct {
 	wg            sync.WaitGroup
 	cancel        context.CancelFunc
 	mu            sync.Mutex
-	running       bool
+	running       atomic.Bool
 }
 
 type Option func(*Queue)
@@ -62,7 +63,7 @@ func New(client redis.UniversalClient, queueKey string, executor Executor, opts 
 		return nil, ErrNilExecutor
 	}
 
-	queue := &Queue{
+	queue := &Queue{ //nolint:exhaustruct
 		client:        client,
 		queueKey:      queueKey,
 		processingKey: queueKey + ":processing",
@@ -75,7 +76,6 @@ func New(client redis.UniversalClient, queueKey string, executor Executor, opts 
 		wg:            sync.WaitGroup{},
 		cancel:        nil,
 		mu:            sync.Mutex{},
-		running:       false,
 	}
 
 	for _, opt := range opts {
@@ -132,15 +132,9 @@ func (q *Queue) Push(ctx context.Context, taskIDs ...string) error {
 }
 
 func (q *Queue) Start(ctx context.Context) error {
-	q.mu.Lock()
-	if q.running {
-		q.mu.Unlock()
-
+	if !q.running.CompareAndSwap(false, true) {
 		return ErrQueueAlreadyRunning
 	}
-
-	q.running = true
-	q.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(ctx)
 	q.cancel = cancel
@@ -165,15 +159,9 @@ func (q *Queue) Start(ctx context.Context) error {
 }
 
 func (q *Queue) Stop() error {
-	q.mu.Lock()
-	if !q.running {
-		q.mu.Unlock()
-
+	if !q.running.CompareAndSwap(true, false) {
 		return nil
 	}
-
-	q.running = false
-	q.mu.Unlock()
 
 	log.Info().Str("queue", q.queueKey).Msg("Task queue stopping")
 
