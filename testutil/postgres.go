@@ -22,8 +22,8 @@ const (
 	defaultPostgresUser              = "testuser"
 	defaultPostgresPassword          = "testpass"
 	defaultPostgresDatabase          = "testdb"
+	defaultPostgresImage             = "postgres:18-alpine3.22"
 	defaultPostgresPort     nat.Port = "5432"
-	defaultPostgresImage             = "postgres:16-alpine"
 )
 
 const (

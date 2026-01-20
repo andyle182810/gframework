@@ -1,12 +1,21 @@
-//nolint:varnamelen,err113,wsl,exhaustruct,perfsprint
+//nolint:varnamelen,wsl,exhaustruct
 package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+var (
+	ErrDBPoolCastFailed = errors.New("postgres: unable to cast DBPool to *pgxpool.Pool")
+	ErrBeginTxFailed    = errors.New("postgres: failed to begin transaction")
+	ErrTxRollbackFailed = errors.New("postgres: transaction rollback failed")
+	ErrTxRolledBack     = errors.New("postgres: transaction rolled back")
+	ErrTxCommitFailed   = errors.New("postgres: failed to commit transaction")
 )
 
 type TxFunc func(ctx context.Context, tx pgx.Tx) error
@@ -26,12 +35,12 @@ func (p *Postgres) WithTransactionOptions(
 
 	pool, ok := p.DBPool.(*pgxpool.Pool)
 	if !ok {
-		return fmt.Errorf("postgres: unable to cast DBPool to *pgxpool.Pool")
+		return ErrDBPoolCastFailed
 	}
 
 	tx, err := pool.BeginTx(ctx, txOptions)
 	if err != nil {
-		return fmt.Errorf("postgres: failed to begin transaction: %w", err)
+		return fmt.Errorf("%w: %w", ErrBeginTxFailed, err)
 	}
 
 	defer func() {
@@ -43,14 +52,14 @@ func (p *Postgres) WithTransactionOptions(
 
 	if err := fn(ctx, tx); err != nil {
 		if rbErr := tx.Rollback(ctx); rbErr != nil {
-			return fmt.Errorf("postgres: transaction error: %w, rollback error: %w", err, rbErr)
+			return fmt.Errorf("%w: %w, %w: %w", ErrTxRolledBack, err, ErrTxRollbackFailed, rbErr)
 		}
 
-		return fmt.Errorf("postgres: transaction rolled back: %w", err)
+		return fmt.Errorf("%w: %w", ErrTxRolledBack, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("postgres: failed to commit transaction: %w", err)
+		return fmt.Errorf("%w: %w", ErrTxCommitFailed, err)
 	}
 
 	return nil

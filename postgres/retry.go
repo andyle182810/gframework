@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -47,13 +48,7 @@ func IsRetryableError(err error, retryableCodes []string) bool {
 		return false
 	}
 
-	for _, code := range retryableCodes {
-		if pgErr.Code == code {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(retryableCodes, pgErr.Code)
 }
 
 type RetryableFunc func(ctx context.Context) error
@@ -69,10 +64,7 @@ func WithRetry(ctx context.Context, config RetryConfig, fn RetryableFunc) error 
 				return fmt.Errorf("retry cancelled: %w", ctx.Err())
 			case <-time.After(delay):
 				// Calculate next delay with exponential backoff
-				delay = time.Duration(float64(delay) * config.Multiplier)
-				if delay > config.MaxDelay {
-					delay = config.MaxDelay
-				}
+				delay = min(time.Duration(float64(delay)*config.Multiplier), config.MaxDelay)
 			}
 		}
 

@@ -18,7 +18,6 @@ require (
 	github.com/labstack/echo-contrib v0.50.0
 	github.com/labstack/echo-jwt/v5 v5.0.0
 	github.com/labstack/echo/v5 v5.0.0
-	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
