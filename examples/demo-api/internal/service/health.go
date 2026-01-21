@@ -20,12 +20,11 @@ func (s *Service) CheckHealth(ctx *echo.Context, req *HealthCheckRequest) (any, 
 	) (*httpserver.HandlerResponse[HealthCheckResponse], *echo.HTTPError) {
 		log.Info().Msg("Health check requested")
 
-		return &httpserver.HandlerResponse[HealthCheckResponse]{
-			Data: HealthCheckResponse{
+		return httpserver.NewResponse(
+			HealthCheckResponse{
 				Status: "healthy",
 			},
-			Pagination: nil,
-		}, nil
+		), nil
 	}
 
 	return httpserver.ExecuteStandardized(ctx, req, "CheckHealth", delegator)

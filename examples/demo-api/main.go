@@ -217,13 +217,9 @@ func initPostgres(cfg *config.Config) (*postgres.Postgres, error) {
 	}
 
 	if cfg.MigrationEnabled {
-		log.Info().Str("source", cfg.MigrationSource).Msg("Starting database migration process...")
-
-		if err := postgres.MigrateUp(cfg.PostgresDSN(), cfg.MigrationSource); err != nil {
-			return nil, fmt.Errorf("postgresql migration failed: %w", err)
+		if err := postgres.RunMigration(cfg.PostgresDSN(), cfg.MigrationSource); err != nil {
+			return nil, err
 		}
-
-		log.Info().Msg("Database migration process completed successfully")
 	}
 
 	db, err := postgres.New(pgCfg)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/runner"
+	"github.com/stretchr/testify/require"
 )
 
 var errStart = errors.New("start error")
@@ -90,9 +91,7 @@ func TestNew_DefaultValues(t *testing.T) {
 	t.Parallel()
 
 	r := runner.New()
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestNew_WithCoreService(t *testing.T) {
@@ -101,9 +100,7 @@ func TestNew_WithCoreService(t *testing.T) {
 	svc := newMockService("core-svc")
 
 	r := runner.New(runner.WithCoreService(svc))
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestNew_WithMultipleCoreServices(t *testing.T) {
@@ -116,9 +113,7 @@ func TestNew_WithMultipleCoreServices(t *testing.T) {
 		runner.WithCoreService(svc1),
 		runner.WithCoreService(svc2),
 	)
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestNew_WithInfrastructureService(t *testing.T) {
@@ -127,9 +122,7 @@ func TestNew_WithInfrastructureService(t *testing.T) {
 	svc := newMockService("infra-svc")
 
 	r := runner.New(runner.WithInfrastructureService(svc))
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestNew_WithMultipleInfrastructureServices(t *testing.T) {
@@ -142,18 +135,14 @@ func TestNew_WithMultipleInfrastructureServices(t *testing.T) {
 		runner.WithInfrastructureService(svc1),
 		runner.WithInfrastructureService(svc2),
 	)
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestNew_WithShutdownTimeout(t *testing.T) {
 	t.Parallel()
 
 	r := runner.New(runner.WithShutdownTimeout(5 * time.Second))
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestNew_WithAllOptions(t *testing.T) {
@@ -167,9 +156,7 @@ func TestNew_WithAllOptions(t *testing.T) {
 		runner.WithInfrastructureService(infraSvc),
 		runner.WithShutdownTimeout(10*time.Second),
 	)
-	if r == nil {
-		t.Fatal("expected non-nil runner")
-	}
+	require.NotNil(t, r)
 }
 
 func TestRunner_ErrServicePanicIsDefined(t *testing.T) {

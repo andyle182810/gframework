@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/httpserver"
-	"github.com/andyle182810/gframework/pagination"
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
@@ -70,15 +69,14 @@ func (s *Service) CreateUser(ctx *echo.Context, req *CreateUserRequest) (any, *e
 
 		log.Info().Str("user_id", user.ID).Msg("User created successfully")
 
-		return &httpserver.HandlerResponse[CreateUserResponse]{
-			Data: CreateUserResponse{
+		return httpserver.NewResponse(
+			CreateUserResponse{
 				ID:        user.ID,
 				Name:      user.Name,
 				Email:     user.Email,
 				CreatedAt: user.CreatedAt,
 			},
-			Pagination: nil,
-		}, nil
+		), nil
 	}
 
 	return httpserver.ExecuteStandardized(ctx, req, "CreateUser", delegator)
@@ -97,25 +95,24 @@ func (s *Service) GetUser(ctx *echo.Context, req *GetUserRequest) (any, *echo.HT
 			if pgxscan.NotFound(err) {
 				log.Error().Err(err).Str("user_id", req.UserID).Msg("User not found")
 
-				return nil, httpserver.HTTPError(http.StatusNotFound, err, "User not found")
+				return nil, httpserver.NotFoundError(err, "User not found")
 			}
 
 			log.Error().Err(err).Str("user_id", req.UserID).Msg("Failed to fetch user")
 
-			return nil, httpserver.HTTPError(http.StatusInternalServerError, err, "Failed to fetch user")
+			return nil, httpserver.InternalError(err, "Failed to fetch user")
 		}
 
 		log.Info().Str("user_id", req.UserID).Msg("User fetched successfully")
 
-		return &httpserver.HandlerResponse[GetUserResponse]{
-			Data: GetUserResponse{
+		return httpserver.NewResponse(
+			GetUserResponse{
 				ID:        user.ID,
 				Name:      user.Name,
 				Email:     user.Email,
 				CreatedAt: user.CreatedAt,
 			},
-			Pagination: nil,
-		}, nil
+		), nil
 	}
 
 	return httpserver.ExecuteStandardized(ctx, req, "GetUser", delegator)
@@ -127,7 +124,7 @@ func (s *Service) ListUsers(ctx *echo.Context, req *ListUsersRequest) (any, *ech
 		ctx *echo.Context,
 		req *ListUsersRequest,
 	) (*httpserver.HandlerResponse[ListUsersResponse], *echo.HTTPError) {
-		page, pageSize, offset := pagination.Normalize(req.Page, req.PageSize)
+		page, pageSize, offset := httpserver.NormalizePage(req.Page, req.PageSize)
 
 		log.Info().
 			Int("page", page).
@@ -138,14 +135,14 @@ func (s *Service) ListUsers(ctx *echo.Context, req *ListUsersRequest) (any, *ech
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to count users")
 
-			return nil, httpserver.HTTPError(http.StatusInternalServerError, err, "Failed to count users")
+			return nil, httpserver.InternalError(err, "Failed to count users")
 		}
 
 		users, err := s.repo.User.ListUsers(ctx.Request().Context(), pageSize, offset)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to list users")
 
-			return nil, httpserver.HTTPError(http.StatusInternalServerError, err, "Failed to list users")
+			return nil, httpserver.InternalError(err, "Failed to list users")
 		}
 
 		userResponses := make([]GetUserResponse, 0, len(users))
@@ -158,24 +155,17 @@ func (s *Service) ListUsers(ctx *echo.Context, req *ListUsersRequest) (any, *ech
 			})
 		}
 
-		totalPages := pagination.ComputeTotals(totalCount, pageSize)
-
 		log.Info().
 			Int("total_count", totalCount).
 			Int("returned", len(users)).
 			Msg("Users listed successfully")
 
-		return &httpserver.HandlerResponse[ListUsersResponse]{
-			Data: ListUsersResponse{
+		return httpserver.NewPaginatedResponse(
+			ListUsersResponse{
 				Users: userResponses,
 			},
-			Pagination: &httpserver.Pagination{
-				Page:       page,
-				PageSize:   pageSize,
-				TotalCount: totalCount,
-				TotalPages: totalPages,
-			},
-		}, nil
+			httpserver.NewPagination(page, pageSize, totalCount),
+		), nil
 	}
 
 	return httpserver.ExecuteStandardized(ctx, req, "ListUsers", delegator)

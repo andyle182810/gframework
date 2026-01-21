@@ -11,16 +11,16 @@ import (
 )
 
 func Wrapper[TREQ any](wrapped func(*echo.Context, *TREQ) (any, *echo.HTTPError)) echo.HandlerFunc {
-	return func(ectx *echo.Context) error {
-		requestURI := ectx.Request().RequestURI
-		requestID := ectx.Request().Header.Get(middleware.HeaderXRequestID)
+	return func(c *echo.Context) error {
+		requestURI := c.Request().RequestURI
+		requestID := c.Request().Header.Get(middleware.HeaderXRequestID)
 
-		logger := zerolog.Ctx(ectx.Request().Context())
+		logger := zerolog.Ctx(c.Request().Context())
 		if logger.GetLevel() == zerolog.Disabled {
 			newLogger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 			logger = &newLogger
-			ctx := logger.WithContext(ectx.Request().Context())
-			ectx.SetRequest(ectx.Request().WithContext(ctx))
+			ctx := logger.WithContext(c.Request().Context())
+			c.SetRequest(c.Request().WithContext(ctx))
 		}
 
 		logCtx := logger.With().
@@ -29,19 +29,19 @@ func Wrapper[TREQ any](wrapped func(*echo.Context, *TREQ) (any, *echo.HTTPError)
 
 		logRequestStart(logCtx, requestURI)
 
-		req, err := bindAndValidate[TREQ](ectx, logCtx, requestURI)
+		req, err := bindAndValidate[TREQ](c, logCtx, requestURI)
 		if err != nil {
 			return err
 		}
 
-		ectx.Set(middleware.ContextKeyBody, req)
+		c.Set(middleware.ContextKeyBody, req)
 
-		res, err := wrapped(ectx, req)
+		res, err := wrapped(c, req)
 		if err != nil {
 			return err
 		}
 
-		response, errx := echo.UnwrapResponse(ectx.Response())
+		response, errx := echo.UnwrapResponse(c.Response())
 		if errx != nil {
 			return errx
 		}
@@ -52,7 +52,7 @@ func Wrapper[TREQ any](wrapped func(*echo.Context, *TREQ) (any, *echo.HTTPError)
 			status = response.Status
 		}
 
-		return sendResponse(ectx, logCtx, status, res)
+		return sendResponse(c, logCtx, status, res)
 	}
 }
 
@@ -77,10 +77,10 @@ func logError(log zerolog.Logger, err error, path string, req any, msg string) {
 		Msg(msg)
 }
 
-func bindAndValidate[TREQ any](ectx *echo.Context, log zerolog.Logger, path string) (*TREQ, *echo.HTTPError) {
+func bindAndValidate[TREQ any](c *echo.Context, log zerolog.Logger, path string) (*TREQ, *echo.HTTPError) {
 	var req TREQ
 
-	if err := ectx.Bind(&req); err != nil {
+	if err := c.Bind(&req); err != nil {
 		logError(log, err, path, req, "The request body failed to bind to the expected structure")
 
 		httpErr := echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -89,7 +89,7 @@ func bindAndValidate[TREQ any](ectx *echo.Context, log zerolog.Logger, path stri
 		return nil, httpErr
 	}
 
-	if err := ectx.Validate(&req); err != nil {
+	if err := c.Validate(&req); err != nil {
 		logError(log, err, path, req, "The request validation has failed")
 
 		httpErr := echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -101,14 +101,14 @@ func bindAndValidate[TREQ any](ectx *echo.Context, log zerolog.Logger, path stri
 	return &req, nil
 }
 
-func sendResponse(ectx *echo.Context, log zerolog.Logger, status int, res any) error {
+func sendResponse(c *echo.Context, log zerolog.Logger, status int, res any) error {
 	if status != 0 {
 		logRequestEnd(log, status)
 
-		return ectx.JSON(status, res)
+		return c.JSON(status, res)
 	}
 
 	logRequestEnd(log, status)
 
-	return ectx.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, res)
 }

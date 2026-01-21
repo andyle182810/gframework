@@ -12,7 +12,6 @@ import (
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/service"
 	"github.com/andyle182810/gframework/httpserver"
-	"github.com/andyle182810/gframework/pagination"
 	"github.com/andyle182810/gframework/postgres"
 	"github.com/andyle182810/gframework/testutil"
 	"github.com/andyle182810/gframework/valkey"
@@ -316,7 +315,7 @@ func TestService_ListUsers(t *testing.T) { //nolint:funlen
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
-				require.LessOrEqual(t, len(resp.Data.Users), pagination.DefaultPageSize)
+				require.LessOrEqual(t, len(resp.Data.Users), httpserver.DefaultPageSize)
 				require.NotNil(t, resp.Pagination)
 				require.Equal(t, 1, resp.Pagination.Page)
 				require.Equal(t, 15, resp.Pagination.TotalCount)
@@ -362,7 +361,7 @@ func TestService_ListUsers(t *testing.T) { //nolint:funlen
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
-				require.Equal(t, pagination.DefaultPage, resp.Pagination.Page)
+				require.Equal(t, httpserver.DefaultPage, resp.Pagination.Page)
 			},
 		},
 		{
@@ -374,7 +373,7 @@ func TestService_ListUsers(t *testing.T) { //nolint:funlen
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				var resp listUsersResponse
 				testutil.AssertJSONResponse(t, rec, &resp)
-				require.Equal(t, pagination.MaxPageSize, resp.Pagination.PageSize)
+				require.Equal(t, httpserver.MaxPageSize, resp.Pagination.PageSize)
 			},
 		},
 	}

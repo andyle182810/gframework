@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/workerpool"
+	"github.com/stretchr/testify/require"
 )
 
 var errExecutor = errors.New("executor error")
@@ -46,9 +47,7 @@ func TestNew_DefaultValues(t *testing.T) {
 	executor := newMockExecutor()
 
 	pool := workerpool.New(executor)
-	if pool == nil {
-		t.Fatal("expected non-nil pool")
-	}
+	require.NotNil(t, pool)
 }
 
 func TestNew_WithCustomWorkerCount(t *testing.T) {
@@ -57,9 +56,7 @@ func TestNew_WithCustomWorkerCount(t *testing.T) {
 	executor := newMockExecutor()
 
 	pool := workerpool.New(executor, workerpool.WithWorkerCount(5))
-	if pool == nil {
-		t.Fatal("expected non-nil pool")
-	}
+	require.NotNil(t, pool)
 }
 
 func TestNew_WithCustomTickInterval(t *testing.T) {
@@ -68,9 +65,7 @@ func TestNew_WithCustomTickInterval(t *testing.T) {
 	executor := newMockExecutor()
 
 	pool := workerpool.New(executor, workerpool.WithTickInterval(500*time.Millisecond))
-	if pool == nil {
-		t.Fatal("expected non-nil pool")
-	}
+	require.NotNil(t, pool)
 }
 
 func TestNew_WithExecutionTimeout(t *testing.T) {
@@ -79,9 +74,7 @@ func TestNew_WithExecutionTimeout(t *testing.T) {
 	executor := newMockExecutor()
 
 	pool := workerpool.New(executor, workerpool.WithExecutionTimeout(5*time.Second))
-	if pool == nil {
-		t.Fatal("expected non-nil pool")
-	}
+	require.NotNil(t, pool)
 }
 
 func TestNew_InvalidWorkerCountIsIgnored(t *testing.T) {
@@ -90,9 +83,7 @@ func TestNew_InvalidWorkerCountIsIgnored(t *testing.T) {
 	executor := newMockExecutor()
 
 	pool := workerpool.New(executor, workerpool.WithWorkerCount(0))
-	if pool == nil {
-		t.Fatal("expected non-nil pool")
-	}
+	require.NotNil(t, pool)
 }
 
 func TestNew_InvalidTickIntervalIsIgnored(t *testing.T) {
@@ -101,9 +92,7 @@ func TestNew_InvalidTickIntervalIsIgnored(t *testing.T) {
 	executor := newMockExecutor()
 
 	pool := workerpool.New(executor, workerpool.WithTickInterval(0))
-	if pool == nil {
-		t.Fatal("expected non-nil pool")
-	}
+	require.NotNil(t, pool)
 }
 
 func TestWorkerPool_StartsAndStopsWorkers(t *testing.T) {
@@ -115,9 +104,7 @@ func TestWorkerPool_StartsAndStopsWorkers(t *testing.T) {
 		workerpool.WithTickInterval(50*time.Millisecond),
 	)
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(150 * time.Millisecond)
 
@@ -137,9 +124,7 @@ func TestWorkerPool_MultipleStartCallsAreIdempotent(t *testing.T) {
 
 	ctx := t.Context()
 
-	if err := pool.Start(ctx); err != nil {
-		t.Fatalf("unexpected error on first start: %v", err)
-	}
+	require.NoError(t, pool.Start(ctx))
 
 	if err := pool.Start(ctx); !errors.Is(err, workerpool.ErrAlreadyRunning) {
 		t.Errorf("expected ErrAlreadyRunning on second start, got %v", err)
@@ -160,9 +145,7 @@ func TestWorkerPool_MultipleStopCallsAreIdempotent(t *testing.T) {
 	executor := newMockExecutor()
 	pool := workerpool.New(executor, workerpool.WithTickInterval(50*time.Millisecond))
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -193,9 +176,7 @@ func TestWorkerPool_ContinuesOnExecutorError(t *testing.T) {
 		workerpool.WithTickInterval(50*time.Millisecond),
 	)
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(150 * time.Millisecond)
 
@@ -218,9 +199,7 @@ func TestWorkerPool_RespectsParentContextCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 
-	if err := pool.Start(ctx); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(ctx))
 
 	countBefore := executor.execCount.Load()
 
@@ -236,9 +215,7 @@ func TestWorkerPool_RespectsParentContextCancellation(t *testing.T) {
 
 	countLater := executor.execCount.Load()
 
-	if countAfterCancel <= countBefore {
-		t.Fatalf("expected executor to be called before cancel, before=%d, after=%d", countBefore, countAfterCancel)
-	}
+	require.Greater(t, countAfterCancel, countBefore, "expected executor to be called before cancel")
 
 	if countAfterCancel != countLater {
 		t.Errorf("expected executor not to be called after context cancellation, "+
@@ -261,9 +238,7 @@ func TestWorkerPool_BusyWorkersAllowOthersToPickUpJobs(t *testing.T) {
 		workerpool.WithTickInterval(30*time.Millisecond),
 	)
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -288,9 +263,7 @@ func TestWorkerPool_AllWorkersBusyCausesTickToWait(t *testing.T) {
 		workerpool.WithTickInterval(20*time.Millisecond),
 	)
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(150 * time.Millisecond)
 
@@ -316,9 +289,7 @@ func TestWorkerPool_ExecutionTimeoutCancelsLongRunningTasks(t *testing.T) {
 		workerpool.WithExecutionTimeout(100*time.Millisecond),
 	)
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(300 * time.Millisecond)
 
@@ -343,9 +314,7 @@ func TestWorkerPool_NoTimeoutAllowsLongRunningTasksToComplete(t *testing.T) {
 		workerpool.WithTickInterval(30*time.Millisecond),
 	)
 
-	if err := pool.Start(t.Context()); err != nil {
-		t.Fatalf("unexpected error starting pool: %v", err)
-	}
+	require.NoError(t, pool.Start(t.Context()))
 
 	time.Sleep(250 * time.Millisecond)
 

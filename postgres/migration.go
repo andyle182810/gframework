@@ -230,6 +230,49 @@ func GetMigrationVersion(dbURI, source string) (*MigrationVersion, error) {
 	}, nil
 }
 
+func RunMigration(dbURI, source string) error {
+	log.Info().Str("source", source).Msg("Starting database migration process...")
+
+	logPreMigrationState(dbURI, source)
+
+	if err := MigrateUp(dbURI, source); err != nil {
+		return err
+	}
+
+	logPostMigrationState(dbURI, source)
+
+	return nil
+}
+
+func logPreMigrationState(dbURI, source string) {
+	currentVersion, err := GetMigrationVersion(dbURI, source)
+	if err != nil {
+		return
+	}
+
+	log.Info().
+		Uint("current_version", currentVersion.Version).
+		Bool("dirty", currentVersion.Dirty).
+		Msg("Pre-migration state")
+
+	if currentVersion.Dirty {
+		log.Warn().Msg("Database is in dirty state from previous failed migration")
+	}
+}
+
+func logPostMigrationState(dbURI, source string) {
+	finalVersion, err := GetMigrationVersion(dbURI, source)
+	if err != nil {
+		log.Info().Msg("Database migration process completed successfully")
+
+		return
+	}
+
+	log.Info().
+		Uint("version", finalVersion.Version).
+		Msg("Database migration process completed successfully")
+}
+
 func ForceMigrationVersion(dbURI, source string, version int) error {
 	db, err := openAndPingDB(dbURI)
 	if err != nil {

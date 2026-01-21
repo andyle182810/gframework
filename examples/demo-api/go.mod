@@ -61,7 +61,6 @@ require (
 	github.com/labstack/echo-contrib v0.50.0 // indirect
 	github.com/labstack/echo-jwt/v5 v5.0.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect

@@ -1,6 +1,9 @@
+//nolint:nonamedreturns
 package httpserver
 
 import (
+	"net/http"
+
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
@@ -17,8 +20,23 @@ func ExecuteStandardized[REQ any, RES any](
 	request *REQ,
 	handlerName string,
 	delegate HandlerFunc[REQ, RES],
-) (any, *echo.HTTPError) {
+) (resp any, httpErr *echo.HTTPError) {
 	log := zerolog.Ctx(c.Request().Context()).With().Str("handler", handlerName).Logger()
+
+	// Protect against handler panics crashing the server
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error().
+				Interface("panic", r).
+				Msg("Handler panicked")
+
+			httpErr = echo.NewHTTPError(http.StatusInternalServerError, "internal server error")
+		}
+	}()
+
+	if c.Request().Context().Err() != nil {
+		return nil, echo.NewHTTPError(499, "client closed request") //nolint:mnd
+	}
 
 	internalResponse, delegateError := delegate(log, c, request)
 	if delegateError != nil {
@@ -26,7 +44,7 @@ func ExecuteStandardized[REQ any, RES any](
 			Int("status_code", delegateError.Code).
 			Interface("error_cause", delegateError.Unwrap()).
 			Interface("error_message", delegateError.Message).
-			Msg("The request has failed with an HTTP error")
+			Msg("Request failed")
 
 		return nil, delegateError
 	}

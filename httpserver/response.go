@@ -5,6 +5,20 @@ type HandlerResponse[T any] struct {
 	Pagination *Pagination `json:"pagination,omitempty"`
 }
 
+func NewResponse[T any](data T) *HandlerResponse[T] {
+	return &HandlerResponse[T]{
+		Data:       data,
+		Pagination: nil,
+	}
+}
+
+func NewPaginatedResponse[T any](data T, pagination *Pagination) *HandlerResponse[T] {
+	return &HandlerResponse[T]{
+		Data:       data,
+		Pagination: pagination,
+	}
+}
+
 type Pagination struct {
 	Page       int `example:"1"  json:"page"`
 	PageSize   int `example:"10" json:"pageSize"`

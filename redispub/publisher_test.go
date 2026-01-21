@@ -11,6 +11,7 @@ import (
 	"github.com/andyle182810/gframework/testutil"
 	"github.com/andyle182810/gframework/valkey"
 	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/require"
 )
 
 type mockRedisClient struct {
@@ -29,9 +30,7 @@ func setupTestClient(ctx context.Context, t *testing.T) *valkey.Valkey {
 	container := testutil.SetupValkeyContainer(ctx, t)
 
 	port, err := strconv.Atoi(container.Port.Port())
-	if err != nil {
-		t.Fatalf("failed to parse port: %v", err)
-	}
+	require.NoError(t, err, "failed to parse port")
 
 	cfg := &valkey.Config{
 		Host:            container.Host,
@@ -56,9 +55,7 @@ func setupTestClient(ctx context.Context, t *testing.T) *valkey.Valkey {
 	}
 
 	client, err := valkey.New(cfg)
-	if err != nil {
-		t.Fatalf("failed to create valkey client: %v", err)
-	}
+	require.NoError(t, err, "failed to create valkey client")
 
 	t.Cleanup(func() {
 		_ = client.Close()
@@ -106,13 +103,8 @@ func TestNew_WithZeroMaxStreamEntries(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if publisher == nil {
-		t.Fatal("expected non-nil publisher")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, publisher)
 
 	_ = publisher.Close()
 }
@@ -128,13 +120,8 @@ func TestNew_WithPositiveMaxStreamEntries(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if publisher == nil {
-		t.Fatal("expected non-nil publisher")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, publisher)
 
 	_ = publisher.Close()
 }
@@ -150,13 +137,8 @@ func TestNew_WithCustomTimeout(t *testing.T) {
 		Timeout:          10 * time.Second,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if publisher == nil {
-		t.Fatal("expected non-nil publisher")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, publisher)
 
 	_ = publisher.Close()
 }
@@ -172,13 +154,8 @@ func TestNew_WithZeroTimeoutUsesDefault(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if publisher == nil {
-		t.Fatal("expected non-nil publisher")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, publisher)
 
 	_ = publisher.Close()
 }
@@ -194,13 +171,8 @@ func TestNew_WithNegativeTimeoutUsesDefault(t *testing.T) {
 		Timeout:          -1 * time.Second,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if publisher == nil {
-		t.Fatal("expected non-nil publisher")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, publisher)
 
 	_ = publisher.Close()
 }
@@ -216,9 +188,7 @@ func TestRedisPublisher_CloseIsIdempotent(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	_ = publisher.Close()
 	_ = publisher.Close()
@@ -235,9 +205,7 @@ func TestRedisPublisher_ImplementsPublisherInterface(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	var _ redispub.Publisher = publisher
@@ -254,9 +222,7 @@ func TestRedisPublisher_PublishToTopicWithNoMessages(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic")
@@ -276,9 +242,7 @@ func TestRedisPublisher_PublishToTopicWithSingleMessage(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic", "message-1")
@@ -298,9 +262,7 @@ func TestRedisPublisher_PublishToTopicWithMultipleMessages(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic", "message-1", "message-2", "message-3")
@@ -320,9 +282,7 @@ func TestRedisPublisher_PublishToTopicRespectsExistingContextDeadline(t *testing
 		Timeout:          1 * time.Second,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -345,9 +305,7 @@ func TestRedisPublisher_PublishToTopicWithAlreadyCancelledContext(t *testing.T) 
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	ctxCancelled, cancel := context.WithCancel(ctx)
@@ -370,9 +328,7 @@ func TestRedisPublisher_PublishToTopicAppliesDefaultTimeoutWhenNoDeadline(t *tes
 		Timeout:          5 * time.Second,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic", "message-1")
@@ -392,9 +348,7 @@ func TestRedisPublisher_PublishToMultipleTopics(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	topics := []string{"topic-1", "topic-2", "topic-3"}
@@ -417,9 +371,7 @@ func TestRedisPublisher_PublishWithMaxStreamEntries(t *testing.T) {
 		Timeout:          0,
 		Logger:           nil,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error creating publisher: %v", err)
-	}
+	require.NoError(t, err)
 	defer publisher.Close()
 
 	for i := range 20 {
