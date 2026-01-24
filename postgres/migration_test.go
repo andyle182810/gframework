@@ -1,8 +1,6 @@
-//nolint:usetesting
 package postgres_test
 
 import (
-	"context"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -25,8 +23,7 @@ func getTestMigrationsPath() string {
 func TestMigrateUp(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -42,8 +39,7 @@ func TestMigrateUp(t *testing.T) {
 func TestMigrateUp_NoChange(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -61,8 +57,7 @@ func TestMigrateUp_NoChange(t *testing.T) {
 func TestMigrateDown(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -80,8 +75,7 @@ func TestMigrateDown(t *testing.T) {
 func TestMigrateSteps_Up(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -104,8 +98,7 @@ func TestMigrateSteps_Up(t *testing.T) {
 func TestMigrateSteps_Down(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -123,8 +116,7 @@ func TestMigrateSteps_Down(t *testing.T) {
 func TestGetMigrationVersion_NoMigrations(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -137,8 +129,7 @@ func TestGetMigrationVersion_NoMigrations(t *testing.T) {
 func TestForceMigrationVersion(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 	migrationsPath := getTestMigrationsPath()
 
@@ -154,8 +145,7 @@ func TestForceMigrationVersion(t *testing.T) {
 func TestMigrateUp_InvalidSource(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 	dbURI := container.ConnectionString()
 
 	err := postgres.MigrateUp(dbURI, "file:///nonexistent/path")

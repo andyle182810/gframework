@@ -1,7 +1,6 @@
 package testutil
 
 import (
-	"context"
 	"testing"
 
 	"github.com/docker/go-connections/nat"
@@ -25,8 +24,10 @@ func (c *ValkeyTestContainer) Address() string {
 	return c.Host + ":" + c.Port.Port()
 }
 
-func SetupValkeyContainer(ctx context.Context, t *testing.T) *ValkeyTestContainer {
+func SetupValkeyContainer(t *testing.T) *ValkeyTestContainer {
 	t.Helper()
+
+	ctx := t.Context()
 
 	//nolint:exhaustruct
 	req := testcontainers.ContainerRequest{

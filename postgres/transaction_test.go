@@ -26,7 +26,7 @@ func setupTransactionTestPostgres(t *testing.T) (*postgres.Postgres, context.Con
 
 	ctx := t.Context()
 
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 
 	dbURL := fmt.Sprintf(
 		"postgres://%s:%s@%s/%s?sslmode=disable",

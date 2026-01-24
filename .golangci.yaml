@@ -148,6 +148,7 @@ linters-settings:
       - pg
       - wg
       - tx
+      - tt
       - c
       - e
       - v

@@ -52,8 +52,10 @@ func (c *PostgresTestContainer) DSN() string {
 		c.Host, c.Port.Port(), c.User, c.Password, c.Database)
 }
 
-func SetupPostgresContainer(ctx context.Context, t *testing.T) *PostgresTestContainer {
+func SetupPostgresContainer(t *testing.T) *PostgresTestContainer {
 	t.Helper()
+
+	ctx := t.Context()
 
 	container, err := postgres.Run(ctx,
 		defaultPostgresImage,

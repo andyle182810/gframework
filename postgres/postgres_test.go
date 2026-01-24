@@ -17,10 +17,8 @@ import (
 func TestPostgresConnection(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-
 	// Start the test container
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 
 	dbURL := fmt.Sprintf(
 		"postgres://%s:%s@%s/%s?sslmode=disable",

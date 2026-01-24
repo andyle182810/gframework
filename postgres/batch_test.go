@@ -2,7 +2,6 @@
 package postgres_test
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -29,12 +28,10 @@ type testProduct struct {
 	Description string
 }
 
-func setupTestPostgres(t *testing.T) (*postgres.Postgres, context.Context) {
+func setupTestPostgres(t *testing.T) *postgres.Postgres {
 	t.Helper()
 
-	ctx := t.Context()
-
-	container := testutil.SetupPostgresContainer(ctx, t)
+	container := testutil.SetupPostgresContainer(t)
 
 	dbURL := fmt.Sprintf(
 		"postgres://%s:%s@%s/%s?sslmode=disable",
@@ -60,13 +57,15 @@ func setupTestPostgres(t *testing.T) (*postgres.Postgres, context.Context) {
 		pg.Close()
 	})
 
-	return pg, ctx
+	return pg
 }
 
 func TestBulkInsert_Success(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_users (
@@ -112,7 +111,9 @@ func TestBulkInsert_Success(t *testing.T) {
 func TestBulkInsert_EmptyRows(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_empty (
@@ -150,7 +151,9 @@ func TestBulkInsert_NilConnectionPool(t *testing.T) {
 func TestBulkInsert_InvalidTable(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	columns := []string{"name"}
 	rows := [][]any{{"test"}}
@@ -164,7 +167,9 @@ func TestBulkInsert_InvalidTable(t *testing.T) {
 func TestBulkInsert_MismatchedColumns(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_mismatch (
@@ -189,7 +194,9 @@ func TestBulkInsert_MismatchedColumns(t *testing.T) {
 func TestBulkInsert_LargeDataset(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_large (
@@ -221,7 +228,9 @@ func TestBulkInsert_LargeDataset(t *testing.T) {
 func TestBulkInsertStructs_Success(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_struct_users (
@@ -270,7 +279,9 @@ func TestBulkInsertStructs_Success(t *testing.T) {
 func TestBulkInsertStructs_EmptySlice(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_empty_structs (
@@ -296,7 +307,9 @@ func TestBulkInsertStructs_EmptySlice(t *testing.T) {
 func TestBulkInsertStructs_DifferentTypes(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_products (
@@ -340,7 +353,9 @@ func TestBulkInsertStructs_DifferentTypes(t *testing.T) {
 func TestBulkInsertStructs_WithPartialColumns(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_partial (
@@ -387,7 +402,9 @@ func TestBulkInsertStructs_WithPartialColumns(t *testing.T) {
 func TestBulkInsertStructs_LargeDataset(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS test_large_structs (

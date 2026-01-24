@@ -20,10 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestService(ctx context.Context, t *testing.T) (*service.Service, *repo.Repository, *valkey.Valkey) {
+func setupTestService(t *testing.T) (*service.Service, *repo.Repository, *valkey.Valkey) {
 	t.Helper()
 
-	pgContainer := testutil.SetupPostgresContainer(ctx, t)
+	pgContainer := testutil.SetupPostgresContainer(t)
 	valkeyContainer := testutil.SetupValkeyContainer(ctx, t)
 
 	pg, err := postgres.New(&postgres.Config{ //nolint:contextcheck

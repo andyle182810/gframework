@@ -13,7 +13,9 @@ import (
 func TestHealthCheck_BasicSuccess(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	err := pg.HealthCheck(ctx)
 	require.NoError(t, err)
@@ -22,7 +24,9 @@ func TestHealthCheck_BasicSuccess(t *testing.T) {
 func TestHealthCheck_WithCustomTimeout(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	err := pg.HealthCheck(ctx, postgres.WithHealthCheckTimeout(10*time.Second))
 	require.NoError(t, err)
@@ -31,7 +35,9 @@ func TestHealthCheck_WithCustomTimeout(t *testing.T) {
 func TestHealthCheck_WithQueryExecution(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	err := pg.HealthCheck(ctx, postgres.WithCustomHealthCheckSQL("SELECT 1"))
 	require.NoError(t, err)
@@ -40,7 +46,9 @@ func TestHealthCheck_WithQueryExecution(t *testing.T) {
 func TestHealthCheck_WithComplexQuery(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	err := pg.HealthCheck(ctx, postgres.WithCustomHealthCheckSQL("SELECT 1 + 1"))
 	require.NoError(t, err)
@@ -49,7 +57,9 @@ func TestHealthCheck_WithComplexQuery(t *testing.T) {
 func TestHealthCheck_WithMultipleOptions(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	err := pg.HealthCheck(ctx,
 		postgres.WithHealthCheckTimeout(5*time.Second),
@@ -61,7 +71,9 @@ func TestHealthCheck_WithMultipleOptions(t *testing.T) {
 func TestHealthCheck_FailsWithInvalidQuery(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	err := pg.HealthCheck(ctx, postgres.WithCustomHealthCheckSQL("SELECT * FROM nonexistent_table"))
 	require.Error(t, err)
@@ -70,7 +82,7 @@ func TestHealthCheck_FailsWithInvalidQuery(t *testing.T) {
 func TestHealthCheck_FailsWithCancelledContext(t *testing.T) {
 	t.Parallel()
 
-	pg, _ := setupTestPostgres(t)
+	pg := setupTestPostgres(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -82,7 +94,9 @@ func TestHealthCheck_FailsWithCancelledContext(t *testing.T) {
 func TestIsHealthy_ReturnsTrueWhenHealthy(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	healthy := pg.IsHealthy(ctx)
 	require.True(t, healthy)
@@ -91,7 +105,7 @@ func TestIsHealthy_ReturnsTrueWhenHealthy(t *testing.T) {
 func TestIsHealthy_ReturnsFalseWithCancelledContext(t *testing.T) {
 	t.Parallel()
 
-	pg, _ := setupTestPostgres(t)
+	pg := setupTestPostgres(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -103,7 +117,7 @@ func TestIsHealthy_ReturnsFalseWithCancelledContext(t *testing.T) {
 func TestGetPoolStats_ReturnsStats(t *testing.T) {
 	t.Parallel()
 
-	pg, _ := setupTestPostgres(t)
+	pg := setupTestPostgres(t)
 
 	stats, err := pg.GetPoolStats()
 	require.NoError(t, err)
@@ -114,7 +128,9 @@ func TestGetPoolStats_ReturnsStats(t *testing.T) {
 func TestGetPoolStats_UpdatesAfterQueries(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupTestPostgres(t)
+	ctx := t.Context()
+
+	pg := setupTestPostgres(t)
 
 	var result int
 	err := pg.DBPool.QueryRow(ctx, "SELECT 1").Scan(&result)

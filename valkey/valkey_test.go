@@ -1,8 +1,7 @@
-//nolint:exhaustruct,paralleltest,tparallel,usetesting,testifylint
+//nolint:exhaustruct,paralleltest,tparallel,testifylint
 package valkey_test
 
 import (
-	"context"
 	"strconv"
 	"testing"
 	"time"
@@ -15,10 +14,10 @@ import (
 func TestValkeyConnection(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Start the test container
-	container := testutil.SetupValkeyContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)
@@ -138,10 +137,10 @@ func TestValkeyConfigDefaults(t *testing.T) {
 func TestValkeyHealthCheck(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Start the test container
-	container := testutil.SetupValkeyContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)

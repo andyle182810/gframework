@@ -8,30 +8,22 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// ErrorHandlerConfig holds configuration for the error handler middleware.
 type ErrorHandlerConfig struct {
-	// Logger for logging errors (optional)
-	Logger *zerolog.Logger
-	// LogErrors enables automatic error logging
-	LogErrors bool
-	// IncludeInternalErrors includes internal error details in response (useful for dev, dangerous for prod)
+	Logger                *zerolog.Logger
+	LogErrors             bool
 	IncludeInternalErrors bool
-	// CustomErrorResponse allows customizing the error response structure
-	CustomErrorResponse func(*echo.Context, error, int) map[string]any
+	CustomErrorResponse   func(*echo.Context, error, int) map[string]any
 }
 
-// ErrorHandler creates an error handler middleware with optional configuration.
 func ErrorHandler(next echo.HTTPErrorHandler, config ...*ErrorHandlerConfig) echo.HTTPErrorHandler {
 	cfg := getErrorHandlerConfig(config)
 
 	return func(ectx *echo.Context, err error) {
-		// Skip if response is already committed
 		res, unwrapErr := echo.UnwrapResponse(ectx.Response())
 		if unwrapErr == nil && res.Committed {
 			return
 		}
 
-		// Handle echo.HTTPError
 		var httpErr *echo.HTTPError
 		if errors.As(err, &httpErr) {
 			handleHTTPError(ectx, httpErr, cfg)
@@ -39,12 +31,10 @@ func ErrorHandler(next echo.HTTPErrorHandler, config ...*ErrorHandlerConfig) ech
 			return
 		}
 
-		// Log non-HTTP errors if configured
 		if cfg.LogErrors && cfg.Logger != nil {
 			logError(ectx, err, cfg.Logger)
 		}
 
-		// Delegate to next handler if available
 		if next != nil {
 			next(ectx, err)
 		}
@@ -60,12 +50,10 @@ func getErrorHandlerConfig(config []*ErrorHandlerConfig) *ErrorHandlerConfig {
 }
 
 func handleHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorHandlerConfig) {
-	// Log HTTP errors if configured
 	if cfg.LogErrors && cfg.Logger != nil {
 		logHTTPError(ectx, httpErr, cfg.Logger)
 	}
 
-	// Use custom response if configured
 	if cfg.CustomErrorResponse != nil {
 		response := cfg.CustomErrorResponse(ectx, httpErr, httpErr.Code)
 		_ = ectx.JSON(httpErr.Code, response)
@@ -73,7 +61,6 @@ func handleHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorHand
 		return
 	}
 
-	// Build standard error response
 	response := buildErrorResponse(httpErr, cfg)
 	_ = ectx.JSON(httpErr.Code, response)
 }
@@ -83,7 +70,6 @@ func buildErrorResponse(httpErr *echo.HTTPError, cfg *ErrorHandlerConfig) map[st
 		"message": httpErr.Message,
 	}
 
-	// Include internal error details if configured (dev mode)
 	if cfg.IncludeInternalErrors {
 		if internal := httpErr.Unwrap(); internal != nil {
 			response["internal"] = internal.Error()
@@ -111,7 +97,6 @@ func logHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, logger *zerolog.L
 		loggerWithFields = loggerWithFields.With().Err(internal).Logger()
 	}
 
-	// Log based on status code
 	switch {
 	case httpErr.Code >= http.StatusInternalServerError:
 		loggerWithFields.Error().Msg("HTTP error: server error")
