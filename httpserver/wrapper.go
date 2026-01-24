@@ -13,7 +13,7 @@ import (
 func Wrapper[TREQ any](wrapped func(*echo.Context, *TREQ) (any, *echo.HTTPError)) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		requestURI := c.Request().RequestURI
-		requestID := c.Request().Header.Get(middleware.HeaderXRequestID)
+		requestID := middleware.GetRequestID(c)
 
 		logger := zerolog.Ctx(c.Request().Context())
 		if logger.GetLevel() == zerolog.Disabled {

@@ -1,4 +1,4 @@
-//nolint:exhaustruct,paralleltest,tparallel,usetesting
+//nolint:exhaustruct,paralleltest,tparallel
 package taskqueue_test
 
 import (
@@ -24,10 +24,10 @@ func (m *mockExecutor) Execute(ctx context.Context, taskID string) error {
 	return m.fn(ctx, taskID)
 }
 
-func setupTestQueue(ctx context.Context, t *testing.T) *valkey.Valkey {
+func setupTestQueue(t *testing.T) *valkey.Valkey {
 	t.Helper()
 
-	container := testutil.SetupValkeyContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)
@@ -44,8 +44,7 @@ func setupTestQueue(ctx context.Context, t *testing.T) *valkey.Valkey {
 func TestNew(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	valkeyClient := setupTestQueue(t)
 
 	executor := &mockExecutor{
 		fn: func(_ context.Context, _ string) error {
@@ -118,8 +117,8 @@ func TestNew(t *testing.T) {
 func TestQueueStartStop(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	executor := &mockExecutor{
 		fn: func(_ context.Context, _ string) error {
@@ -146,8 +145,8 @@ func TestQueueStartStop(t *testing.T) {
 func TestQueuePushAndProcess(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	var processedTasks sync.Map
 
@@ -203,8 +202,8 @@ func TestQueuePushAndProcess(t *testing.T) {
 func TestQueueExecTimeout(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	var timedOut atomic.Bool
 
@@ -245,8 +244,8 @@ func TestQueueExecTimeout(t *testing.T) {
 func TestQueueConcurrentProcessing(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	var peakConcurrent atomic.Int32
 
@@ -309,8 +308,8 @@ func TestQueueConcurrentProcessing(t *testing.T) {
 func TestQueueRecoverStale(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	queueKey := "test:recover"
 	processingKey := queueKey + ":processing"
@@ -356,8 +355,8 @@ func TestQueueRecoverStale(t *testing.T) {
 func TestQueueUniqueTaskProcessing(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	var taskProcessCount sync.Map
 
@@ -412,8 +411,7 @@ func TestQueueUniqueTaskProcessing(t *testing.T) {
 func TestQueueName(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	valkeyClient := setupTestQueue(t)
 
 	executor := &mockExecutor{
 		fn: func(_ context.Context, _ string) error {
@@ -430,8 +428,8 @@ func TestQueueName(t *testing.T) {
 func TestQueueOptions(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	valkeyClient := setupTestQueue(ctx, t)
+	ctx := t.Context()
+	valkeyClient := setupTestQueue(t)
 
 	var processedCount atomic.Int32
 

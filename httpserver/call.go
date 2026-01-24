@@ -49,7 +49,7 @@ func ExecuteStandardized[REQ any, RES any](
 		return nil, delegateError
 	}
 
-	requestID, _ := c.Get(middleware.ContextKeyRequestID).(string)
+	requestID := middleware.GetRequestID(c)
 
 	finalPayload := &APIResponse[RES]{
 		RequestID:  requestID,

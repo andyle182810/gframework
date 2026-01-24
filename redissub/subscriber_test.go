@@ -26,8 +26,7 @@ var (
 func setupTestClient(t *testing.T) *valkey.Valkey {
 	t.Helper()
 
-	ctx := t.Context()
-	container := testutil.SetupValkeyContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err)

@@ -2,7 +2,6 @@
 package repo_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -16,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestRepo(ctx context.Context, t *testing.T) (*repo.UserRepo, *postgres.Postgres) { //nolint:unparam
+func setupTestRepo(t *testing.T) (*repo.UserRepo, *postgres.Postgres) { //nolint:unparam
 	t.Helper()
 
-	pgContainer := testutil.SetupPostgresContainer(ctx, t)
+	pgContainer := testutil.SetupPostgresContainer(t)
 
 	pg, err := postgres.New(&postgres.Config{ //nolint:contextcheck
 		URL:                      pgContainer.ConnectionString(),

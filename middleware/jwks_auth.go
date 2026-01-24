@@ -66,7 +66,7 @@ func (j *JwksAuth) Middleware() echo.MiddlewareFunc {
 					return j.keyfunc.Keyfunc(token)
 				},
 				NewClaimsFunc: func(_ *echo.Context) jwt.Claims {
-					//nolint:exhaustruct // Claims fields are populated by JWT parser
+					//nolint:exhaustruct
 					return &ExtendedClaims{}
 				},
 				SuccessHandler: func(echoCtx *echo.Context) error {

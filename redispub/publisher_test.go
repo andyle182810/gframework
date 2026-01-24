@@ -24,10 +24,10 @@ func newMockRedisClient() *mockRedisClient {
 	}
 }
 
-func setupTestClient(ctx context.Context, t *testing.T) *valkey.Valkey {
+func setupTestClient(t *testing.T) *valkey.Valkey {
 	t.Helper()
 
-	container := testutil.SetupValkeyContainer(ctx, t)
+	container := testutil.SetupValkeyContainer(t)
 
 	port, err := strconv.Atoi(container.Port.Port())
 	require.NoError(t, err, "failed to parse port")
@@ -95,8 +95,7 @@ func TestNew_WithNegativeMaxStreamEntries(t *testing.T) {
 func TestNew_WithZeroMaxStreamEntries(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -112,8 +111,7 @@ func TestNew_WithZeroMaxStreamEntries(t *testing.T) {
 func TestNew_WithPositiveMaxStreamEntries(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 1000,
@@ -129,9 +127,7 @@ func TestNew_WithPositiveMaxStreamEntries(t *testing.T) {
 func TestNew_WithCustomTimeout(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
-
+	client := setupTestClient(t)
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
 		Timeout:          10 * time.Second,
@@ -146,8 +142,7 @@ func TestNew_WithCustomTimeout(t *testing.T) {
 func TestNew_WithZeroTimeoutUsesDefault(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -163,8 +158,7 @@ func TestNew_WithZeroTimeoutUsesDefault(t *testing.T) {
 func TestNew_WithNegativeTimeoutUsesDefault(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -180,8 +174,7 @@ func TestNew_WithNegativeTimeoutUsesDefault(t *testing.T) {
 func TestRedisPublisher_CloseIsIdempotent(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -197,8 +190,7 @@ func TestRedisPublisher_CloseIsIdempotent(t *testing.T) {
 func TestRedisPublisher_ImplementsPublisherInterface(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -215,7 +207,7 @@ func TestRedisPublisher_PublishToTopicWithNoMessages(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -235,7 +227,7 @@ func TestRedisPublisher_PublishToTopicWithSingleMessage(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -255,7 +247,7 @@ func TestRedisPublisher_PublishToTopicWithMultipleMessages(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -275,7 +267,7 @@ func TestRedisPublisher_PublishToTopicRespectsExistingContextDeadline(t *testing
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -298,7 +290,7 @@ func TestRedisPublisher_PublishToTopicWithAlreadyCancelledContext(t *testing.T) 
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -321,7 +313,7 @@ func TestRedisPublisher_PublishToTopicAppliesDefaultTimeoutWhenNoDeadline(t *tes
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -341,7 +333,7 @@ func TestRedisPublisher_PublishToMultipleTopics(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 0,
@@ -364,7 +356,7 @@ func TestRedisPublisher_PublishWithMaxStreamEntries(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	client := setupTestClient(ctx, t)
+	client := setupTestClient(t)
 
 	publisher, err := redispub.New(client, redispub.Options{
 		MaxStreamEntries: 10,
