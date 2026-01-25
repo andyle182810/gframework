@@ -1,4 +1,4 @@
-//nolint:paralleltest,varnamelen
+//nolint:paralleltest
 package repo_test
 
 import (
@@ -18,9 +18,11 @@ import (
 func setupTestRepo(t *testing.T) (*repo.UserRepo, *postgres.Postgres) { //nolint:unparam
 	t.Helper()
 
+	ctx := t.Context()
+
 	pgContainer := testutil.SetupPostgresContainer(t)
 
-	pg, err := postgres.New(&postgres.Config{ //nolint:contextcheck
+	pg, err := postgres.New(&postgres.Config{
 		URL:                      pgContainer.ConnectionString(),
 		MaxConnection:            10,
 		MinConnection:            2,
@@ -48,8 +50,8 @@ func setupTestRepo(t *testing.T) (*repo.UserRepo, *postgres.Postgres) { //nolint
 func TestUserRepo_CreateUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	tests := []struct {
 		name      string
@@ -97,8 +99,8 @@ func TestUserRepo_CreateUser(t *testing.T) {
 func TestUserRepo_CreateUser_DuplicateEmail(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	email := testutil.RandomEmail()
 
@@ -114,8 +116,8 @@ func TestUserRepo_CreateUser_DuplicateEmail(t *testing.T) {
 func TestUserRepo_GetUserByID(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	createdUser, err := repo.CreateUser(ctx, "Test User", testutil.RandomEmail())
 	require.NoError(t, err)
@@ -158,8 +160,8 @@ func TestUserRepo_GetUserByID(t *testing.T) {
 func TestUserRepo_GetUserByEmail(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	email := testutil.RandomEmail()
 	createdUser, err := repo.CreateUser(ctx, "Test User", email)
@@ -203,8 +205,8 @@ func TestUserRepo_GetUserByEmail(t *testing.T) {
 func TestUserRepo_ListUsers(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	const userCount = 25
 	for range userCount {
@@ -270,8 +272,8 @@ func TestUserRepo_ListUsers(t *testing.T) {
 func TestUserRepo_CountUsers(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	count, err := repo.CountUsers(ctx)
 	require.NoError(t, err)
@@ -291,8 +293,8 @@ func TestUserRepo_CountUsers(t *testing.T) {
 func TestUserRepo_UpdateUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	originalEmail := testutil.RandomEmail()
 	createdUser, err := repo.CreateUser(ctx, "Original Name", originalEmail)
@@ -320,8 +322,8 @@ func TestUserRepo_UpdateUser(t *testing.T) {
 func TestUserRepo_UpdateUser_NonExistent(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	updatedUser, err := repo.UpdateUser(ctx, uuid.NewString(), "Name", testutil.RandomEmail())
 	require.Error(t, err)
@@ -332,8 +334,8 @@ func TestUserRepo_UpdateUser_NonExistent(t *testing.T) {
 func TestUserRepo_DeleteUser(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	createdUser, err := repo.CreateUser(ctx, "Test User", testutil.RandomEmail())
 	require.NoError(t, err)
@@ -350,8 +352,8 @@ func TestUserRepo_DeleteUser(t *testing.T) {
 func TestUserRepo_DeleteUser_NonExistent(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	err := repo.DeleteUser(ctx, uuid.NewString())
 	assert.NoError(t, err)
@@ -360,8 +362,8 @@ func TestUserRepo_DeleteUser_NonExistent(t *testing.T) {
 func TestUserRepo_ConcurrentCreation(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	repo, _ := setupTestRepo(ctx, t)
+	ctx := t.Context()
+	repo, _ := setupTestRepo(t)
 
 	const concurrentUsers = 10
 	errChan := make(chan error, concurrentUsers)

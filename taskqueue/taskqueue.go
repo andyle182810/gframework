@@ -28,20 +28,33 @@ var (
 	ErrMaxAgeTooSmall      = errors.New("taskqueue: maxAge must be greater than execTimeout")
 )
 
+type Payload []byte
+
+type Task struct {
+	ID      string
+	Payload Payload
+}
+
 type Executor interface {
-	Execute(ctx context.Context, taskID string) error
+	Execute(ctx context.Context, taskID string, payload Payload) error
+}
+
+type taskItem struct {
+	id      string
+	payload Payload
 }
 
 type Queue struct {
 	client        redis.UniversalClient
 	queueKey      string
 	processingKey string
+	payloadKey    string
 	executor      Executor
 	workerCount   int
 	bufferSize    int
 	execTimeout   time.Duration
 	pollInterval  time.Duration
-	taskChan      chan string
+	taskChan      chan taskItem
 	wg            sync.WaitGroup
 	cancel        context.CancelFunc
 	mu            sync.Mutex
@@ -67,12 +80,13 @@ func New(client redis.UniversalClient, queueKey string, executor Executor, opts 
 		client:        client,
 		queueKey:      queueKey,
 		processingKey: queueKey + ":processing",
+		payloadKey:    queueKey + ":payloads",
 		executor:      executor,
 		workerCount:   defaultWorkerCount,
 		bufferSize:    defaultBufferSize,
 		execTimeout:   defaultExecTimeout,
 		pollInterval:  defaultPollInterval,
-		taskChan:      make(chan string, defaultBufferSize),
+		taskChan:      make(chan taskItem, defaultBufferSize),
 		wg:            sync.WaitGroup{},
 		cancel:        nil,
 		mu:            sync.Mutex{},
@@ -97,7 +111,7 @@ func WithBufferSize(size int) Option {
 	return func(q *Queue) {
 		if size > 0 {
 			q.bufferSize = size
-			q.taskChan = make(chan string, size)
+			q.taskChan = make(chan taskItem, size)
 		}
 	}
 }
@@ -118,17 +132,29 @@ func WithPollInterval(interval time.Duration) Option {
 	}
 }
 
-func (q *Queue) Push(ctx context.Context, taskIDs ...string) error {
-	if len(taskIDs) == 0 {
+func (q *Queue) Push(ctx context.Context, tasks ...Task) error {
+	if len(tasks) == 0 {
 		return nil
 	}
 
-	args := make([]any, len(taskIDs))
-	for i, id := range taskIDs {
-		args[i] = id
-	}
+	_, err := q.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		queueArgs := make([]any, len(tasks))
+		for i, task := range tasks {
+			queueArgs[i] = task.ID
+		}
 
-	return q.client.LPush(ctx, q.queueKey, args...).Err()
+		pipe.LPush(ctx, q.queueKey, queueArgs...)
+
+		for _, task := range tasks {
+			if len(task.Payload) > 0 {
+				pipe.HSet(ctx, q.payloadKey, task.ID, []byte(task.Payload))
+			}
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 func (q *Queue) Start(ctx context.Context) error {
@@ -189,7 +215,7 @@ func (q *Queue) fetcher(ctx context.Context) {
 
 			return
 		default:
-			taskID, err := q.fetchTask(ctx)
+			task, err := q.fetchTask(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
@@ -204,11 +230,11 @@ func (q *Queue) fetcher(ctx context.Context) {
 			}
 
 			select {
-			case q.taskChan <- taskID:
+			case q.taskChan <- task:
 			case <-ctx.Done():
 				// Use a fresh context since the parent is cancelled but we need to return the task
 				returnCtx := context.WithoutCancel(ctx)
-				q.returnTask(returnCtx, taskID)
+				q.returnTask(returnCtx, task.id)
 
 				return
 			}
@@ -216,13 +242,21 @@ func (q *Queue) fetcher(ctx context.Context) {
 	}
 }
 
-func (q *Queue) fetchTask(ctx context.Context) (string, error) {
+func (q *Queue) fetchTask(ctx context.Context) (taskItem, error) {
 	result, err := q.client.BRPop(ctx, q.pollInterval, q.queueKey).Result()
 	if err != nil {
-		return "", err
+		return taskItem{}, err
 	}
 
 	taskID := result[1] // result[0] is the key name
+
+	// Fetch payload from hash (if exists)
+	payloadBytes, err := q.client.HGet(ctx, q.payloadKey, taskID).Bytes()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		q.returnTask(ctx, taskID)
+
+		return taskItem{}, fmt.Errorf("failed to get payload: %w", err)
+	}
 
 	now := float64(time.Now().Unix())
 
@@ -233,10 +267,13 @@ func (q *Queue) fetchTask(ctx context.Context) (string, error) {
 	if err != nil {
 		q.returnTask(ctx, taskID)
 
-		return "", fmt.Errorf("failed to add task to processing set: %w", err)
+		return taskItem{}, fmt.Errorf("failed to add task to processing set: %w", err)
 	}
 
-	return taskID, nil
+	return taskItem{
+		id:      taskID,
+		payload: payloadBytes,
+	}, nil
 }
 
 func (q *Queue) returnTask(ctx context.Context, taskID string) {
@@ -256,52 +293,59 @@ func (q *Queue) worker(ctx context.Context, id int) {
 			log.Debug().Int("worker_id", id).Msg("Worker stopping")
 
 			return
-		case taskID, ok := <-q.taskChan:
+		case task, ok := <-q.taskChan:
 			if !ok {
 				log.Debug().Int("worker_id", id).Msg("Worker stopping - channel closed")
 
 				return
 			}
 
-			q.processTask(ctx, id, taskID)
+			q.processTask(ctx, id, task)
 		}
 	}
 }
 
-func (q *Queue) processTask(ctx context.Context, workerID int, taskID string) {
+func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 	log.Debug().
 		Int("worker_id", workerID).
-		Str("task_id", taskID).
+		Str("task_id", task.id).
 		Msg("Processing task")
 
 	execCtx, cancel := context.WithTimeout(ctx, q.execTimeout)
 	defer cancel()
 
-	err := q.executor.Execute(execCtx, taskID)
+	err := q.executor.Execute(execCtx, task.id, task.payload)
 
 	if err != nil {
 		if errors.Is(execCtx.Err(), context.DeadlineExceeded) {
 			log.Error().
 				Int("worker_id", workerID).
-				Str("task_id", taskID).
+				Str("task_id", task.id).
 				Dur("timeout", q.execTimeout).
 				Msg("Task timed out")
 		} else {
 			log.Error().
 				Err(err).
 				Int("worker_id", workerID).
-				Str("task_id", taskID).
+				Str("task_id", task.id).
 				Msg("Task failed")
 		}
 	} else {
 		log.Debug().
 			Int("worker_id", workerID).
-			Str("task_id", taskID).
+			Str("task_id", task.id).
 			Msg("Task completed successfully")
 	}
 
-	if err := q.client.ZRem(ctx, q.processingKey, taskID).Err(); err != nil {
-		log.Error().Err(err).Str("task_id", taskID).Msg("Failed to remove task from processing set")
+	// Clean up: remove from processing set and delete payload
+	if err := q.client.ZRem(ctx, q.processingKey, task.id).Err(); err != nil {
+		log.Error().Err(err).Str("task_id", task.id).Msg("Failed to remove task from processing set")
+	}
+
+	if len(task.payload) > 0 {
+		if err := q.client.HDel(ctx, q.payloadKey, task.id).Err(); err != nil {
+			log.Error().Err(err).Str("task_id", task.id).Msg("Failed to delete payload")
+		}
 	}
 }
 

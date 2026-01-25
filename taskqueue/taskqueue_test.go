@@ -17,11 +17,11 @@ import (
 )
 
 type mockExecutor struct {
-	fn func(ctx context.Context, taskID string) error
+	fn func(ctx context.Context, taskID string, payload taskqueue.Payload) error
 }
 
-func (m *mockExecutor) Execute(ctx context.Context, taskID string) error {
-	return m.fn(ctx, taskID)
+func (m *mockExecutor) Execute(ctx context.Context, taskID string, payload taskqueue.Payload) error {
+	return m.fn(ctx, taskID, payload)
 }
 
 func setupTestQueue(t *testing.T) *valkey.Valkey {
@@ -47,7 +47,7 @@ func TestNew(t *testing.T) {
 	valkeyClient := setupTestQueue(t)
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, _ string) error {
+		fn: func(_ context.Context, _ string, _ taskqueue.Payload) error {
 			return nil
 		},
 	}
@@ -121,7 +121,7 @@ func TestQueueStartStop(t *testing.T) {
 	valkeyClient := setupTestQueue(t)
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, _ string) error {
+		fn: func(_ context.Context, _ string, _ taskqueue.Payload) error {
 			return nil
 		},
 	}
@@ -153,7 +153,7 @@ func TestQueuePushAndProcess(t *testing.T) {
 	var processedCount atomic.Int32
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, taskID string) error {
+		fn: func(_ context.Context, taskID string, _ taskqueue.Payload) error {
 			processedTasks.Store(taskID, true)
 			processedCount.Add(1)
 
@@ -170,7 +170,15 @@ func TestQueuePushAndProcess(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = queue.Push(ctx, "task1", "task2", "task3")
+	payload1 := taskqueue.Payload(`{"data":"value1"}`)
+	payload2 := taskqueue.Payload(`{"data":"value2"}`)
+	payload3 := taskqueue.Payload(`{"data":"value3"}`)
+
+	err = queue.Push(ctx,
+		taskqueue.Task{ID: "task1", Payload: payload1},
+		taskqueue.Task{ID: "task2", Payload: payload2},
+		taskqueue.Task{ID: "task3", Payload: payload3},
+	)
 	require.NoError(t, err)
 
 	length, err := queue.QueueLength(ctx)
@@ -208,7 +216,7 @@ func TestQueueExecTimeout(t *testing.T) {
 	var timedOut atomic.Bool
 
 	executor := &mockExecutor{
-		fn: func(ctx context.Context, _ string) error {
+		fn: func(ctx context.Context, _ string, _ taskqueue.Payload) error {
 			select {
 			case <-ctx.Done():
 				timedOut.Store(true)
@@ -229,7 +237,7 @@ func TestQueueExecTimeout(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = queue.Push(ctx, "slow-task")
+	err = queue.Push(ctx, taskqueue.Task{ID: "slow-task"})
 	require.NoError(t, err)
 
 	err = queue.Start(ctx)
@@ -254,7 +262,7 @@ func TestQueueConcurrentProcessing(t *testing.T) {
 	var totalProcessed atomic.Int32
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, _ string) error {
+		fn: func(_ context.Context, _ string, _ taskqueue.Payload) error {
 			current := currentConcurrent.Add(1)
 
 			// Track max concurrent workers
@@ -287,7 +295,7 @@ func TestQueueConcurrentProcessing(t *testing.T) {
 
 	taskCount := 20
 	for i := range taskCount {
-		err = queue.Push(ctx, "task-"+strconv.Itoa(i))
+		err = queue.Push(ctx, taskqueue.Task{ID: "task-" + strconv.Itoa(i)})
 		require.NoError(t, err)
 	}
 
@@ -331,7 +339,7 @@ func TestQueueRecoverStale(t *testing.T) {
 	require.NoError(t, err)
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, _ string) error {
+		fn: func(_ context.Context, _ string, _ taskqueue.Payload) error {
 			return nil
 		},
 	}
@@ -361,7 +369,7 @@ func TestQueueUniqueTaskProcessing(t *testing.T) {
 	var taskProcessCount sync.Map
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, taskID string) error {
+		fn: func(_ context.Context, taskID string, _ taskqueue.Payload) error {
 			// Count how many times each task is processed
 			val, _ := taskProcessCount.LoadOrStore(taskID, new(atomic.Int32))
 
@@ -385,7 +393,7 @@ func TestQueueUniqueTaskProcessing(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := range 10 {
-		err = queue.Push(ctx, "task-"+strconv.Itoa(i))
+		err = queue.Push(ctx, taskqueue.Task{ID: "task-" + strconv.Itoa(i)})
 		require.NoError(t, err)
 	}
 
@@ -414,7 +422,7 @@ func TestQueueName(t *testing.T) {
 	valkeyClient := setupTestQueue(t)
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, _ string) error {
+		fn: func(_ context.Context, _ string, _ taskqueue.Payload) error {
 			return nil
 		},
 	}
@@ -434,7 +442,7 @@ func TestQueueOptions(t *testing.T) {
 	var processedCount atomic.Int32
 
 	executor := &mockExecutor{
-		fn: func(_ context.Context, _ string) error {
+		fn: func(_ context.Context, _ string, _ taskqueue.Payload) error {
 			processedCount.Add(1)
 
 			return nil
@@ -453,7 +461,7 @@ func TestQueueOptions(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, queue)
 
-	err = queue.Push(ctx, "test-task")
+	err = queue.Push(ctx, taskqueue.Task{ID: "test-task"})
 	require.NoError(t, err)
 
 	err = queue.Start(ctx)

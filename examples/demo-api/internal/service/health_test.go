@@ -11,8 +11,7 @@ import (
 )
 
 func TestService_HealthCheck(t *testing.T) {
-	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(ctx, t)
+	svc, _, _ := setupTestService(t)
 
 	echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodGet,

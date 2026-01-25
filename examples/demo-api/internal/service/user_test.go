@@ -1,8 +1,7 @@
-//nolint:paralleltest,thelper,varnamelen
+//nolint:paralleltest,thelper
 package service_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -22,11 +21,12 @@ import (
 
 func setupTestService(t *testing.T) (*service.Service, *repo.Repository, *valkey.Valkey) {
 	t.Helper()
+	ctx := t.Context()
 
 	pgContainer := testutil.SetupPostgresContainer(t)
-	valkeyContainer := testutil.SetupValkeyContainer(ctx, t)
+	valkeyContainer := testutil.SetupValkeyContainer(t)
 
-	pg, err := postgres.New(&postgres.Config{ //nolint:contextcheck
+	pg, err := postgres.New(&postgres.Config{
 		URL:                      pgContainer.ConnectionString(),
 		MaxConnection:            10,
 		MinConnection:            2,
@@ -63,8 +63,7 @@ func setupTestService(t *testing.T) (*service.Service, *repo.Repository, *valkey
 func TestService_CreateUser(t *testing.T) { //nolint:funlen
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(ctx, t)
+	svc, _, _ := setupTestService(t)
 
 	tests := []struct {
 		name           string
@@ -163,8 +162,7 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(ctx, t)
+	svc, _, _ := setupTestService(t)
 
 	email := testutil.RandomEmail()
 
@@ -209,9 +207,9 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 
 func TestService_GetUser(t *testing.T) {
 	testutil.SkipIfShort(t)
+	ctx := t.Context()
 
-	ctx := testutil.Context(t)
-	svc, repository, _ := setupTestService(ctx, t)
+	svc, repository, _ := setupTestService(t)
 
 	email := testutil.RandomEmail()
 	user, err := repository.User.CreateUser(ctx, "Test User", email)
@@ -288,8 +286,9 @@ func TestService_GetUser(t *testing.T) {
 func TestService_ListUsers(t *testing.T) { //nolint:funlen
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	svc, repository, _ := setupTestService(ctx, t)
+	ctx := t.Context()
+
+	svc, repository, _ := setupTestService(t)
 
 	for i := range 15 {
 		_, err := repository.User.CreateUser(ctx, fmt.Sprintf("User %d", i), testutil.RandomEmail())
@@ -406,7 +405,7 @@ func TestService_GetUser_WithCache(t *testing.T) {
 	testutil.SkipIfShort(t)
 
 	ctx := testutil.Context(t)
-	svc, _, redis := setupTestService(ctx, t)
+	svc, _, redis := setupTestService(t)
 
 	createReq := service.CreateUserRequest{
 		Name:  "Cached User",
