@@ -13,8 +13,7 @@ import (
 func TestService_ReadinessCheck(t *testing.T) {
 	testutil.SkipIfShort(t)
 
-	ctx := testutil.Context(t)
-	svc, _, _ := setupTestService(ctx, t)
+	svc, _, _ := setupTestService(t)
 
 	echoCtx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodGet,
