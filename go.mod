@@ -6,6 +6,7 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.5
+	github.com/bsm/redislock v0.9.4
 	github.com/docker/go-connections v0.6.0
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/go-playground/validator/v10 v10.30.1
