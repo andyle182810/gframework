@@ -91,6 +91,10 @@ func logHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, logger *zerolog.L
 		logFields["request_id"] = id
 	}
 
+	if handler, ok := ectx.Get(ContextKeyHandler).(string); ok && handler != "" {
+		logFields["handler"] = handler
+	}
+
 	loggerWithFields := logger.With().Fields(logFields).Logger()
 
 	if internal := httpErr.Unwrap(); internal != nil {
@@ -99,9 +103,9 @@ func logHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, logger *zerolog.L
 
 	switch {
 	case httpErr.Code >= http.StatusInternalServerError:
-		loggerWithFields.Error().Msg("HTTP error: server error")
+		loggerWithFields.Error().Msg("Request failed with server error")
 	case httpErr.Code >= http.StatusBadRequest:
-		loggerWithFields.Warn().Msg("HTTP error: client error")
+		loggerWithFields.Warn().Msg("Request failed with client error")
 	default:
 		loggerWithFields.Info().Msg("HTTP error")
 	}
@@ -115,6 +119,10 @@ func logError(ectx *echo.Context, err error, logger *zerolog.Logger) {
 
 	if id, ok := ectx.Get(ContextKeyRequestID).(string); ok && id != "" {
 		logFields["request_id"] = id
+	}
+
+	if handler, ok := ectx.Get(ContextKeyHandler).(string); ok && handler != "" {
+		logFields["handler"] = handler
 	}
 
 	logger.Error().

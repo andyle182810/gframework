@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -43,7 +42,7 @@ func New(cfg *Config) *Server {
 	e.Validator = validator.DefaultRestValidator()
 	e.HTTPErrorHandler = middleware.ErrorHandler(echo.DefaultHTTPErrorHandler(false))
 
-	e.Pre(middleware.RequestLogger(log.Logger, RestLogFieldsExtractor))
+	e.Pre(middleware.RequestLogger(log.Logger, SafeLogFieldsExtractor))
 
 	// Parse body limit string (e.g., "10M") to bytes
 	bodyLimitBytes := parseBodyLimit(cfg.BodyLimit)
@@ -144,20 +143,18 @@ func (s *Server) Name() string {
 	return "http"
 }
 
-func RestLogFieldsExtractor(ctx *echo.Context) map[string]any {
+func SafeLogFieldsExtractor(ctx *echo.Context) map[string]any {
+	fields := make(map[string]any)
+
 	if req := ctx.Get(middleware.ContextKeyBody); req != nil {
-		var requestPayload string
-
-		if b, err := json.Marshal(req); err != nil {
-			requestPayload = fmt.Sprintf("failed to parse request object as string: %+v", err)
-		} else {
-			requestPayload = string(b)
-		}
-
-		return map[string]any{"request_payload": requestPayload}
+		// Only log that a body exists and its type, not the actual content
+		fields["has_body"] = true
+		fields["body_type"] = fmt.Sprintf("%T", req)
+	} else {
+		fields["has_body"] = false
 	}
 
-	return nil
+	return fields
 }
 
 func RequestIDSkipper(skip bool) echomiddleware.Skipper {

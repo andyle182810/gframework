@@ -21,6 +21,9 @@ func ExecuteStandardized[REQ any, RES any](
 	handlerName string,
 	delegate HandlerFunc[REQ, RES],
 ) (resp any, httpErr *echo.HTTPError) {
+	// Set handler name in context for error logging
+	c.Set(middleware.ContextKeyHandler, handlerName)
+
 	log := zerolog.Ctx(c.Request().Context()).With().Str("handler", handlerName).Logger()
 
 	// Protect against handler panics crashing the server
@@ -40,12 +43,6 @@ func ExecuteStandardized[REQ any, RES any](
 
 	internalResponse, delegateError := delegate(log, c, request)
 	if delegateError != nil {
-		log.Error().
-			Int("status_code", delegateError.Code).
-			Interface("error_cause", delegateError.Unwrap()).
-			Interface("error_message", delegateError.Message).
-			Msg("Request failed")
-
 		return nil, delegateError
 	}
 
