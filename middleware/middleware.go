@@ -16,6 +16,7 @@ const (
 	ContextKeyBody          string = "body"
 	ContextKeyToken         string = "token"
 	ContextKeyClaims        string = "claims"
+	ContextKeyHandler       string = "handler"
 )
 
 const (
@@ -97,4 +98,12 @@ func GetExtendedClaimsFromContext(c *echo.Context) (*ExtendedClaims, error) {
 	}
 
 	return claims, nil
+}
+
+func GetHandler(c *echo.Context) string {
+	if handler, ok := c.Get(ContextKeyHandler).(string); ok {
+		return handler
+	}
+
+	return ""
 }
