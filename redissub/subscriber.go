@@ -408,7 +408,13 @@ func (s *Subscriber) handleFailedMessage(ctx context.Context, msg *message.Messa
 		}
 	}
 
-	msg.Nack()
+	// Acknowledge the message to prevent infinite redelivery loop.
+	// The message has either been sent to DLQ or logged as failed after exhausting retries.
+	if !msg.Ack() {
+		log.Warn().
+			Str("message_id", msg.UUID).
+			Msg("Failed message was already acknowledged")
+	}
 
 	if s.config.Metrics != nil {
 		s.config.Metrics.MessageNacked(s.Topic())

@@ -55,14 +55,14 @@ func bindAndValidate[TREQ any](c *echo.Context) (*TREQ, *echo.HTTPError) {
 	var req TREQ
 
 	if err := c.Bind(&req); err != nil {
-		httpErr := echo.NewHTTPError(http.StatusBadRequest, "Invalid request body: "+err.Error())
+		httpErr := BadRequestError(err, "Invalid request body")
 		_ = httpErr.Wrap(err)
 
 		return nil, httpErr
 	}
 
 	if err := c.Validate(&req); err != nil {
-		httpErr := echo.NewHTTPError(http.StatusBadRequest, "Validation failed: "+err.Error())
+		httpErr := BadRequestError(err, "Validation failed")
 		_ = httpErr.Wrap(err)
 
 		return nil, httpErr
