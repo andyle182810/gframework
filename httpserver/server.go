@@ -16,6 +16,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	kilobyte         = 1 << 10
+	megabyte         = 1 << 20
+	gigabyte         = 1 << 30
+	defaultBodyLimit = 10 * megabyte
+)
+
 type Config struct {
 	Host         string
 	Port         int
@@ -43,10 +50,7 @@ func New(cfg *Config) *Server {
 	e.HTTPErrorHandler = middleware.ErrorHandler(echo.DefaultHTTPErrorHandler(false))
 
 	e.Pre(middleware.RequestLogger(log.Logger, SafeLogFieldsExtractor))
-
-	// Parse body limit string (e.g., "10M") to bytes
-	bodyLimitBytes := parseBodyLimit(cfg.BodyLimit)
-	e.Pre(echomiddleware.BodyLimit(bodyLimitBytes))
+	e.Pre(echomiddleware.BodyLimit(parseBodyLimit(cfg.BodyLimit)))
 
 	if cfg.EnableCors {
 		e.Use(echomiddleware.CORS(cfg.AllowOrigins...))
@@ -67,8 +71,7 @@ func New(cfg *Config) *Server {
 
 func parseBodyLimit(limit string) int64 {
 	if limit == "" {
-		// Default 10MB
-		return 10 << 20 //nolint:mnd
+		return defaultBodyLimit
 	}
 
 	multiplier := int64(1)
@@ -76,20 +79,19 @@ func parseBodyLimit(limit string) int64 {
 
 	switch unit {
 	case "K", "k":
-		multiplier = 1 << 10 //nolint:mnd
+		multiplier = kilobyte
 		limit = limit[:len(limit)-1]
 	case "M", "m":
-		multiplier = 1 << 20 //nolint:mnd
+		multiplier = megabyte
 		limit = limit[:len(limit)-1]
 	case "G", "g":
-		multiplier = 1 << 30 //nolint:mnd
+		multiplier = gigabyte
 		limit = limit[:len(limit)-1]
 	}
 
 	size, err := strconv.ParseInt(limit, 10, 64)
 	if err != nil {
-		// Default 10MB on error
-		return 10 << 20 //nolint:mnd
+		return defaultBodyLimit
 	}
 
 	return size * multiplier

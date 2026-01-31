@@ -850,3 +850,181 @@ func TestSubscriberWithExecTimeoutToDLQ(t *testing.T) {
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, length, int64(1))
 }
+
+func TestSubscriberNoInfiniteRedeliveryAfterRetryExhaustion(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	valkeyClient := setupTestClient(t)
+	publisher := setupTestPublisher(t, valkeyClient)
+
+	const maxRetries = 2
+	expectedAttempts := maxRetries + 1
+
+	var attemptCount atomic.Int32
+
+	handler := func(_ context.Context, _ message.Payload) error {
+		attemptCount.Add(1)
+
+		return errAlwaysFail
+	}
+
+	topic := "test-topic-no-infinite-loop-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	subscriber, err := redissub.NewSubscriber(
+		valkeyClient.Client,
+		"test-group",
+		topic,
+		handler,
+		redissub.WithRetry(maxRetries, 10*time.Millisecond, ""),
+	)
+	require.NoError(t, err)
+
+	publishTestMessage(t, publisher, topic, "test-message")
+
+	startCtx, cancel := context.WithCancel(ctx)
+
+	started := make(chan struct{})
+
+	go func() {
+		close(started)
+
+		_ = subscriber.Start(startCtx)
+	}()
+
+	<-started
+
+	require.Eventually(t, func() bool {
+		return attemptCount.Load() >= int32(expectedAttempts) //nolint:gosec
+	}, 5*time.Second, 50*time.Millisecond, "should have attempted processing %d times", expectedAttempts)
+
+	time.Sleep(500 * time.Millisecond)
+
+	finalAttempts := attemptCount.Load()
+	require.Equal(t, int32(expectedAttempts), finalAttempts, //nolint:gosec
+		"message should only be processed %d times (initial + %d retries), got %d - indicates infinite redelivery bug",
+		expectedAttempts, maxRetries, finalAttempts)
+
+	cancel()
+}
+
+func TestSubscriberNoInfiniteRedeliveryWithDLQ(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	valkeyClient := setupTestClient(t)
+	publisher := setupTestPublisher(t, valkeyClient)
+
+	const maxRetries = 2
+	expectedAttempts := maxRetries + 1
+
+	var attemptCount atomic.Int32
+
+	handler := func(_ context.Context, _ message.Payload) error {
+		attemptCount.Add(1)
+
+		return errAlwaysFail
+	}
+
+	topic := "test-topic-dlq-no-loop-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	dlqTopic := topic + "-dlq"
+
+	subscriber, err := redissub.NewSubscriber(
+		valkeyClient.Client,
+		"test-group",
+		topic,
+		handler,
+		redissub.WithRetry(maxRetries, 10*time.Millisecond, dlqTopic),
+	)
+	require.NoError(t, err)
+
+	publishTestMessage(t, publisher, topic, "dlq-test-message")
+
+	startCtx, cancel := context.WithCancel(ctx)
+
+	started := make(chan struct{})
+
+	go func() {
+		close(started)
+
+		_ = subscriber.Start(startCtx)
+	}()
+
+	<-started
+
+	require.Eventually(t, func() bool {
+		length, dlqErr := valkeyClient.Client.XLen(ctx, dlqTopic).Result()
+
+		return dlqErr == nil && length >= 1
+	}, 5*time.Second, 50*time.Millisecond, "message should have been sent to DLQ")
+
+	time.Sleep(500 * time.Millisecond)
+
+	finalAttempts := attemptCount.Load()
+	require.Equal(t, int32(expectedAttempts), finalAttempts,
+		"message should only be processed %d times before going to DLQ, got %d - indicates infinite redelivery bug",
+		expectedAttempts, finalAttempts)
+
+	length, err := valkeyClient.Client.XLen(ctx, dlqTopic).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), length, "should have exactly 1 message in DLQ")
+
+	cancel()
+}
+
+func TestSubscriberMetricsAfterRetryExhaustion(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	valkeyClient := setupTestClient(t)
+	publisher := setupTestPublisher(t, valkeyClient)
+
+	const maxRetries = 2
+
+	metrics := &mockMetrics{}
+
+	handler := func(_ context.Context, _ message.Payload) error {
+		return errAlwaysFail
+	}
+
+	topic := "test-topic-metrics-retry-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	dlqTopic := topic + "-dlq"
+
+	subscriber, err := redissub.NewSubscriber(
+		valkeyClient.Client,
+		"test-group",
+		topic,
+		handler,
+		redissub.WithRetry(maxRetries, 10*time.Millisecond, dlqTopic),
+		redissub.WithMetrics(metrics),
+	)
+	require.NoError(t, err)
+
+	publishTestMessage(t, publisher, topic, "metrics-retry-message")
+
+	startCtx, cancel := context.WithCancel(ctx)
+
+	started := make(chan struct{})
+
+	go func() {
+		close(started)
+
+		_ = subscriber.Start(startCtx)
+	}()
+
+	<-started
+
+	require.Eventually(t, func() bool {
+		return metrics.dlqCount.Load() >= 1
+	}, 5*time.Second, 50*time.Millisecond, "message should have been sent to DLQ")
+
+	time.Sleep(300 * time.Millisecond)
+
+	cancel()
+
+	require.Equal(t, int32(1), metrics.receivedCount.Load(), "should receive message exactly once")
+	require.Equal(t, int32(1), metrics.processedCount.Load(), "should record processed exactly once")
+	require.Equal(t, int32(1), metrics.dlqCount.Load(), "should send to DLQ exactly once")
+	require.Equal(t, int32(1), metrics.nackedCount.Load(), "should record nacked exactly once (for failed processing)")
+	require.Equal(t, int32(0), metrics.ackedCount.Load(), "should not record acked (message failed)")
+}
