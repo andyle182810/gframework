@@ -33,7 +33,8 @@ type APIResponse[T any] struct {
 }
 
 type ResponseError struct {
-	Message string `json:"message"`
+	Message  string `json:"message"`
+	Internal string `json:"internal"`
 }
 
 func (e ResponseError) Error() string {

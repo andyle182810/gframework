@@ -1,4 +1,3 @@
-//nolint:ireturn
 package keyprovider
 
 import (
@@ -17,7 +16,7 @@ const (
 	JWKSRefreshInterval = 60 * time.Minute
 )
 
-func NewKeyFunc(ctx context.Context, log zerolog.Logger, urls []string) (keyfunc.Keyfunc, error) {
+func NewKeyFunc(ctx context.Context, log zerolog.Logger, urls []string) (keyfunc.Keyfunc, error) { //nolint:ireturn
 	rateLimiter := rate.NewLimiter(rate.Every(time.Second), JWKSRateLimitBurst)
 
 	var httpClient *http.Client
