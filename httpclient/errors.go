@@ -6,14 +6,13 @@ import (
 )
 
 var (
-	ErrRequestFailed      = errors.New("httpclient: request failed")
-	ErrServiceError       = errors.New("httpclient: service error")
-	ErrDecodeResponse     = errors.New("httpclient: failed to decode response")
-	ErrCreateRequest      = errors.New("httpclient: failed to create request")
-	ErrEncodeBody         = errors.New("httpclient: failed to encode request body")
-	ErrAuthFailed         = errors.New("httpclient: authentication failed")
-	ErrTokenRequestFailed = errors.New("httpclient: token request failed")
-	ErrResponseTooLarge   = errors.New("httpclient: response body too large")
+	ErrRequestFailed    = errors.New("httpclient: request failed")
+	ErrServiceError     = errors.New("httpclient: service error")
+	ErrDecodeResponse   = errors.New("httpclient: failed to decode response")
+	ErrCreateRequest    = errors.New("httpclient: failed to create request")
+	ErrEncodeBody       = errors.New("httpclient: failed to encode request body")
+	ErrAuthFailed       = errors.New("httpclient: authentication failed")
+	ErrResponseTooLarge = errors.New("httpclient: response body too large")
 )
 
 type ServiceError struct {

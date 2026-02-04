@@ -1,4 +1,4 @@
-package httpclient_test
+package authtoken_test
 
 import (
 	"encoding/json"
@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andyle182810/gframework/httpclient"
+	"github.com/andyle182810/gframework/authtoken"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestTokenProvider_FetchesTokenOnFirstCall(t *testing.T) {
+func TestClient_FetchesTokenOnFirstCall(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -38,19 +38,15 @@ func TestTokenProvider_FetchesTokenOnFirstCall(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
-	token, err := provider.GetToken(t.Context())
+	token, err := client.GetToken(t.Context())
 
 	require.NoError(t, err)
 	require.Equal(t, "test-access-token", token)
 }
 
-func TestTokenProvider_ReturnsCachedToken(t *testing.T) {
+func TestClient_ReturnsCachedToken(t *testing.T) {
 	t.Parallel()
 
 	var callCount atomic.Int32
@@ -66,23 +62,19 @@ func TestTokenProvider_ReturnsCachedToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
-	token1, err := provider.GetToken(t.Context())
+	token1, err := client.GetToken(t.Context())
 	require.NoError(t, err)
 
-	token2, err := provider.GetToken(t.Context())
+	token2, err := client.GetToken(t.Context())
 	require.NoError(t, err)
 
 	require.Equal(t, token1, token2)
 	require.Equal(t, int32(1), callCount.Load())
 }
 
-func TestTokenProvider_RefreshesExpiredToken(t *testing.T) {
+func TestClient_RefreshesExpiredToken(t *testing.T) {
 	t.Parallel()
 
 	var callCount atomic.Int32
@@ -99,24 +91,20 @@ func TestTokenProvider_RefreshesExpiredToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
-	_, err := provider.GetToken(t.Context())
+	_, err := client.GetToken(t.Context())
 	require.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)
 
-	_, err = provider.GetToken(t.Context())
+	_, err = client.GetToken(t.Context())
 	require.NoError(t, err)
 
 	require.Equal(t, int32(2), callCount.Load())
 }
 
-func TestTokenProvider_HandlesTokenRequestFailure(t *testing.T) {
+func TestClient_HandlesTokenRequestFailure(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -124,18 +112,14 @@ func TestTokenProvider_HandlesTokenRequestFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "wrong-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "wrong-secret")
 
-	_, err := provider.GetToken(t.Context())
+	_, err := client.GetToken(t.Context())
 
-	require.ErrorIs(t, err, httpclient.ErrTokenRequestFailed)
+	require.ErrorIs(t, err, authtoken.ErrTokenRequestFailed)
 }
 
-func TestTokenProvider_HandlesInvalidJSONResponse(t *testing.T) {
+func TestClient_HandlesInvalidJSONResponse(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -144,32 +128,28 @@ func TestTokenProvider_HandlesInvalidJSONResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
-	_, err := provider.GetToken(t.Context())
+	_, err := client.GetToken(t.Context())
 
 	require.Error(t, err)
 }
 
-func TestTokenProvider_HandlesNetworkError(t *testing.T) {
+func TestClient_HandlesNetworkError(t *testing.T) {
 	t.Parallel()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     "http://invalid-host-that-does-not-exist.local",
-	})
+	client := authtoken.New(
+		"http://invalid-host-that-does-not-exist.local",
+		"test-client",
+		"test-secret",
+	)
 
-	_, err := provider.GetToken(t.Context())
+	_, err := client.GetToken(t.Context())
 
 	require.Error(t, err)
 }
 
-func TestTokenProvider_InvalidateTokenClearsCache(t *testing.T) {
+func TestClient_InvalidateTokenClearsCache(t *testing.T) {
 	t.Parallel()
 
 	var callCount atomic.Int32
@@ -186,25 +166,21 @@ func TestTokenProvider_InvalidateTokenClearsCache(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
-	token1, err := provider.GetToken(t.Context())
+	token1, err := client.GetToken(t.Context())
 	require.NoError(t, err)
 
-	provider.InvalidateToken()
+	client.InvalidateToken()
 
-	token2, err := provider.GetToken(t.Context())
+	token2, err := client.GetToken(t.Context())
 	require.NoError(t, err)
 
 	require.NotEqual(t, token1, token2)
 	require.Equal(t, int32(2), callCount.Load())
 }
 
-func TestTokenProvider_ConcurrentRequestsShareToken(t *testing.T) {
+func TestClient_ConcurrentRequestsShareToken(t *testing.T) {
 	t.Parallel()
 
 	var callCount atomic.Int32
@@ -222,11 +198,7 @@ func TestTokenProvider_ConcurrentRequestsShareToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	provider := httpclient.NewTokenProviderForTest(httpclient.AuthConfig{
-		ClientID:     "test-client",
-		ClientSecret: "test-secret",
-		TokenURL:     server.URL,
-	})
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
 	var wg sync.WaitGroup
 
@@ -239,7 +211,7 @@ func TestTokenProvider_ConcurrentRequestsShareToken(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 
-			tokens[idx], errs[idx] = provider.GetToken(t.Context())
+			tokens[idx], errs[idx] = client.GetToken(t.Context())
 		}(idx)
 	}
 
@@ -256,36 +228,78 @@ func TestTokenProvider_ConcurrentRequestsShareToken(t *testing.T) {
 	require.LessOrEqual(t, callCount.Load(), int32(2))
 }
 
-func TestWithAuth_AddsAuthorizationHeaderToRequests(t *testing.T) {
+func TestClient_HandlesEmptyAccessToken(t *testing.T) {
 	t.Parallel()
 
-	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token": "oauth-token",
+			"access_token": "",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
 		})
 	}))
-	defer tokenServer.Close()
+	defer server.Close()
 
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer oauth-token", r.Header.Get("Authorization"))
+	client := authtoken.New(server.URL, "test-client", "test-secret")
 
+	_, err := client.GetToken(t.Context())
+
+	require.ErrorIs(t, err, authtoken.ErrNoAccessToken)
+}
+
+func TestWithHTTPClient(t *testing.T) {
+	t.Parallel()
+
+	customClient := &http.Client{ //nolint:exhaustruct
+		Timeout: 5 * time.Second,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "authenticated"})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "custom-client-token",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		})
 	}))
-	defer apiServer.Close()
+	defer server.Close()
 
-	client := httpclient.New(apiServer.URL, httpclient.WithAuth(httpclient.AuthConfig{
-		ClientID:     "client-id",
-		ClientSecret: "client-secret",
-		TokenURL:     tokenServer.URL,
-	}))
+	client := authtoken.New(
+		server.URL,
+		"test-client",
+		"test-secret",
+		authtoken.WithHTTPClient(customClient),
+	)
 
-	var response map[string]string
-	err := client.Get(t.Context(), "/protected", &response)
+	token, err := client.GetToken(t.Context())
 
 	require.NoError(t, err)
-	require.Equal(t, "authenticated", response["status"])
+	require.Equal(t, "custom-client-token", token)
+}
+
+func TestWithTimeout(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "slow-token",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		})
+	}))
+	defer server.Close()
+
+	client := authtoken.New(
+		server.URL,
+		"test-client",
+		"test-secret",
+		authtoken.WithTimeout(50*time.Millisecond),
+	)
+
+	_, err := client.GetToken(t.Context())
+
+	require.Error(t, err)
 }
