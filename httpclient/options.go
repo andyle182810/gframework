@@ -4,6 +4,8 @@ import (
 	"maps"
 	"net/http"
 	"time"
+
+	"github.com/andyle182810/gframework/authtoken"
 )
 
 const (
@@ -52,7 +54,7 @@ type AuthConfig struct {
 func WithAuth(cfg AuthConfig) Option {
 	return func(c *Client) {
 		c.authConfig = &cfg
-		c.tokenProvider = newTokenProvider(cfg)
+		c.tokenProvider = authtoken.New(cfg.TokenURL, cfg.ClientID, cfg.ClientSecret)
 	}
 }
 

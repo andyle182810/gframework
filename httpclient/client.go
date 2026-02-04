@@ -22,10 +22,7 @@ type TokenProvider interface {
 	InvalidateToken()
 }
 
-var (
-	_ Doer          = (*http.Client)(nil)
-	_ TokenProvider = (*tokenProvider)(nil)
-)
+var _ Doer = (*http.Client)(nil)
 
 type Client struct {
 	baseURL         string

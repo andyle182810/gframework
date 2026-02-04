@@ -140,7 +140,7 @@ func TestErrorHandler_WithLogging(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 
-	require.Contains(t, buf.String(), "HTTP error: server error")
+	require.Contains(t, buf.String(), "Request failed with server error")
 	require.Contains(t, buf.String(), "Internal Server Error")
 }
 
