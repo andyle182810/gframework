@@ -134,7 +134,7 @@ func TestNew_ValidatesJWT(t *testing.T) {
 	signedToken, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 
-	parsedToken, err := jwt.Parse(signedToken, keyFuncResult.Keyfunc.Keyfunc)
+	parsedToken, err := jwt.Parse(signedToken, keyFuncResult.Keyfunc)
 	require.NoError(t, err)
 	require.True(t, parsedToken.Valid)
 }

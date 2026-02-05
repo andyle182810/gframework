@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -38,7 +39,7 @@ type JWTConfig struct {
 func DefaultJWTConfig() JWTConfig {
 	return JWTConfig{
 		Skipper:       middleware.DefaultSkipper,
-		Logger:        nil,
+		Logger:        &log.Logger,
 		Keyfunc:       nil,
 		NewClaimsFunc: defaultNewClaimsFunc,
 		ContextKey:    "user",
@@ -113,7 +114,7 @@ func createSuccessHandler(logger *zerolog.Logger) func(*echo.Context) error {
 	return func(echoCtx *echo.Context) error {
 		token, ok := echoCtx.Get("user").(*jwt.Token)
 		if !ok {
-			jwtLogError(logger, "jwt token retrieval from context failed", nil)
+			jwtLogError(logger, "JWT token retrieval from context failed", nil)
 
 			return nil
 		}
@@ -122,12 +123,12 @@ func createSuccessHandler(logger *zerolog.Logger) func(*echo.Context) error {
 
 		if claims, ok := token.Claims.(*ExtendedClaims); ok {
 			echoCtx.Set(ContextKeyClaims, claims)
-			jwtLogDebug(logger, "jwt token and claims set successfully")
+			jwtLogDebug(logger, "JWT token and claims set successfully")
 		} else {
-			jwtLogError(logger, "token claims assertion as ExtendedClaims failed", nil)
+			jwtLogError(logger, "Token claims assertion as ExtendedClaims failed", nil)
 		}
 
-		jwtLogDebug(logger, "jwt token verified successfully")
+		jwtLogDebug(logger, "JWT token verified successfully")
 
 		return nil
 	}
@@ -135,7 +136,7 @@ func createSuccessHandler(logger *zerolog.Logger) func(*echo.Context) error {
 
 func createErrorHandler(logger *zerolog.Logger) func(*echo.Context, error) error {
 	return func(_ *echo.Context, err error) error {
-		jwtLogError(logger, "jwt verification failed", err)
+		jwtLogError(logger, "JWT verification failed", err)
 
 		if err.Error() == "missing value in request header" {
 			return ErrTokenRequired

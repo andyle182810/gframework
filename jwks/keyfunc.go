@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MicahParks/jwkset"
 	"github.com/MicahParks/keyfunc/v3"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/time/rate"
 )
@@ -17,7 +19,7 @@ const (
 )
 
 type KeyFunc struct {
-	keyfunc.Keyfunc
+	keyfunc keyfunc.Keyfunc
 }
 
 type Config struct {
@@ -82,5 +84,21 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 		Dur("refresh_timeout", cfg.refreshTimeout).
 		Msg("JWKS keyfunc initialized successfully")
 
-	return &KeyFunc{Keyfunc: keyFunc}, nil
+	return &KeyFunc{keyfunc: keyFunc}, nil
+}
+
+func (k *KeyFunc) Keyfunc(token *jwt.Token) (any, error) {
+	return k.keyfunc.Keyfunc(token)
+}
+
+func (k *KeyFunc) KeyfuncCtx(ctx context.Context) jwt.Keyfunc {
+	return k.keyfunc.KeyfuncCtx(ctx)
+}
+
+func (k *KeyFunc) Storage() jwkset.Storage { //nolint:ireturn
+	return k.keyfunc.Storage()
+}
+
+func (k *KeyFunc) VerificationKeySet(ctx context.Context) (jwt.VerificationKeySet, error) {
+	return k.keyfunc.VerificationKeySet(ctx)
 }
