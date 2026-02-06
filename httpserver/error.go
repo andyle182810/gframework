@@ -18,14 +18,21 @@ const (
 )
 
 func HTTPError(code int, err error, details ...string) *echo.HTTPError {
-	message := err.Error()
+	message := http.StatusText(code)
+
+	if err != nil {
+		message = err.Error()
+	}
 
 	if len(details) > 0 {
 		message = details[0]
 	}
 
 	httpErr := echo.NewHTTPError(code, message)
-	_ = httpErr.Wrap(err)
+
+	if err != nil {
+		_ = httpErr.Wrap(err)
+	}
 
 	return httpErr
 }
