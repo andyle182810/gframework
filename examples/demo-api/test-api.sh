@@ -45,19 +45,30 @@ curl -s -X GET "$API_URL/v1/users/$USER_ID" \
   -H "X-Request-ID: $(uuidgen)" | jq '.'
 echo -e "\n"
 
-# Test 5: List Users
-echo -e "${GREEN}5. Listing users (page 1, 5 items)${NC}"
+# Test 5: Update User
+echo -e "${GREEN}5. Updating user: $USER_ID${NC}"
+curl -s -X PATCH "$API_URL/v1/users/$USER_ID" \
+  -H "Content-Type: application/json" \
+  -H "X-Request-ID: $(uuidgen)" \
+  -d '{
+    "name": "Updated Test User",
+    "email": "updated-'$(date +%s)'@example.com"
+  }' | jq '.'
+echo -e "\n"
+
+# Test 6: List Users
+echo -e "${GREEN}6. Listing users (page 1, 5 items)${NC}"
 curl -s -X GET "$API_URL/v1/users?page=1&pageSize=5" \
   -H "X-Request-ID: $(uuidgen)" | jq '.'
 echo -e "\n"
 
-# Test 6: Metrics
-echo -e "${GREEN}6. Checking metrics endpoint${NC}"
+# Test 7: Metrics
+echo -e "${GREEN}7. Checking metrics endpoint${NC}"
 curl -s "$METRICS_URL/metrics" | head -n 20
 echo -e "\n..."
 
-# Test 7: Metrics Status
-echo -e "${GREEN}7. Checking metrics status${NC}"
+# Test 8: Metrics Status
+echo -e "${GREEN}8. Checking metrics status${NC}"
 curl -s "$METRICS_URL/status" | jq '.'
 echo -e "\n"
 
