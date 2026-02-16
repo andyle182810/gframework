@@ -42,6 +42,20 @@ type ListUsersResponse struct {
 	Users []GetUserResponse `json:"users"`
 }
 
+type UpdateUserRequest struct {
+	UserID string `param:"userId" validate:"required,uuid"`
+	Name   string `json:"name"    validate:"required,min=2,max=100"`
+	Email  string `json:"email"   validate:"required,email"`
+}
+
+type UpdateUserResponse struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 func (s *Service) CreateUser(ctx *echo.Context, req *CreateUserRequest) (any, *echo.HTTPError) {
 	delegator := func(
 		log zerolog.Logger,
@@ -116,6 +130,55 @@ func (s *Service) GetUser(ctx *echo.Context, req *GetUserRequest) (any, *echo.HT
 	}
 
 	return httpserver.ExecuteStandardized(ctx, req, "GetUser", delegator)
+}
+
+func (s *Service) UpdateUser(ctx *echo.Context, req *UpdateUserRequest) (any, *echo.HTTPError) {
+	delegator := func(
+		log zerolog.Logger,
+		ctx *echo.Context,
+		req *UpdateUserRequest,
+	) (*httpserver.HandlerResponse[UpdateUserResponse], *echo.HTTPError) {
+		log.Info().
+			Str("user_id", req.UserID).
+			Str("name", req.Name).
+			Str("email", req.Email).
+			Msg("Updating user")
+
+		user, err := s.repo.User.UpdateUser(ctx.Request().Context(), req.UserID, req.Name, req.Email)
+		if err != nil {
+			if pgxscan.NotFound(err) {
+				log.Error().Err(err).Str("user_id", req.UserID).Msg("User not found")
+
+				return nil, httpserver.NotFoundError(err, "User not found")
+			}
+
+			log.Error().Err(err).Str("user_id", req.UserID).Msg("Failed to update user")
+
+			return nil, httpserver.InternalError(err, "Failed to update user")
+		}
+
+		// Invalidate cache for the old email and update with new email
+		cacheKey := "user:email:" + req.Email
+
+		const cacheExpiration = 5 * time.Minute
+		if err := s.valkey.Set(ctx.Request().Context(), cacheKey, user.ID, cacheExpiration).Err(); err != nil {
+			log.Warn().Err(err).Msg("Failed to cache user email")
+		}
+
+		log.Info().Str("user_id", req.UserID).Msg("User updated successfully")
+
+		return httpserver.NewResponse(
+			UpdateUserResponse{
+				ID:        user.ID,
+				Name:      user.Name,
+				Email:     user.Email,
+				CreatedAt: user.CreatedAt,
+				UpdatedAt: user.UpdatedAt,
+			},
+		), nil
+	}
+
+	return httpserver.ExecuteStandardized(ctx, req, "UpdateUser", delegator)
 }
 
 func (s *Service) ListUsers(ctx *echo.Context, req *ListUsersRequest) (any, *echo.HTTPError) {

@@ -19,7 +19,7 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/labstack/echo-contrib v0.50.0
 	github.com/labstack/echo-jwt/v5 v5.0.0
-	github.com/labstack/echo/v5 v5.0.0
+	github.com/labstack/echo/v5 v5.0.4
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/rs/zerolog v1.34.0

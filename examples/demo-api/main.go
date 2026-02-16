@@ -216,6 +216,7 @@ func (app *application) registerRoutes(_ *echo.Echo, root *echo.Group) {
 
 	v1.POST("/users", httpserver.Wrapper(app.svc.CreateUser))
 	v1.GET("/users/:userId", httpserver.Wrapper(app.svc.GetUser))
+	v1.PATCH("/users/:userId", httpserver.Wrapper(app.svc.UpdateUser))
 	v1.GET("/users", httpserver.Wrapper(app.svc.ListUsers))
 }
 

@@ -1,10 +1,12 @@
 package httpserver
 
 import (
+	"errors"
 	"net/http"
 	"os"
 
 	"github.com/andyle182810/gframework/middleware"
+	"github.com/andyle182810/gframework/validator"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
@@ -62,8 +64,15 @@ func bindAndValidate[TREQ any](c *echo.Context) (*TREQ, *echo.HTTPError) {
 	}
 
 	if err := c.Validate(&req); err != nil {
-		httpErr := BadRequestError(err, "Validation failed")
-		_ = httpErr.Wrap(err)
+		message := "Validation failed"
+
+		var validationErrs validator.ValidationErrors
+
+		if errors.As(err, &validationErrs) {
+			message = validationErrs.Error()
+		}
+
+		httpErr := BadRequestError(err, message)
 
 		return nil, httpErr
 	}
