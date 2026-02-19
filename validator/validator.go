@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/shopspring/decimal"
 )
 
 type Validator struct {
@@ -44,6 +45,16 @@ func DefaultRestValidator() *Validator {
 
 		return name
 	})
+
+	v.RegisterCustomTypeFunc(func(field reflect.Value) any {
+		if val, ok := field.Interface().(decimal.Decimal); ok {
+			f, _ := val.Float64()
+
+			return f
+		}
+
+		return nil
+	}, decimal.Decimal{})
 
 	return &Validator{Validator: v}
 }
