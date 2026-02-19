@@ -7,6 +7,7 @@ import (
 
 	"github.com/andyle182810/gframework/validator"
 	gvalidator "github.com/go-playground/validator/v10"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -562,6 +563,146 @@ func TestValidationError_ErrorMethod(t *testing.T) {
 
 	parts := strings.Split(errorMsg, "; ")
 	require.Len(t, parts, 3)
+}
+
+type DecimalStruct struct {
+	Amount decimal.Decimal  `json:"amount" validate:"required,gte=0"`
+	Fee    decimal.Decimal  `json:"fee"    validate:"gte=0,lte=1000"`
+	Limit  *decimal.Decimal `json:"limit"  validate:"omitempty,gte=0"`
+}
+
+func TestValidate_DecimalGteSuccess(t *testing.T) {
+	t.Parallel()
+
+	validatorInstance := validator.DefaultRestValidator()
+
+	tests := []struct {
+		name  string
+		input DecimalStruct
+	}{
+		{
+			name: "positive decimal",
+			input: DecimalStruct{
+				Amount: decimal.NewFromFloat(100.50),
+				Fee:    decimal.NewFromInt(10),
+				Limit:  nil,
+			},
+		},
+		{
+			name: "zero fee (gte=0 without required)",
+			input: DecimalStruct{
+				Amount: decimal.NewFromInt(1),
+				Fee:    decimal.NewFromInt(0),
+				Limit:  nil,
+			},
+		},
+		{
+			name: "nil optional pointer",
+			input: DecimalStruct{
+				Amount: decimal.NewFromInt(1),
+				Fee:    decimal.NewFromInt(0),
+				Limit:  nil,
+			},
+		},
+		{
+			name: "non-nil optional pointer with valid value",
+			input: DecimalStruct{
+				Amount: decimal.NewFromInt(1),
+				Fee:    decimal.NewFromInt(0),
+				Limit:  decimalPtr(decimal.NewFromFloat(500.25)),
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validatorInstance.Validate(testCase.input)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestValidate_DecimalGteFailure(t *testing.T) {
+	t.Parallel()
+
+	validatorInstance := validator.DefaultRestValidator()
+
+	tests := []struct {
+		name          string
+		input         DecimalStruct
+		expectedField string
+		expectedTag   string
+		expectedMsg   string
+	}{
+		{
+			name: "negative amount",
+			input: DecimalStruct{
+				Amount: decimal.NewFromFloat(-1.5),
+				Fee:    decimal.NewFromInt(0),
+				Limit:  nil,
+			},
+			expectedField: "amount",
+			expectedTag:   "gte",
+			expectedMsg:   "amount must be greater than or equal to 0",
+		},
+		{
+			name: "negative fee",
+			input: DecimalStruct{
+				Amount: decimal.NewFromInt(100),
+				Fee:    decimal.NewFromFloat(-0.01),
+				Limit:  nil,
+			},
+			expectedField: "fee",
+			expectedTag:   "gte",
+			expectedMsg:   "fee must be greater than or equal to 0",
+		},
+		{
+			name: "fee exceeds lte limit",
+			input: DecimalStruct{
+				Amount: decimal.NewFromInt(100),
+				Fee:    decimal.NewFromFloat(1000.01),
+				Limit:  nil,
+			},
+			expectedField: "fee",
+			expectedTag:   "lte",
+			expectedMsg:   "fee must be less than or equal to 1000",
+		},
+		{
+			name: "negative optional pointer",
+			input: DecimalStruct{
+				Amount: decimal.NewFromInt(1),
+				Fee:    decimal.NewFromInt(0),
+				Limit:  decimalPtr(decimal.NewFromFloat(-10)),
+			},
+			expectedField: "limit",
+			expectedTag:   "gte",
+			expectedMsg:   "limit must be greater than or equal to 0",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validatorInstance.Validate(testCase.input)
+			require.Error(t, err)
+
+			var validationErrors validator.ValidationErrors
+			ok := errors.As(err, &validationErrors)
+			require.True(t, ok)
+
+			found := findValidationError(validationErrors, testCase.expectedField)
+			require.NotNil(t, found, "expected validation error for field %s", testCase.expectedField)
+			require.Equal(t, testCase.expectedTag, found.Tag)
+			require.Equal(t, testCase.expectedMsg, found.Message)
+		})
+	}
+}
+
+func decimalPtr(d decimal.Decimal) *decimal.Decimal {
+	return &d
 }
 
 func findValidationError(errors validator.ValidationErrors, field string) *validator.ValidationError {
