@@ -74,7 +74,7 @@ func TestJWT_ValidToken(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 		Azp: "my-client-app",
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -169,7 +169,7 @@ func TestJWT_ExpiredToken(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 		Azp: "my-client-app",
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -241,7 +241,7 @@ func TestJWTWithConfig_CustomLogger(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 		Azp: "my-client-app",
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -286,7 +286,7 @@ func TestJWTWithConfig_CustomContextKey(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 		Azp: "my-client-app",
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -349,7 +349,7 @@ func TestDefaultJWTConfig(t *testing.T) {
 func TestExtendedClaims_Getters(t *testing.T) {
 	t.Parallel()
 
-	claims := &middleware.ExtendedClaims{
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 		Azp: "my-authorized-party",
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{},
@@ -362,7 +362,7 @@ func TestJWTWithConfig_NilDefaults(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 		Azp: "my-client-app",
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{

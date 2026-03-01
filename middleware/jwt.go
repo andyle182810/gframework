@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -18,13 +19,64 @@ var (
 	ErrInvalidToken    = echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 )
 
+type RoleAccess struct {
+	Roles []string `json:"roles"`
+}
+
+type ResourceAccess map[string]RoleAccess
+
 type ExtendedClaims struct {
+	// Token metadata
+	Typ string `json:"typ"`
 	Azp string `json:"azp"`
+	Sid string `json:"sid"`
+	Acr string `json:"acr"`
+
+	// Authorization
+	Scope          string         `json:"scope"`
+	RealmAccess    RoleAccess     `json:"realm_access"`    //nolint:tagliatelle
+	ResourceAccess ResourceAccess `json:"resource_access"` //nolint:tagliatelle
+	AllowedOrigins []string       `json:"allowed-origins"` //nolint:tagliatelle
+
+	// User profile
+	Name              string `json:"name"`
+	PreferredUsername string `json:"preferred_username"` //nolint:tagliatelle
+	GivenName         string `json:"given_name"`         //nolint:tagliatelle
+	FamilyName        string `json:"family_name"`        //nolint:tagliatelle
+	Email             string `json:"email"`
+	EmailVerified     bool   `json:"email_verified"` //nolint:tagliatelle
+
 	jwt.RegisteredClaims
 }
 
 func (c *ExtendedClaims) GetAzp() string {
 	return c.Azp
+}
+
+func (c *ExtendedClaims) HasRealmRole(role string) bool {
+	return slices.Contains(c.RealmAccess.Roles, role)
+}
+
+func (c *ExtendedClaims) GetRealmRoles() []string {
+	return c.RealmAccess.Roles
+}
+
+func (c *ExtendedClaims) HasResourceRole(resource, role string) bool {
+	access, ok := c.ResourceAccess[resource]
+	if !ok {
+		return false
+	}
+
+	return slices.Contains(access.Roles, role)
+}
+
+func (c *ExtendedClaims) GetResourceRoles(resource string) []string {
+	access, ok := c.ResourceAccess[resource]
+	if !ok {
+		return nil
+	}
+
+	return access.Roles
 }
 
 type JWTConfig struct {
@@ -47,10 +99,8 @@ func DefaultJWTConfig() JWTConfig {
 	}
 }
 
-//nolint:ireturn
-func defaultNewClaimsFunc(_ *echo.Context) jwt.Claims {
-	//nolint:exhaustruct
-	return &ExtendedClaims{}
+func defaultNewClaimsFunc(_ *echo.Context) jwt.Claims { //nolint:ireturn
+	return &ExtendedClaims{} //nolint:exhaustruct
 }
 
 func JWT(kf keyfunc.Keyfunc) echo.MiddlewareFunc {
