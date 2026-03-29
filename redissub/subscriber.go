@@ -1,3 +1,37 @@
+// Package redissub provides a Redis Stream subscriber with automatic retry, timeout, and lifecycle management.
+//
+// This package wraps Watermill's Redis Stream subscriber to consume events from Redis Streams
+// with configurable retry logic, execution timeouts, and graceful shutdown. It supports
+// consumer groups for distributed message processing.
+//
+// Basic usage:
+//
+//	handler := func(ctx context.Context, msg *message.Message) error {
+//	    var event MyEvent
+//	    if err := json.Unmarshal(msg.Payload, &event); err != nil {
+//	        return err
+//	    }
+//	    // process event
+//	    return nil
+//	}
+//
+//	subscriber, err := redissub.New(redisClient, "my-consumer-group", &redissub.Config{
+//	    ExecTimeout:     30 * time.Second,
+//	    MaxRetries:      3,
+//	    ShutdownTimeout: 20 * time.Second,
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	subscriber.Subscribe(ctx, "events-topic", handler)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// Messages are acknowledged only after successful processing. Failed messages are retried
+// up to MaxRetries times before being nacked. Timeouts on message handlers are enforced
+// via the ExecTimeout configuration.
 package redissub
 
 import (
@@ -197,6 +231,7 @@ func (s *Subscriber) Stop() error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("topic", s.topic).
 		Str("consumer_group", s.consumerGroup).
 		Msg("Stopping subscriber")
@@ -212,6 +247,7 @@ func (s *Subscriber) Stop() error {
 		// Good, subscriber stopped cleanly
 	case <-time.After(s.config.ShutdownTimeout):
 		log.Error().
+			Str("source", "gframework").
 			Str("topic", s.topic).
 			Str("consumer_group", s.consumerGroup).
 			Dur("timeout", s.config.ShutdownTimeout).
@@ -219,6 +255,7 @@ func (s *Subscriber) Stop() error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("topic", s.topic).
 		Str("consumer_group", s.consumerGroup).
 		Msg("Subscriber stopped")
@@ -250,6 +287,7 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 	defer close(s.stoppedSignal)
 
 	log.Info().
+		Str("source", "gframework").
 		Str("topic", s.Topic()).
 		Msg("The subscription is being started")
 
@@ -265,6 +303,7 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 		case <-ctx.Done():
 			s.healthy.Store(false)
 			log.Info().
+				Str("source", "gframework").
 				Str("service_name", s.Name()).
 				Str("topic", s.Topic()).
 				Msg("Subscriber stopped: context cancelled")
@@ -273,6 +312,7 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 		case <-s.shutdownSignal:
 			s.healthy.Store(false)
 			log.Info().
+				Str("source", "gframework").
 				Str("service_name", s.Name()).
 				Str("topic", s.Topic()).
 				Msg("Subscriber stopped: graceful shutdown initiated")
@@ -281,6 +321,7 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 		case msg := <-msgChan:
 			if msg == nil || msg.UUID == "" {
 				log.Debug().
+					Str("source", "gframework").
 					Str("topic", s.Topic()).
 					Msg("An empty message has been received")
 
@@ -293,6 +334,7 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 
 			if err := s.handleMessage(ctx, msg); err != nil {
 				log.Error().
+					Str("source", "gframework").
 					Err(err).
 					Str("topic", s.Topic()).
 					Str("message_id", msg.UUID).
@@ -342,6 +384,7 @@ func (s *Subscriber) processWithRetry(ctx context.Context, msg *message.Message)
 
 		if attempt < maxAttempts {
 			log.Warn().
+				Str("source", "gframework").
 				Err(processingErr).
 				Str("message_id", msg.UUID).
 				Int("attempt", attempt).
@@ -400,6 +443,7 @@ func (s *Subscriber) handleFailedMessage(ctx context.Context, msg *message.Messa
 	if s.config.Retry != nil && s.config.Retry.DLQTopic != "" {
 		if dlqErr := s.sendToDLQ(ctx, msg, processingErr); dlqErr != nil {
 			log.Error().
+				Str("source", "gframework").
 				Err(dlqErr).
 				Str("message_id", msg.UUID).
 				Msg("Failed to send message to DLQ")
@@ -412,6 +456,7 @@ func (s *Subscriber) handleFailedMessage(ctx context.Context, msg *message.Messa
 	// The message has either been sent to DLQ or logged as failed after exhausting retries.
 	if !msg.Ack() {
 		log.Warn().
+			Str("source", "gframework").
 			Str("message_id", msg.UUID).
 			Msg("Failed message was already acknowledged")
 	}
@@ -424,6 +469,7 @@ func (s *Subscriber) handleFailedMessage(ctx context.Context, msg *message.Messa
 func (s *Subscriber) acknowledgeMessage(msg *message.Message) {
 	if !msg.Ack() {
 		log.Debug().
+			Str("source", "gframework").
 			Str("message_id", msg.UUID).
 			Msg("The message has already been acknowledged")
 
@@ -431,6 +477,7 @@ func (s *Subscriber) acknowledgeMessage(msg *message.Message) {
 	}
 
 	log.Debug().
+		Str("source", "gframework").
 		Str("message_id", msg.UUID).
 		Msg("The message has been acknowledged successfully")
 

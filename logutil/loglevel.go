@@ -1,3 +1,15 @@
+// Package logutil provides log-level string parsing for zerolog and PostgreSQL query tracing.
+//
+// It offers a single, consistent parsing point for log-level configuration strings used throughout
+// the application. Unknown levels default to Info.
+//
+// Basic usage:
+//
+//	level := logutil.ParseZerologLevel("debug")
+//	pgLevel := logutil.ParsePostgresLogLevel("info")
+//
+// Supported levels: "trace", "debug", "info", "warn", "error", "fatal", "panic" (for zerolog).
+// For PostgreSQL: "trace", "debug", "info", "warn", "error".
 package logutil
 
 import (

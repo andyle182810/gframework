@@ -1,3 +1,26 @@
+// Package middleware provides reusable Echo v5 middleware and context value accessors for common patterns.
+//
+// It includes JWT validation with JWKS support, request ID generation/propagation, request logging,
+// error handling, and typed context accessor functions. Each middleware is optional and can be
+// composed based on application requirements.
+//
+// Key components:
+//
+//   - JWT validation via middleware.JWT() with support for Keycloak-style extended claims
+//   - Request ID tracking via middleware.RequestID()
+//   - Request logging via middleware.RequestLogger()
+//   - Centralized error handling via middleware.ErrorHandler()
+//   - Context getter functions: GetRequestID(), GetToken(), GetExtendedClaimsFromContext(), etc.
+//
+// Example:
+//
+//	e := echo.New()
+//	e.Use(middleware.RequestID())
+//	e.Use(middleware.RequestLogger(logger))
+//	e.Use(middleware.JWT(jwtConfig))
+//	e.GET("/api/protected", protectedHandler)
+//
+// All context values use typed keys (ContextKeyTenantID, ContextKeyRequestID, etc.) to prevent collisions.
 package middleware
 
 import (

@@ -1,4 +1,4 @@
-.PHONY: help docker-up docker-down docker-logs run clean deps test pre-lint lint pre-gci gci
+.PHONY: help docker-up docker-down docker-logs run clean deps test pre-lint lint pre-gci gci migrate-version migrate-up migrate-down swagger
 
 .DEFAULT_GOAL := help
 
@@ -24,6 +24,16 @@ docker-logs: ## Show docker logs
 ## Application commands
 run: ## Run the application
 	go run main.go
+
+## Migration commands
+migrate-version: ## Show current migration version
+	go run cmd/migrate/main.go version
+
+migrate-up: ## Run all pending up migrations
+	go run cmd/migrate/main.go up
+
+migrate-down: ## Roll back N migrations (usage: make migrate-down N=1)
+	go run cmd/migrate/main.go down $(N)
 
 ## Testing commands
 test: ## Run all tests
@@ -62,6 +72,10 @@ clean: ## Clean up docker volumes and data
 deps: ## Install dependencies
 	go mod download
 	go mod tidy
+
+## API Documentation
+swagger: ## Generate Swagger API docs (requires swag: go install github.com/swaggo/swag/cmd/swag@latest)
+	swag init -g main.go -o api-docs --parseDependency --parseInternal
 
 ## Linting commands
 pre-gci: ## Install gci tool

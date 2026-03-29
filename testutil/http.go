@@ -45,11 +45,11 @@ func AssertResponseContains(t *testing.T, rec *httptest.ResponseRecorder, substr
 	assert.Contains(t, rec.Body.String(), substring, "Response body should contain substring")
 }
 
-func ParseJSONResponse(rec *httptest.ResponseRecorder, target interface{}) error {
+func ParseJSONResponse(rec *httptest.ResponseRecorder, target any) error {
 	return json.Unmarshal(rec.Body.Bytes(), target)
 }
 
-func MustParseJSONResponse(t *testing.T, rec *httptest.ResponseRecorder, target interface{}) {
+func MustParseJSONResponse(t *testing.T, rec *httptest.ResponseRecorder, target any) {
 	t.Helper()
 
 	err := json.Unmarshal(rec.Body.Bytes(), target)

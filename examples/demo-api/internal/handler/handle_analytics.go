@@ -1,4 +1,4 @@
-package msghandler
+package handler
 
 import (
 	"context"

@@ -1,3 +1,25 @@
+// Package distlock provides Redis-backed distributed locking with two usage modes: fail-hard and fail-silent.
+//
+// The locker wraps the bsm/redislock library and ensures locks are always released via defer,
+// even if the handler panics. Lock release failures are logged as warnings but do not cause errors.
+//
+// Basic usage (fail-hard):
+//
+//	locker := distlock.New(redisClient)
+//	err := locker.WithLock(ctx, "resource:123", 30*time.Second, func() error {
+//	    // Exclusive access to resource:123 for 30 seconds
+//	    return updateResource()
+//	})
+//	if err != nil && errors.Is(err, distlock.ErrLockNotObtained) {
+//	    return fmt.Errorf("failed to acquire lock")
+//	}
+//
+// For background jobs that should silently skip if the lock is unavailable:
+//
+//	err := locker.TryWithLock(ctx, "job:cleanup", 5*time.Minute, cleanupHandler)
+//	// ErrLockNotObtained is swallowed and logged at debug level
+//
+// Lock TTL is enforced by Redis; the handler should complete well before the TTL expires.
 package distlock
 
 import (
@@ -35,6 +57,7 @@ func (l *Locker) WithLock(ctx context.Context, key string, ttl time.Duration, ha
 	defer func() {
 		if releaseErr := lock.Release(ctx); releaseErr != nil {
 			log.Warn().
+				Str("source", "gframework").
 				Err(releaseErr).
 				Str("key", key).
 				Msg("Failed to release distributed lock")
@@ -48,6 +71,7 @@ func (l *Locker) TryWithLock(ctx context.Context, key string, ttl time.Duration,
 	err := l.WithLock(ctx, key, ttl, handler)
 	if errors.Is(err, ErrLockNotObtained) {
 		log.Debug().
+			Str("source", "gframework").
 			Str("key", key).
 			Msg("Could not obtain lock, another instance is running")
 

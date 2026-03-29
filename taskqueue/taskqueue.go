@@ -1,3 +1,27 @@
+// Package taskqueue provides a Redis-backed distributed task queue with at-least-once delivery semantics.
+//
+// The queue maintains an in-flight processing set to track tasks currently being executed.
+// A configurable recovery mechanism periodically moves stale tasks from the processing set back to the
+// main queue, ensuring no task is lost if a worker crashes. The queue supports multiple concurrent workers.
+//
+// Basic usage:
+//
+//	executor := &MyExecutor{}
+//	queue, err := taskqueue.New(
+//	    redisClient,
+//	    "tasks:myapp",
+//	    executor,
+//	    taskqueue.WithWorkerCount(5),
+//	)
+//	if err != nil {
+//	    return err
+//	}
+//
+//	queue.Push(ctx, taskqueue.Task{ID: "task-1", Payload: []byte(`{"key":"value"}`)})
+//	queue.Start(ctx)
+//
+// Tasks are stored in Redis as a list (main queue) and a sorted set (processing set with timestamps).
+// Worker failures are detected via a configurable timeout on the processing set entries.
 package taskqueue
 
 import (
@@ -176,6 +200,7 @@ func (q *Queue) Start(ctx context.Context) error {
 	go q.fetcher(ctx)
 
 	log.Info().
+		Str("source", "gframework").
 		Int("workers", q.workerCount).
 		Str("queue", q.queueKey).
 		Dur("exec_timeout", q.execTimeout).
@@ -189,7 +214,7 @@ func (q *Queue) Stop() error {
 		return nil
 	}
 
-	log.Info().Str("queue", q.queueKey).Msg("Task queue stopping")
+	log.Info().Str("source", "gframework").Str("queue", q.queueKey).Msg("Task queue stopping")
 
 	if q.cancel != nil {
 		q.cancel()
@@ -197,7 +222,7 @@ func (q *Queue) Stop() error {
 
 	q.wg.Wait()
 
-	log.Info().Str("queue", q.queueKey).Msg("Task queue stopped")
+	log.Info().Str("source", "gframework").Str("queue", q.queueKey).Msg("Task queue stopped")
 
 	return nil
 }
@@ -206,12 +231,12 @@ func (q *Queue) fetcher(ctx context.Context) {
 	defer q.wg.Done()
 	defer close(q.taskChan)
 
-	log.Debug().Str("queue", q.queueKey).Msg("Fetcher started")
+	log.Debug().Str("source", "gframework").Str("queue", q.queueKey).Msg("Fetcher started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debug().Str("queue", q.queueKey).Msg("Fetcher stopping")
+			log.Debug().Str("source", "gframework").Str("queue", q.queueKey).Msg("Fetcher stopping")
 
 			return
 		default:
@@ -222,7 +247,7 @@ func (q *Queue) fetcher(ctx context.Context) {
 				}
 
 				if !errors.Is(err, redis.Nil) {
-					log.Error().Err(err).Msg("Failed to fetch task")
+					log.Error().Str("source", "gframework").Err(err).Msg("Failed to fetch task")
 					time.Sleep(q.pollInterval)
 				}
 
@@ -278,24 +303,24 @@ func (q *Queue) fetchTask(ctx context.Context) (taskItem, error) {
 
 func (q *Queue) returnTask(ctx context.Context, taskID string) {
 	if err := q.client.LPush(ctx, q.queueKey, taskID).Err(); err != nil {
-		log.Error().Err(err).Str("task_id", taskID).Msg("Failed to return task to queue")
+		log.Error().Str("source", "gframework").Err(err).Str("task_id", taskID).Msg("Failed to return task to queue")
 	}
 }
 
 func (q *Queue) worker(ctx context.Context, id int) {
 	defer q.wg.Done()
 
-	log.Debug().Int("worker_id", id).Msg("Worker started")
+	log.Debug().Str("source", "gframework").Int("worker_id", id).Msg("Worker started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debug().Int("worker_id", id).Msg("Worker stopping")
+			log.Debug().Str("source", "gframework").Int("worker_id", id).Msg("Worker stopping")
 
 			return
 		case task, ok := <-q.taskChan:
 			if !ok {
-				log.Debug().Int("worker_id", id).Msg("Worker stopping - channel closed")
+				log.Debug().Str("source", "gframework").Int("worker_id", id).Msg("Worker stopping - channel closed")
 
 				return
 			}
@@ -307,6 +332,7 @@ func (q *Queue) worker(ctx context.Context, id int) {
 
 func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 	log.Debug().
+		Str("source", "gframework").
 		Int("worker_id", workerID).
 		Str("task_id", task.id).
 		Msg("Processing task")
@@ -319,12 +345,14 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 	if err != nil {
 		if errors.Is(execCtx.Err(), context.DeadlineExceeded) {
 			log.Error().
+				Str("source", "gframework").
 				Int("worker_id", workerID).
 				Str("task_id", task.id).
 				Dur("timeout", q.execTimeout).
 				Msg("Task timed out")
 		} else {
 			log.Error().
+				Str("source", "gframework").
 				Err(err).
 				Int("worker_id", workerID).
 				Str("task_id", task.id).
@@ -332,6 +360,7 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 		}
 	} else {
 		log.Debug().
+			Str("source", "gframework").
 			Int("worker_id", workerID).
 			Str("task_id", task.id).
 			Msg("Task completed successfully")
@@ -339,12 +368,12 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 
 	// Clean up: remove from processing set and delete payload
 	if err := q.client.ZRem(ctx, q.processingKey, task.id).Err(); err != nil {
-		log.Error().Err(err).Str("task_id", task.id).Msg("Failed to remove task from processing set")
+		log.Error().Str("source", "gframework").Err(err).Str("task_id", task.id).Msg("Failed to remove task from processing set")
 	}
 
 	if len(task.payload) > 0 {
 		if err := q.client.HDel(ctx, q.payloadKey, task.id).Err(); err != nil {
-			log.Error().Err(err).Str("task_id", task.id).Msg("Failed to delete payload")
+			log.Error().Str("source", "gframework").Err(err).Str("task_id", task.id).Msg("Failed to delete payload")
 		}
 	}
 }
@@ -384,12 +413,12 @@ func (q *Queue) RecoverStale(ctx context.Context, maxAge time.Duration) (int, er
 			return nil
 		})
 		if err != nil {
-			log.Error().Err(err).Str("task_id", taskID).Msg("Failed to recover stale task")
+			log.Error().Str("source", "gframework").Err(err).Str("task_id", taskID).Msg("Failed to recover stale task")
 
 			continue
 		}
 
-		log.Warn().Str("task_id", taskID).Msg("Recovered stale task")
+		log.Warn().Str("source", "gframework").Str("task_id", taskID).Msg("Recovered stale task")
 
 		recovered++
 	}

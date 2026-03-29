@@ -1,3 +1,26 @@
+// Package postgres provides a PostgreSQL connection pool factory with built-in support for decimal types,
+// query tracing via zerolog, and configurable session-level timeouts.
+//
+// The pool is created from a pgxpool.Pool and supports automatic health checks, connection limits,
+// and idle timeout management. Shopspring decimal types are automatically registered for JSON marshaling.
+//
+// Basic usage:
+//
+//	pool, err := postgres.New(&postgres.Config{
+//	    URL:           "postgres://user:pass@localhost/dbname",
+//	    MaxConnection: 25,
+//	    LogLevel:      "info",
+//	})
+//	if err != nil {
+//	    return err
+//	}
+//
+//	// Use pool for queries
+//	var user User
+//	err = pool.QueryRow(ctx, "SELECT ... WHERE id = $1", userID).Scan(&user)
+//
+// Session-level timeouts (statement_timeout, lock_timeout, idle_in_transaction_session_timeout) can be
+// configured to prevent long-running queries from blocking other connections.
 package postgres
 
 import (
@@ -115,11 +138,13 @@ func (p *Postgres) Stop() error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("service_name", p.Name()).
 		Msg("The PostgreSQL connection pool is being closed")
 	p.DBPool.Close()
 
 	log.Info().
+		Str("source", "gframework").
 		Str("service_name", p.Name()).
 		Msg("The PostgreSQL connection pool has been closed successfully")
 

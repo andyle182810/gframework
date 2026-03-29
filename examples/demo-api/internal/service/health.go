@@ -12,19 +12,42 @@ type HealthCheckResponse struct {
 	Status string `example:"healthy" json:"status"`
 }
 
+type HealthCheckExecutor struct {
+	log zerolog.Logger
+}
+
+func NewHealthCheckExecutor(log zerolog.Logger) *HealthCheckExecutor {
+	return &HealthCheckExecutor{log: log}
+}
+
+func (e *HealthCheckExecutor) Execute(
+	_ *echo.Context,
+	_ *HealthCheckRequest,
+) (*httpserver.HandlerResponse[HealthCheckResponse], *echo.HTTPError) {
+	e.log.Info().Msg("Health check requested")
+
+	return httpserver.NewResponse(HealthCheckResponse{
+		Status: "healthy",
+	}), nil
+}
+
+// CheckHealth godoc
+//
+//	@Summary		Health check
+//	@Description	Returns the health status of the service.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	httpserver.APIResponse[HealthCheckResponse]	"Service is healthy"
+//	@Router			/health [get]
 func (s *Service) CheckHealth(ctx *echo.Context, req *HealthCheckRequest) (any, *echo.HTTPError) {
 	delegator := func(
 		log zerolog.Logger,
-		_ *echo.Context,
-		_ *HealthCheckRequest,
+		ctx *echo.Context,
+		req *HealthCheckRequest,
 	) (*httpserver.HandlerResponse[HealthCheckResponse], *echo.HTTPError) {
-		log.Info().Msg("Health check requested")
+		exec := NewHealthCheckExecutor(log)
 
-		return httpserver.NewResponse(
-			HealthCheckResponse{
-				Status: "healthy",
-			},
-		), nil
+		return exec.Execute(ctx, req)
 	}
 
 	return httpserver.ExecuteStandardized(ctx, req, "CheckHealth", delegator)

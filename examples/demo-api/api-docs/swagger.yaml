@@ -1,0 +1,353 @@
+basePath: /
+definitions:
+  echo.HTTPError:
+    properties:
+      message:
+        type: string
+    type: object
+  httpserver.APIResponse-service_CreateUserResponse:
+    properties:
+      data:
+        $ref: '#/definitions/service.CreateUserResponse'
+      pagination:
+        $ref: '#/definitions/httpserver.Pagination'
+      requestId:
+        example: 3bf74527-8097-4217-8485-ffe05d16f82e
+        type: string
+    type: object
+  httpserver.APIResponse-service_GetUserResponse:
+    properties:
+      data:
+        $ref: '#/definitions/service.GetUserResponse'
+      pagination:
+        $ref: '#/definitions/httpserver.Pagination'
+      requestId:
+        example: 3bf74527-8097-4217-8485-ffe05d16f82e
+        type: string
+    type: object
+  httpserver.APIResponse-service_HealthCheckResponse:
+    properties:
+      data:
+        $ref: '#/definitions/service.HealthCheckResponse'
+      pagination:
+        $ref: '#/definitions/httpserver.Pagination'
+      requestId:
+        example: 3bf74527-8097-4217-8485-ffe05d16f82e
+        type: string
+    type: object
+  httpserver.APIResponse-service_ListUsersResponse:
+    properties:
+      data:
+        $ref: '#/definitions/service.ListUsersResponse'
+      pagination:
+        $ref: '#/definitions/httpserver.Pagination'
+      requestId:
+        example: 3bf74527-8097-4217-8485-ffe05d16f82e
+        type: string
+    type: object
+  httpserver.APIResponse-service_ReadinessCheckResponse:
+    properties:
+      data:
+        $ref: '#/definitions/service.ReadinessCheckResponse'
+      pagination:
+        $ref: '#/definitions/httpserver.Pagination'
+      requestId:
+        example: 3bf74527-8097-4217-8485-ffe05d16f82e
+        type: string
+    type: object
+  httpserver.APIResponse-service_UpdateUserResponse:
+    properties:
+      data:
+        $ref: '#/definitions/service.UpdateUserResponse'
+      pagination:
+        $ref: '#/definitions/httpserver.Pagination'
+      requestId:
+        example: 3bf74527-8097-4217-8485-ffe05d16f82e
+        type: string
+    type: object
+  httpserver.Pagination:
+    properties:
+      page:
+        example: 1
+        type: integer
+      pageSize:
+        example: 10
+        type: integer
+      totalCount:
+        example: 42
+        type: integer
+      totalPages:
+        example: 5
+        type: integer
+    type: object
+  service.CreateUserRequest:
+    properties:
+      email:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - email
+    - name
+    type: object
+  service.CreateUserResponse:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  service.GetUserResponse:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  service.HealthCheckResponse:
+    properties:
+      status:
+        example: healthy
+        type: string
+    type: object
+  service.Info:
+    properties:
+      error:
+        type: string
+      status:
+        type: string
+    type: object
+  service.ListUsersResponse:
+    properties:
+      users:
+        items:
+          $ref: '#/definitions/service.GetUserResponse'
+        type: array
+    type: object
+  service.ReadinessCheckResponse:
+    properties:
+      services:
+        additionalProperties:
+          $ref: '#/definitions/service.Info'
+        type: object
+      status:
+        type: string
+    type: object
+  service.UpdateUserRequest:
+    properties:
+      email:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      userID:
+        type: string
+    required:
+    - email
+    - name
+    - userID
+    type: object
+  service.UpdateUserResponse:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A demo API built with gframework showcasing users CRUD, task queues,
+    and message publishing.
+  title: Demo API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Returns the health status of the service.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            $ref: '#/definitions/httpserver.APIResponse-service_HealthCheckResponse'
+      summary: Health check
+      tags:
+      - health
+  /ready:
+    get:
+      description: Returns the readiness status of the service and its dependencies.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is ready
+          schema:
+            $ref: '#/definitions/httpserver.APIResponse-service_ReadinessCheckResponse'
+        "503":
+          description: Service not ready
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Readiness check
+      tags:
+      - health
+  /v1/users:
+    get:
+      description: |-
+        Returns a paginated list of users.
+
+        Optional query parameters:
+        - `page` (int): Page number (default: 1)
+        - `pageSize` (int): Number of items per page (default: 20, max: 100)
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Users listed successfully
+          schema:
+            $ref: '#/definitions/httpserver.APIResponse-service_ListUsersResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: List users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Creates a new user in the system.
+
+        Mandatory fields:
+        - `name` (string): User name (2-100 characters)
+        - `email` (string): Valid email address
+      parameters:
+      - description: User creation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/httpserver.APIResponse-service_CreateUserResponse'
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Create a new user
+      tags:
+      - users
+  /v1/users/{userId}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a user by their unique identifier.
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User retrieved successfully
+          schema:
+            $ref: '#/definitions/httpserver.APIResponse-service_GetUserResponse'
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Get a user by ID
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      description: |-
+        Updates an existing user's name and email.
+
+        Mandatory fields:
+        - `name` (string): User name (2-100 characters)
+        - `email` (string): Valid email address
+      parameters:
+      - description: User ID (UUID)
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: User update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/service.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User updated successfully
+          schema:
+            $ref: '#/definitions/httpserver.APIResponse-service_UpdateUserResponse'
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Update a user
+      tags:
+      - users
+swagger: "2.0"

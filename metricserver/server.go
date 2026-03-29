@@ -1,3 +1,24 @@
+// Package metricserver provides a dedicated HTTP server for operational endpoints:
+// a /status health-check and a /metrics Prometheus scrape endpoint.
+//
+// The server implements the runner.Service interface (Start, Stop, Name) and is designed to run
+// independently from the main application server. This separation allows metrics and health to be
+// monitored on a different port/interface from the API.
+//
+// Basic usage:
+//
+//	msrv := metricserver.New(&metricserver.Config{
+//	    Host: "0.0.0.0",
+//	    Port: 9090,
+//	})
+//	err := msrv.Start(ctx)
+//	defer msrv.Stop()
+//
+//	// Endpoints:
+//	// GET /status     returns {"status":"ok"}
+//	// GET /metrics    returns Prometheus-formatted metrics
+//
+// The metrics endpoint integrates with Prometheus client via echoprometheus middleware.
 package metricserver
 
 import (
@@ -65,12 +86,13 @@ func (s *Server) Start(_ context.Context) error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("address", s.address).
 		Msg("The metrics server is being started")
 
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Err(err).Msg("Metrics server failed to start")
+			log.Error().Str("source", "gframework").Err(err).Msg("Metrics server failed to start")
 		}
 	}()
 
@@ -79,6 +101,7 @@ func (s *Server) Start(_ context.Context) error {
 
 func (s *Server) Stop() error {
 	log.Info().
+		Str("source", "gframework").
 		Msg("The graceful shutdown of metrics server is being initiated")
 
 	if s.httpServer == nil {
@@ -89,12 +112,13 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Failed to gracefully stop metrics server")
+		log.Error().Str("source", "gframework").Err(err).Msg("Failed to gracefully stop metrics server")
 
 		return fmt.Errorf("failed to stop metrics server: %w", err)
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Msg("The metrics server shutdown has been completed successfully")
 
 	return nil

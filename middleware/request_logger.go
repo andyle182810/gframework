@@ -31,6 +31,8 @@ func RequestLogger(log zerolog.Logger, extraLogFieldExtractor ...LogFieldExtract
 				fields["request_id"] = id
 			}
 
+			fields["source"] = "gframework"
+
 			addExtraLogFields(fields, ctx, extraLogFieldExtractor)
 
 			log.Info().Fields(fields).Msg("Request completed")

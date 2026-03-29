@@ -1,3 +1,27 @@
+// Package valkey provides a Valkey/Redis client wrapper with health checking and lifecycle management.
+//
+// This package wraps the go-redis library to provide connection pooling, health checks,
+// and clean shutdown. It supports both standard Redis and Valkey (Redis fork) servers.
+//
+// Basic usage:
+//
+//	client, err := valkey.New(&valkey.Config{
+//	    Host:     "localhost",
+//	    Port:     6379,
+//	    Database: 0,
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer client.Close()
+//
+//	val, err := client.Get(ctx, "key").Result()
+//	if err != nil {
+//	    return err
+//	}
+//
+// For TLS connections, configure the TLS field in Config. The underlying redis.UniversalClient
+// is exposed via the Client field for direct access to all standard Redis operations.
 package valkey
 
 import (
@@ -232,6 +256,7 @@ func (v *Valkey) Stop() error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("service_name", v.Name()).
 		Msg("The Valkey client pool is being closed")
 
@@ -240,6 +265,7 @@ func (v *Valkey) Stop() error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("service_name", v.Name()).
 		Msg("The Valkey client pool has been closed successfully")
 
