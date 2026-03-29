@@ -1,3 +1,26 @@
+// Package httpclient provides a generic, type-safe HTTP client for JSON REST APIs.
+//
+// The client supports optional OAuth2 bearer-token injection, automatic request-ID propagation,
+// custom default headers, and response size limiting. It is safe for concurrent use.
+//
+// Basic usage:
+//
+//	type User struct {
+//	    ID   int    `json:"id"`
+//	    Name string `json:"name"`
+//	}
+//
+//	client := httpclient.New("https://api.example.com",
+//	    httpclient.WithTokenProvider(authTokenClient),
+//	)
+//
+//	var user User
+//	if err := client.Get(ctx, "/users/123", &user); err != nil {
+//	    return err
+//	}
+//
+// All methods (Get, Post, Put, Patch, Delete) accept a context, path, optional request body, and response pointer.
+// Request IDs are automatically propagated from the context if set via middleware.ContextKeyRequestID.
 package httpclient
 
 import (

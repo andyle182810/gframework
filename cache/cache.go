@@ -1,3 +1,46 @@
+// Package cache provides a generic, type-safe caching layer using Redis.
+//
+// This package uses generics to provide compile-time type safety for cached values.
+// Cache entries are stored as JSON in Redis with TTL support. Keys can be encoded using
+// custom KeyEncoder implementations for different types (strings, integers, UUIDs).
+//
+// Basic usage:
+//
+//	type User struct {
+//	    ID   int
+//	    Name string
+//	}
+//
+//	cache := cache.New[string, User](
+//	    redisClient,
+//	    "users",           // hash key
+//	    24 * time.Hour,    // TTL
+//	    cache.NewStringKeyEncoder(),
+//	)
+//
+//	// Set a value
+//	user := User{ID: 123, Name: "Alice"}
+//	if err := cache.Set(ctx, "user:123", &user); err != nil {
+//	    return err
+//	}
+//
+//	// Get a value
+//	retrieved, err := cache.Get(ctx, "user:123")
+//	if err != nil {
+//	    return err
+//	}
+//
+// Custom KeyEncoder implementations can be provided for non-standard key types:
+//
+//	cache := cache.New[CustomKeyType, MyValue](
+//	    redisClient,
+//	    "data",
+//	    time.Hour,
+//	    MyCustomKeyEncoder{},
+//	)
+//
+// The cache layer automatically handles JSON marshaling/unmarshaling and provides
+// operations for Set, Get, Delete, and Invalidate (clear all cached values for a hash).
 package cache
 
 import (

@@ -1,3 +1,27 @@
+// Package redispub provides a Redis Stream publisher using Watermill message bus.
+//
+// This package wraps Watermill's Redis Stream publisher to provide event publishing
+// with configurable timeout and error handling. It uses Redis Streams as the underlying
+// transport for reliable message delivery.
+//
+// Basic usage:
+//
+//	publisher, err := redispub.New(redisClient, &redispub.Config{
+//	    Timeout: 5 * time.Second,
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer publisher.Close()
+//
+//	msg := &message.Message{
+//	    UUID:    uuid.New().String(),
+//	    Payload: []byte(`{"event":"user.created"}`),
+//	}
+//	err = publisher.Publish(ctx, "events", msg)
+//
+// Messages are published to Redis Stream keys which can be consumed by subscribers.
+// The Watermill framework provides automatic marshaling, error handling, and routing.
 package redispub
 
 import (

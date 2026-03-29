@@ -1,3 +1,24 @@
+// Package testutil provides integration-test helpers including Docker container setup, random data generation,
+// context factories, and database utilities for testing gframework applications.
+//
+// It includes functions for:
+//
+//   - Setting up Valkey (Redis-compatible) and PostgreSQL Docker containers with automatic cleanup
+//   - Creating cancellable contexts tied to test lifetimes
+//   - Generating random test data (strings, integers, emails)
+//   - Running database migrations and cleanup
+//   - Polling utilities for eventually consistent assertions
+//
+// Basic usage:
+//
+//	valkeyContainer := testutil.SetupValkeyContainer(t)
+//	postgresContainer := testutil.SetupPostgresContainer(t)
+//	ctx := testutil.Context(t)
+//
+//	// Use containers for integration testing
+//	client, _ := redis.NewClient(valkeyContainer.Address())
+//
+// Containers are automatically cleaned up when the test completes via t.Cleanup().
 package testutil
 
 import (

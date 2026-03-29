@@ -1,3 +1,23 @@
+// Package jwks provides a production-ready JWKS (JSON Web Key Set) key function for validating JWTs.
+//
+// The keyfunc wraps the MicahParks/keyfunc library with built-in periodic key refresh, rate-limiting
+// of unknown-KID refresh attempts, and structured logging. It is safe for concurrent use and suitable
+// for use as a jwt.Keyfunc in JWT middleware.
+//
+// Basic usage:
+//
+//	kf, err := jwks.New(ctx, []string{"https://auth.example.com/.well-known/jwks.json"})
+//	if err != nil {
+//	    return err
+//	}
+//
+//	jwtConfig := middleware.JWTConfig{
+//	    Keyfunc: kf.Keyfunc,
+//	}
+//	e.Use(middleware.JWT(jwtConfig))
+//
+// The keyfunc automatically refreshes keys in the background. If a JWT references an unknown key ID,
+// it triggers an immediate refresh but rate-limits rapid refresh attempts to prevent thundering herd.
 package jwks
 
 import (
@@ -59,6 +79,7 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 		RefreshErrorHandlerFunc: func(url string) func(ctx context.Context, err error) {
 			return func(_ context.Context, err error) {
 				log.Error().
+					Str("source", "gframework").
 					Err(err).
 					Str("jwks_url", url).
 					Msg("JWKS key refresh failed")
@@ -71,6 +92,7 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 	keyFunc, err := keyfunc.NewDefaultOverrideCtx(ctx, urls, override)
 	if err != nil {
 		log.Error().
+			Str("source", "gframework").
 			Err(err).
 			Strs("jwks_urls", urls).
 			Msg("Failed to initialize JWKS keyfunc")
@@ -79,6 +101,7 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Strs("jwks_urls", urls).
 		Dur("refresh_interval", cfg.refreshInterval).
 		Dur("refresh_timeout", cfg.refreshTimeout).

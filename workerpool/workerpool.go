@@ -1,3 +1,24 @@
+// Package workerpool provides a generic, tick-driven worker pool that repeatedly invokes an Executor on a fixed interval.
+//
+// The pool spawns N concurrent workers that wake up on each tick interval and execute the handler.
+// This is useful for periodic background jobs (e.g., cache refreshes, cleanup tasks) that should run
+// concurrently without blocking each other. Execution timeouts are enforced per worker.
+//
+// Basic usage:
+//
+//	executor := &MyExecutor{}
+//	pool := workerpool.New(executor,
+//	    workerpool.WithWorkerCount(3),
+//	    workerpool.WithTickInterval(1*time.Minute),
+//	    workerpool.WithExecutionTimeout(30*time.Second),
+//	)
+//	if err := pool.Start(ctx); err != nil {
+//	    return err
+//	}
+//	defer pool.Stop()
+//
+// Each worker runs independently; if one times out or fails, others continue executing.
+// The pool prevents concurrent overlapping executions of the same worker (each waits for the previous to finish).
 package workerpool
 
 import (
@@ -100,6 +121,7 @@ func (pool *WorkerPool) Start(ctx context.Context) error {
 	pool.mu.Unlock()
 
 	log.Info().
+		Str("source", "gframework").
 		Int("worker_count", pool.workerCount).
 		Dur("tick_interval", pool.tickInterval).
 		Dur("exec_timeout", pool.execTimeout).
@@ -123,7 +145,7 @@ func (pool *WorkerPool) Stop() error {
 		return nil
 	}
 
-	log.Info().Msg("Worker pool is stopping")
+	log.Info().Str("source", "gframework").Msg("Worker pool is stopping")
 
 	if pool.cancel != nil {
 		pool.cancel()
@@ -131,7 +153,7 @@ func (pool *WorkerPool) Stop() error {
 
 	pool.wg.Wait()
 
-	log.Info().Msg("Worker pool has stopped")
+	log.Info().Str("source", "gframework").Msg("Worker pool has stopped")
 
 	return nil
 }
@@ -142,14 +164,14 @@ func (pool *WorkerPool) dispatcher(ctx context.Context) {
 	ticker := time.NewTicker(pool.tickInterval)
 	defer ticker.Stop()
 
-	log.Info().Msg("Dispatcher has started")
+	log.Info().Str("source", "gframework").Msg("Dispatcher has started")
 
 	for {
 		select {
 		case <-ctx.Done():
 			close(pool.jobChan)
 
-			log.Info().Msg("Dispatcher is shutting down")
+			log.Info().Str("source", "gframework").Msg("Dispatcher is shutting down")
 
 			return
 		case <-ticker.C:
@@ -158,7 +180,7 @@ func (pool *WorkerPool) dispatcher(ctx context.Context) {
 			case <-ctx.Done():
 				close(pool.jobChan)
 
-				log.Info().Msg("Dispatcher is shutting down")
+				log.Info().Str("source", "gframework").Msg("Dispatcher is shutting down")
 
 				return
 			}
@@ -170,6 +192,7 @@ func (pool *WorkerPool) worker(ctx context.Context, id int) {
 	defer pool.wg.Done()
 
 	log.Info().
+		Str("source", "gframework").
 		Int("worker_id", id).
 		Msg("Worker has started")
 
@@ -177,6 +200,7 @@ func (pool *WorkerPool) worker(ctx context.Context, id int) {
 		select {
 		case <-ctx.Done():
 			log.Info().
+				Str("source", "gframework").
 				Int("worker_id", id).
 				Msg("Worker is shutting down")
 
@@ -184,6 +208,7 @@ func (pool *WorkerPool) worker(ctx context.Context, id int) {
 		case _, ok := <-pool.jobChan:
 			if !ok {
 				log.Info().
+					Str("source", "gframework").
 					Int("worker_id", id).
 					Msg("Worker is shutting down")
 
@@ -209,6 +234,7 @@ func (pool *WorkerPool) executeWithTimeout(ctx context.Context, workerID int) {
 	defer cancel()
 
 	log.Debug().
+		Str("source", "gframework").
 		Int("worker_id", workerID).
 		Dur("timeout", pool.execTimeout).
 		Msg("Starting execution for worker")
@@ -216,6 +242,7 @@ func (pool *WorkerPool) executeWithTimeout(ctx context.Context, workerID int) {
 	err := pool.executor.Execute(execCtx)
 	if err != nil {
 		log.Error().
+			Str("source", "gframework").
 			Err(err).
 			Int("worker_id", workerID).
 			Msg("Executor failed")

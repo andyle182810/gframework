@@ -30,6 +30,7 @@ func ExecuteStandardized[REQ any, RES any](
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error().
+				Str("source", "gframework").
 				Interface("panic", r).
 				Msg("Handler panicked")
 

@@ -1,3 +1,22 @@
+// Package runner provides an application lifecycle manager for coordinated startup and graceful shutdown.
+//
+// Services are registered in two tiers: infrastructure (database, cache, queue) and core (API handlers).
+// Infrastructure services start first; if any fail, the application exits immediately. Core services start
+// afterward. On shutdown, core services stop first, then infrastructure. The entire shutdown is bounded
+// by a configurable timeout (default 30 seconds). Service panics are caught and logged.
+//
+// Basic usage:
+//
+//	r := runner.New(
+//	    runner.WithInfrastructureService(dbService),
+//	    runner.WithInfrastructureService(cacheService),
+//	    runner.WithCoreService(apiServer),
+//	    runner.WithShutdownTimeout(30*time.Second),
+//	)
+//	r.Run() // Blocks until SIGINT/SIGTERM; calls os.Exit(1) on error
+//
+// Each service must implement the Service interface (Start, Stop, Name).
+// Startup failures in any tier abort the application immediately.
 package runner
 
 import (
@@ -53,6 +72,7 @@ func WithCoreService(svc Service) Option {
 	return func(r *Runner) {
 		r.coreServices = append(r.coreServices, svc)
 		log.Info().
+			Str("source", "gframework").
 			Str("service_type", "core").
 			Str("service_name", svc.Name()).
 			Msg("Core service registered")
@@ -63,6 +83,7 @@ func WithInfrastructureService(svc Service) Option {
 	return func(r *Runner) {
 		r.infrastructureServices = append(r.infrastructureServices, svc)
 		log.Info().
+			Str("source", "gframework").
 			Str("service_type", "infrastructure").
 			Str("service_name", svc.Name()).
 			Msg("Infrastructure service registered")
@@ -79,36 +100,37 @@ func (r *Runner) Run() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Info().Msg("Starting infrastructure services")
+	log.Info().Str("source", "gframework").Msg("Starting infrastructure services")
 
 	if err := r.startServices(ctx, r.infrastructureServices); err != nil {
-		log.Error().Err(err).Msg("Infrastructure services failed to start")
+		log.Error().Str("source", "gframework").Err(err).Msg("Infrastructure services failed to start")
 		r.shutdownWithTimeout(r.infrastructureServices)
 		os.Exit(1)
 	}
 
-	log.Info().Msg("Starting core services")
+	log.Info().Str("source", "gframework").Msg("Starting core services")
 
 	if err := r.startServices(ctx, r.coreServices); err != nil {
-		log.Error().Err(err).Msg("Core services failed to start")
+		log.Error().Str("source", "gframework").Err(err).Msg("Core services failed to start")
 		r.shutdownWithTimeout(r.coreServices)
 		r.shutdownWithTimeout(r.infrastructureServices)
 		os.Exit(1)
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Int("pid", os.Getpid()).
 		Int("core_services", len(r.coreServices)).
 		Int("infra_services", len(r.infrastructureServices)).
 		Msg("All services started, waiting for shutdown signal")
 
 	<-ctx.Done()
-	log.Warn().Msg("Shutdown signal received")
+	log.Warn().Str("source", "gframework").Msg("Shutdown signal received")
 
 	r.shutdownWithTimeout(r.coreServices)
 	r.shutdownWithTimeout(r.infrastructureServices)
 
-	log.Info().Msg("Graceful shutdown completed")
+	log.Info().Str("source", "gframework").Msg("Graceful shutdown completed")
 }
 
 func (r *Runner) startServices(ctx context.Context, services []Service) error {
@@ -126,7 +148,7 @@ func (r *Runner) startServices(ctx context.Context, services []Service) error {
 				}
 			}()
 
-			log.Info().Str("service_name", service.Name()).Msg("Starting service")
+			log.Info().Str("source", "gframework").Str("service_name", service.Name()).Msg("Starting service")
 
 			if err := service.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- fmt.Errorf("%w: %s: %w", ErrServiceFailed, service.Name(), err)
@@ -163,6 +185,7 @@ func (r *Runner) shutdownWithTimeout(services []Service) {
 		return
 	case <-time.After(r.shutdownTimeout):
 		log.Error().
+			Str("source", "gframework").
 			Dur("timeout", r.shutdownTimeout).
 			Msg("Shutdown timeout exceeded, some services may not have stopped cleanly")
 	}
@@ -177,15 +200,17 @@ func (r *Runner) concurrentStop(services []Service) {
 		go func(service Service) {
 			defer wg.Done()
 
-			log.Info().Str("service_name", service.Name()).Msg("Stopping service")
+			log.Info().Str("source", "gframework").Str("service_name", service.Name()).Msg("Stopping service")
 
 			if err := service.Stop(); err != nil {
 				log.Error().
+					Str("source", "gframework").
 					Err(err).
 					Str("service_name", service.Name()).
 					Msg("Service failed to stop")
 			} else {
 				log.Info().
+					Str("source", "gframework").
 					Str("service_name", service.Name()).
 					Msg("Service stopped")
 			}

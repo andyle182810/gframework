@@ -74,10 +74,12 @@ func logMigrationResult(migrator *migrate.Migrate, err error, operation, source 
 	switch {
 	case errors.Is(err, migrate.ErrNoChange):
 		log.Info().
+			Str("source", "gframework").
 			Str("operation", operation).
 			Msg("The database migration completed with no changes to apply")
 	case err != nil:
 		log.Error().
+			Str("source", "gframework").
 			Err(err).
 			Str("migration_source", source).
 			Str("operation", operation).
@@ -87,6 +89,7 @@ func logMigrationResult(migrator *migrate.Migrate, err error, operation, source 
 	default:
 		version, dirty, _ := migrator.Version()
 		log.Info().
+			Str("source", "gframework").
 			Uint("version", version).
 			Bool("dirty", dirty).
 			Str("operation", operation).
@@ -105,12 +108,14 @@ func MigrateUp(dbURI, source string) error {
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
 			log.Error().
+				Str("source", "gframework").
 				Err(closeErr).
 				Msg("The database connection failed to close after migration attempt")
 		}
 	}()
 
 	log.Info().
+		Str("source", "gframework").
 		Str("migration_source", source).
 		Msg("The database migration is being started")
 
@@ -138,12 +143,14 @@ func MigrateDown(dbURI, source string) error {
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
 			log.Error().
+				Str("source", "gframework").
 				Err(closeErr).
 				Msg("The database connection failed to close after migration attempt")
 		}
 	}()
 
 	log.Info().
+		Str("source", "gframework").
 		Str("migration_source", source).
 		Msg("The database migration rollback is being started")
 
@@ -171,12 +178,14 @@ func MigrateSteps(dbURI, source string, steps int) error {
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
 			log.Error().
+				Str("source", "gframework").
 				Err(closeErr).
 				Msg("The database connection failed to close after migration attempt")
 		}
 	}()
 
 	log.Info().
+		Str("source", "gframework").
 		Str("migration_source", source).
 		Int("steps", steps).
 		Msg("The database migration steps are being applied")
@@ -231,7 +240,7 @@ func GetMigrationVersion(dbURI, source string) (*MigrationVersion, error) {
 }
 
 func RunMigration(dbURI, source string) error {
-	log.Info().Str("source", source).Msg("Starting database migration process...")
+	log.Info().Str("source", "gframework").Str("migration_source", source).Msg("Starting database migration process...")
 
 	logPreMigrationState(dbURI, source)
 
@@ -251,24 +260,26 @@ func logPreMigrationState(dbURI, source string) {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Uint("current_version", currentVersion.Version).
 		Bool("dirty", currentVersion.Dirty).
 		Msg("Pre-migration state")
 
 	if currentVersion.Dirty {
-		log.Warn().Msg("Database is in dirty state from previous failed migration")
+		log.Warn().Str("source", "gframework").Msg("Database is in dirty state from previous failed migration")
 	}
 }
 
 func logPostMigrationState(dbURI, source string) {
 	finalVersion, err := GetMigrationVersion(dbURI, source)
 	if err != nil {
-		log.Info().Msg("Database migration process completed successfully")
+		log.Info().Str("source", "gframework").Msg("Database migration process completed successfully")
 
 		return
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Uint("version", finalVersion.Version).
 		Msg("Database migration process completed successfully")
 }
@@ -288,6 +299,7 @@ func ForceMigrationVersion(dbURI, source string, version int) error {
 	}()
 
 	log.Warn().
+		Str("source", "gframework").
 		Str("migration_source", source).
 		Int("version", version).
 		Msg("Forcing migration version - use with caution")
@@ -304,6 +316,7 @@ func ForceMigrationVersion(dbURI, source string, version int) error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Int("version", version).
 		Msg("Migration version has been forced successfully")
 

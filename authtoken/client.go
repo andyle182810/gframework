@@ -1,3 +1,23 @@
+// Package authtoken provides OAuth2 client-credentials token management with automatic caching and refresh.
+//
+// The client uses an RWMutex with double-check locking to efficiently cache tokens across concurrent requests,
+// automatically refreshing expired tokens. A 30-second expiry buffer prevents race conditions during token refresh.
+//
+// Basic usage:
+//
+//	client := authtoken.New(
+//	    "https://auth.example.com/oauth/token",
+//	    "client-id",
+//	    "client-secret",
+//	)
+//
+//	token, err := client.GetToken(ctx)
+//	if err != nil {
+//	    return err
+//	}
+//	// Use token for API requests
+//
+// The client is safe for concurrent use. Call InvalidateToken() to force a token refresh on the next request.
 package authtoken
 
 import (

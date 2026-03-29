@@ -75,6 +75,7 @@ func (m *MultiSubscriber) Subscribe(topic string, messageHandler MessageHandler)
 	m.subscribersMux.Unlock()
 
 	log.Info().
+		Str("source", "gframework").
 		Str("topic", topic).
 		Msg("The subscription to the topic has been registered")
 
@@ -94,12 +95,13 @@ func (m *MultiSubscriber) Start(ctx context.Context) error {
 	m.subscribersMux.Unlock()
 
 	if len(subscribers) == 0 {
-		log.Warn().Msg("No subscribers registered, waiting for stop signal")
+		log.Warn().Str("source", "gframework").Msg("No subscribers registered, waiting for stop signal")
 
 		return nil
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Int("count", len(subscribers)).
 		Msg("Starting all subscribers")
 
@@ -113,6 +115,7 @@ func (m *MultiSubscriber) Start(ctx context.Context) error {
 
 			if err := sub.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				log.Error().
+					Str("source", "gframework").
 					Err(err).
 					Str("topic", sub.Topic()).
 					Msg("Subscriber failed")
@@ -125,6 +128,7 @@ func (m *MultiSubscriber) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			m.healthy.Store(false)
 			log.Info().
+				Str("source", "gframework").
 				Str("service_name", m.Name()).
 				Int("subscriber_count", len(subscribers)).
 				Msg("Multi-subscriber stopped: context cancelled")
@@ -133,6 +137,7 @@ func (m *MultiSubscriber) Start(ctx context.Context) error {
 		case <-m.shutdownSignal:
 			m.healthy.Store(false)
 			log.Info().
+				Str("source", "gframework").
 				Str("service_name", m.Name()).
 				Int("subscriber_count", len(subscribers)).
 				Msg("Multi-subscriber stopped: graceful shutdown initiated")
@@ -148,6 +153,7 @@ func (m *MultiSubscriber) Stop() error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Msg("The shutdown of all subscribers is being initiated")
 
 	m.healthy.Store(false)
@@ -169,12 +175,14 @@ func (m *MultiSubscriber) Stop() error {
 			)
 
 			log.Error().
+				Str("source", "gframework").
 				Err(err).
 				Str("topic", subscriber.Topic()).
 				Str("name", subscriber.Name()).
 				Msg("The subscriber failed to stop")
 		} else {
 			log.Info().
+				Str("source", "gframework").
 				Str("topic", subscriber.Topic()).
 				Str("name", subscriber.Name()).
 				Msg("The subscriber has been stopped successfully")
@@ -191,17 +199,20 @@ func (m *MultiSubscriber) Stop() error {
 	select {
 	case <-m.stoppedSignal:
 		log.Info().
+			Str("source", "gframework").
 			Str("service_name", m.Name()).
 			Dur("shutdown_duration", time.Since(shutdownStart)).
 			Msg("Multi-subscriber stopped cleanly")
 	case <-time.After(defaultShutdownTimeout):
 		log.Error().
+			Str("source", "gframework").
 			Str("service_name", m.Name()).
 			Dur("timeout", defaultShutdownTimeout).
 			Msg("Timeout waiting for multi-subscriber to stop gracefully")
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("service_name", m.Name()).
 		Msg("All subscribers have been shut down successfully")
 

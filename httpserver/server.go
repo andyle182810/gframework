@@ -1,3 +1,23 @@
+// Package httpserver provides an opinionated HTTP server wrapper around Echo v5 with integrated middleware.
+//
+// The server automatically configures request logging, body size limiting, CORS (optional), validation,
+// and error handling. It supports graceful shutdown and is production-ready.
+//
+// Basic usage:
+//
+//	server := httpserver.New(&httpserver.Config{
+//	    Host:      "0.0.0.0",
+//	    Port:      8080,
+//	    BodyLimit: "10M",
+//	})
+//
+//	server.Echo.GET("/api/users", listUsersHandler)
+//	if err := server.Start(ctx); err != nil {
+//	    return err
+//	}
+//
+// The underlying Echo instance is accessible via server.Echo for route registration and custom middleware.
+// The server implements graceful shutdown with a configurable GracePeriod (default 15s).
 package httpserver
 
 import (
@@ -106,12 +126,13 @@ func (s *Server) Start(_ context.Context) error {
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Str("address", s.address).
 		Msg("The HTTP server is being started")
 
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Err(err).Msg("HTTP server failed to start")
+			log.Error().Str("source", "gframework").Err(err).Msg("HTTP server failed to start")
 		}
 	}()
 
@@ -120,6 +141,7 @@ func (s *Server) Start(_ context.Context) error {
 
 func (s *Server) Stop() error {
 	log.Info().
+		Str("source", "gframework").
 		Msg("The graceful shutdown of HTTP server is being initiated")
 
 	if s.httpServer == nil {
@@ -130,12 +152,13 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Failed to gracefully stop HTTP server")
+		log.Error().Str("source", "gframework").Err(err).Msg("Failed to gracefully stop HTTP server")
 
 		return fmt.Errorf("failed to stop HTTP server: %w", err)
 	}
 
 	log.Info().
+		Str("source", "gframework").
 		Msg("The HTTP server shutdown has been completed successfully")
 
 	return nil

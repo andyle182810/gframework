@@ -335,7 +335,7 @@ func TestDefaultJWTConfig(t *testing.T) {
 	config := middleware.DefaultJWTConfig()
 
 	require.NotNil(t, config.Skipper)
-	require.Nil(t, config.Logger)
+	require.NotNil(t, config.Logger)
 	require.Nil(t, config.Keyfunc)
 	require.NotNil(t, config.NewClaimsFunc)
 	require.Equal(t, "user", config.ContextKey)

@@ -1,13 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"math/rand/v2"
 	"time"
 
 	"github.com/andyle182810/gframework/examples/demo-api/internal/config"
-	"github.com/andyle182810/gframework/examples/demo-api/internal/msghandler"
+	"github.com/andyle182810/gframework/examples/demo-api/internal/executor/consumer"
+	"github.com/andyle182810/gframework/examples/demo-api/internal/executor/worker"
+	"github.com/andyle182810/gframework/examples/demo-api/internal/handler"
+	"github.com/andyle182810/gframework/examples/demo-api/internal/publisher"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/service"
 	"github.com/andyle182810/gframework/httpserver"
@@ -21,13 +22,18 @@ import (
 	"github.com/andyle182810/gframework/taskqueue"
 	"github.com/andyle182810/gframework/valkey"
 	"github.com/andyle182810/gframework/workerpool"
-	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+// @title			Demo API
+// @version		1.0
+// @description	A demo API built with gframework showcasing users CRUD, task queues, and message publishing.
+//
+// @host		localhost:8080
+// @BasePath	/
 func main() {
 	if err := run(); err != nil {
 		log.Fatal().Err(err).Msg("Application exited with an error")
@@ -87,7 +93,7 @@ func run() error {
 		runner.WithInfrastructureService(valkey),
 		runner.WithCoreService(app.newMetricServer()),
 		runner.WithCoreService(app.newHTTPServer()),
-		runner.WithCoreService(app.newWorkerPool()),
+		runner.WithCoreService(app.newTaskProducerPool()),
 		runner.WithCoreService(taskQueue),
 		runner.WithCoreService(app.newMessagePublisherPool()),
 		runner.WithCoreService(app.newTaskRecoveryPool()),
@@ -138,19 +144,28 @@ func (app *application) newMetricServer() *metricserver.Server {
 	return metricserver.New(metricCfg)
 }
 
-func (app *application) newWorkerPool() *workerpool.WorkerPool {
-	producer := &taskProducer{taskQueue: app.taskQueue}
+func (app *application) newTaskProducerPool() *workerpool.WorkerPool {
+	producer := worker.NewTaskProducer(app.taskQueue)
 
 	return workerpool.New(
 		producer,
-		workerpool.WithWorkerCount(2), //nolint:mnd
+		workerpool.WithName("task-producer-pool"),
+		workerpool.WithWorkerCount(2),                   //nolint:mnd
 		workerpool.WithTickInterval(5*time.Second),      //nolint:mnd
 		workerpool.WithExecutionTimeout(10*time.Second), //nolint:mnd
 	)
 }
 
 func (app *application) newMessagePublisherPool() *workerpool.WorkerPool {
-	msgPublisher := &messagePublisher{publisher: app.publisher}
+	orderPub := publisher.NewOrderPublisher(app.publisher, "demo-api:orders")
+	notificationPub := publisher.NewNotificationPublisher(app.publisher, "demo-api:notifications")
+	analyticsPub := publisher.NewAnalyticsPublisher(app.publisher, "demo-api:analytics")
+
+	msgPublisher := worker.NewMessagePublisher(&worker.MessagePublisherConfig{
+		OrderPublisher:        orderPub,
+		NotificationPublisher: notificationPub,
+		AnalyticsPublisher:    analyticsPub,
+	})
 
 	return workerpool.New(
 		msgPublisher,
@@ -162,49 +177,15 @@ func (app *application) newMessagePublisherPool() *workerpool.WorkerPool {
 }
 
 func (app *application) newTaskRecoveryPool() *workerpool.WorkerPool {
-	recoveryExecutor := &taskRecoveryExecutor{taskQueue: app.taskQueue}
+	recoveryExecutor := worker.NewTaskRecovery(app.taskQueue)
 
 	return workerpool.New(
 		recoveryExecutor,
 		workerpool.WithName("task-recovery-pool"),
 		workerpool.WithWorkerCount(1),
-		workerpool.WithTickInterval(time.Minute),        //nolint:mnd
+		workerpool.WithTickInterval(time.Minute),
 		workerpool.WithExecutionTimeout(10*time.Second), //nolint:mnd
 	)
-}
-
-type taskProducer struct {
-	taskQueue *taskqueue.Queue
-}
-
-func (p *taskProducer) Execute(ctx context.Context) error {
-	taskCount := rand.IntN(5) + 1 //nolint:gosec,mnd
-	tasks := make([]taskqueue.Task, taskCount)
-
-	for i := range taskCount {
-		tasks[i] = taskqueue.Task{
-			ID:      uuid.New().String(),
-			Payload: fmt.Appendf(nil, `{"index":%d,"timestamp":"%s"}`, i, time.Now().Format(time.RFC3339)),
-		}
-	}
-
-	taskIDs := make([]string, taskCount)
-	for i, task := range tasks {
-		taskIDs[i] = task.ID
-	}
-
-	log.Info().
-		Int("task_count", taskCount).
-		Strs("task_ids", taskIDs).
-		Msg("Task producer pushing tasks to queue")
-
-	if err := p.taskQueue.Push(ctx, tasks...); err != nil {
-		return fmt.Errorf("failed to push tasks: %w", err)
-	}
-
-	log.Info().Msg("Task producer done")
-
-	return nil
 }
 
 func (app *application) registerRoutes(_ *echo.Echo, root *echo.Group) {
@@ -287,103 +268,14 @@ func initValkey(cfg *config.Config) (*valkey.Valkey, error) {
 	return redis, nil
 }
 
-const (
-	topicOrders        = "demo-api:orders"
-	topicNotifications = "demo-api:notifications"
-	topicAnalytics     = "demo-api:analytics"
-)
-
-type taskRecoveryExecutor struct {
-	taskQueue *taskqueue.Queue
-}
-
-func (r *taskRecoveryExecutor) Execute(ctx context.Context) error {
-	// Recover tasks that have been in the processing set for more than 2 minutes
-	// This catches tasks from crashed workers or ungraceful shutdowns
-	recovered, err := r.taskQueue.RecoverStale(ctx, 2*time.Minute) //nolint:mnd
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to recover stale tasks")
-		return fmt.Errorf("failed to recover stale tasks: %w", err)
-	}
-
-	if recovered > 0 {
-		log.Warn().
-			Int("recovered_count", recovered).
-			Msg("Recovered stale tasks from processing set")
-	} else {
-		log.Debug().Msg("No stale tasks to recover")
-	}
-
-	return nil
-}
-
-type messagePublisher struct {
-	publisher redispub.Publisher
-}
-
-func (p *messagePublisher) Execute(ctx context.Context) error {
-	topics := []string{topicOrders, topicNotifications, topicAnalytics}
-
-	for _, topic := range topics {
-		messageCount := rand.IntN(3) + 1 //nolint:gosec,mnd
-		messages := make([]string, messageCount)
-
-		for i := range messageCount {
-			messages[i] = fmt.Sprintf(
-				`{"id":"%s","topic":"%s","timestamp":"%s"}`,
-				uuid.New().String(),
-				topic,
-				time.Now().Format(time.RFC3339),
-			)
-		}
-
-		log.Info().
-			Str("topic", topic).
-			Int("message_count", messageCount).
-			Msg("Publishing messages to topic")
-
-		if err := p.publisher.PublishToTopic(ctx, topic, messages...); err != nil {
-			log.Error().Err(err).Str("topic", topic).Msg("Failed to publish messages")
-
-			return fmt.Errorf("failed to publish to topic %s: %w", topic, err)
-		}
-	}
-
-	log.Info().Msg("Message publisher completed publishing to all topics")
-
-	return nil
-}
-
-type taskConsumer struct{}
-
-func (c *taskConsumer) Execute(ctx context.Context, taskID string, payload taskqueue.Payload) error {
-	sleepDuration := time.Duration(rand.IntN(3)+1) * time.Second //nolint:gosec,mnd
-
-	log.Info().
-		Str("task_id", taskID).
-		Str("payload", string(payload)).
-		Dur("sleep_duration", sleepDuration).
-		Msg("Processing task...")
-
-	select {
-	case <-time.After(sleepDuration):
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	log.Info().Str("task_id", taskID).Msg("Task completed")
-
-	return nil
-}
-
 func initTaskQueue(valkeyClient *valkey.Valkey) (*taskqueue.Queue, error) {
-	consumer := &taskConsumer{}
+	taskConsumer := consumer.New()
 
 	queue, err := taskqueue.New(
 		valkeyClient.Client,
 		"demo-api:tasks",
-		consumer,
-		taskqueue.WithWorkerCount(3), //nolint:mnd
+		taskConsumer,
+		taskqueue.WithWorkerCount(3),              //nolint:mnd
 		taskqueue.WithExecTimeout(10*time.Second), //nolint:mnd
 	)
 	if err != nil {
@@ -420,18 +312,19 @@ func initMultiSubscriber(valkeyClient *valkey.Valkey) (*redissub.MultiSubscriber
 		redissub.WithRetry(3, 100*time.Millisecond, "demo-api:dlq"), //nolint:mnd
 	)
 
-	handler := msghandler.New()
+	handler := handler.New()
 
-	if err := multiSub.Subscribe(topicOrders, handler.HandleOrder); err != nil {
-		return nil, fmt.Errorf("failed to subscribe to orders topic: %w", err)
+	// Subscribe to message topics
+	topics := map[string]redissub.MessageHandler{
+		"demo-api:orders":        handler.HandleOrder,
+		"demo-api:notifications": handler.HandleNotification,
+		"demo-api:analytics":     handler.HandleAnalytics,
 	}
 
-	if err := multiSub.Subscribe(topicNotifications, handler.HandleNotification); err != nil {
-		return nil, fmt.Errorf("failed to subscribe to notifications topic: %w", err)
-	}
-
-	if err := multiSub.Subscribe(topicAnalytics, handler.HandleAnalytics); err != nil {
-		return nil, fmt.Errorf("failed to subscribe to analytics topic: %w", err)
+	for topic, topicHandler := range topics {
+		if err := multiSub.Subscribe(topic, topicHandler); err != nil {
+			return nil, fmt.Errorf("failed to subscribe to topic %s: %w", topic, err)
+		}
 	}
 
 	log.Info().

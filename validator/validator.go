@@ -1,3 +1,24 @@
+// Package validator provides request validation for REST APIs using go-playground/validator
+// with support for decimal types and JSON-based field naming.
+//
+// The validator converts struct validation errors to a simple ValidationError slice with
+// JSON-friendly field names (from struct tags, not Go field names), which is safe for
+// inclusion in API error responses. It implements the Echo validator interface.
+//
+// Basic usage:
+//
+//	type User struct {
+//	    Email    string          `json:"email" validate:"required,email"`
+//	    Age      int             `json:"age" validate:"gte=0,lte=150"`
+//	    Balance  decimal.Decimal `json:"balance" validate:"gte=0"`
+//	}
+//
+//	v := validator.DefaultRestValidator()
+//	if err := v.Validate(&user); err != nil {
+//	    // err is ValidationErrors with JSON field names
+//	}
+//
+// Custom validation tags and rules can be registered via the underlying Validator field.
 package validator
 
 import (

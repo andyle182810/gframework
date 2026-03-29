@@ -104,7 +104,7 @@ func SetupEchoContextWithJSON(
 	t *testing.T,
 	method string,
 	path string,
-	body interface{},
+	body any,
 ) (*echo.Context, *httptest.ResponseRecorder, *http.Request) {
 	t.Helper()
 
