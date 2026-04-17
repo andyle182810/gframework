@@ -58,6 +58,8 @@ const (
 var (
 	ErrClaimsNotFound            = errors.New("jwt claims: not found in context")
 	ErrClaimsTypeAssertionFailed = errors.New("jwt claims: type assertion failed")
+	ErrMissingJWTClaims          = errors.New("jwt claims: missing")
+	ErrJWTSubjectEmpty           = errors.New("jwt claims: subject is empty")
 )
 
 func GetTenantID(c *echo.Context) string {
@@ -121,6 +123,19 @@ func GetExtendedClaimsFromContext(c *echo.Context) (*ExtendedClaims, error) {
 	}
 
 	return claims, nil
+}
+
+func CurrentUserID(c *echo.Context) (string, error) {
+	claims, err := GetExtendedClaimsFromContext(c)
+	if err != nil {
+		return "", ErrMissingJWTClaims
+	}
+
+	if claims.Subject == "" {
+		return "", ErrJWTSubjectEmpty
+	}
+
+	return claims.Subject, nil
 }
 
 func GetHandler(c *echo.Context) string {
