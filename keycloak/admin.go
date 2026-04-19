@@ -293,7 +293,7 @@ type realmRoleOp func(ctx context.Context, token, realm, userID string, roles []
 func (c *AdminClient) applyRole(
 	ctx context.Context,
 	id, name, action string,
-	op realmRoleOp,
+	apply realmRoleOp,
 ) error {
 	if id == "" || name == "" {
 		return fmt.Errorf("%w: %s role requires id and name", ErrInvalidInput, action)
@@ -309,7 +309,7 @@ func (c *AdminClient) applyRole(
 		return err
 	}
 
-	if err := op(ctx, token, c.realm, id, []gocloak.Role{*role}); err != nil {
+	if err := apply(ctx, token, c.realm, id, []gocloak.Role{*role}); err != nil {
 		return err
 	}
 

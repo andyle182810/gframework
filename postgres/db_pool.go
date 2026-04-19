@@ -21,15 +21,23 @@ type DBPool interface {
 	Close()
 }
 
-type DB interface {
-	DBPool
+type Health interface {
+	IsHealthy(ctx context.Context) bool
+	HealthCheck(ctx context.Context, opts ...HealthCheckOption) error
+}
+
+type Lifecycle interface {
 	Name() string
 	Start(ctx context.Context) error
 	Stop() error
-	IsHealthy(ctx context.Context) bool
-	HealthCheck(ctx context.Context, opts ...HealthCheckOption) error
-	GetPoolStats() (*PoolStats, error)
+}
+
+type Executor interface {
+	DBPool
 	BulkInsert(ctx context.Context, tableName string, columns []string, rows [][]any) (int64, error)
+}
+
+type TxRunner interface {
 	WithTransaction(ctx context.Context, fn TxFunc) error
 	WithTransactionOptions(ctx context.Context, txOptions pgx.TxOptions, fn TxFunc) error
 	WithReadOnlyTransaction(ctx context.Context, fn TxFunc) error
@@ -37,4 +45,12 @@ type DB interface {
 	WithRepeatableReadTransaction(ctx context.Context, fn TxFunc) error
 	WithRetryTx(ctx context.Context, config RetryConfig, fn TxFunc) error
 	WithRetryTxDefault(ctx context.Context, fn TxFunc) error
+}
+
+type DB interface {
+	Executor
+	Health
+	Lifecycle
+	TxRunner
+	GetPoolStats() (*PoolStats, error)
 }
