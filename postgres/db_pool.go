@@ -20,3 +20,21 @@ type DBPool interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Close()
 }
+
+type DB interface {
+	DBPool
+	Name() string
+	Start(ctx context.Context) error
+	Stop() error
+	IsHealthy(ctx context.Context) bool
+	HealthCheck(ctx context.Context, opts ...HealthCheckOption) error
+	GetPoolStats() (*PoolStats, error)
+	BulkInsert(ctx context.Context, tableName string, columns []string, rows [][]any) (int64, error)
+	WithTransaction(ctx context.Context, fn TxFunc) error
+	WithTransactionOptions(ctx context.Context, txOptions pgx.TxOptions, fn TxFunc) error
+	WithReadOnlyTransaction(ctx context.Context, fn TxFunc) error
+	WithSerializableTransaction(ctx context.Context, fn TxFunc) error
+	WithRepeatableReadTransaction(ctx context.Context, fn TxFunc) error
+	WithRetryTx(ctx context.Context, config RetryConfig, fn TxFunc) error
+	WithRetryTxDefault(ctx context.Context, fn TxFunc) error
+}
