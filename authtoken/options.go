@@ -1,24 +1,25 @@
 package authtoken
 
 import (
-	"net/http"
 	"time"
+
+	"github.com/Nerzal/gocloak/v13"
 )
 
 type Option func(*Client)
 
-func WithHTTPClient(httpClient *http.Client) Option {
+func WithTokenExpiryBuffer(buffer time.Duration) Option {
 	return func(c *Client) {
-		if httpClient != nil {
-			c.httpClient = httpClient
+		if buffer > 0 {
+			c.expiryBuffer = buffer
 		}
 	}
 }
 
-func WithTimeout(timeout time.Duration) Option {
+func WithGoCloakClient(client *gocloak.GoCloak) Option {
 	return func(c *Client) {
-		if timeout > 0 {
-			c.httpClient.Timeout = timeout
+		if client != nil {
+			c.gocloak = client
 		}
 	}
 }

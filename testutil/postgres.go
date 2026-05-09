@@ -57,7 +57,8 @@ func SetupPostgresContainer(t *testing.T) *PostgresTestContainer {
 
 	ctx := t.Context()
 
-	container, err := postgres.Run(ctx,
+	container, err := postgres.Run(
+		ctx,
 		defaultPostgresImage,
 		postgres.WithDatabase(defaultPostgresDatabase),
 		postgres.WithUsername(defaultPostgresUser),

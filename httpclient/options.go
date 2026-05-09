@@ -48,13 +48,19 @@ func WithDefaultHeaders(headers map[string]string) Option {
 type AuthConfig struct {
 	ClientID     string
 	ClientSecret string
-	TokenURL     string
+	BaseURL      string
+	Realm        string
 }
 
 func WithAuth(cfg AuthConfig) Option {
 	return func(c *Client) {
 		c.authConfig = &cfg
-		c.tokenProvider = authtoken.New(cfg.TokenURL, cfg.ClientID, cfg.ClientSecret)
+		c.tokenProvider = authtoken.New(
+			cfg.BaseURL,
+			cfg.Realm,
+			cfg.ClientID,
+			cfg.ClientSecret,
+		)
 	}
 }
 

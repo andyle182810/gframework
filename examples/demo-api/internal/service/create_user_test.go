@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andyle182810/gframework/cache"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/service"
 	"github.com/andyle182810/gframework/httpserver"
 	"github.com/andyle182810/gframework/testutil"
@@ -90,7 +91,8 @@ func TestService_CreateUser(t *testing.T) { //nolint:funlen
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			echoCtx, rec, _ := testutil.SetupEchoContextWithJSON(t,
+			echoCtx, rec, _ := testutil.SetupEchoContextWithJSON(
+				t,
 				http.MethodPost,
 				"/v1/users",
 				tt.requestBody,
@@ -124,7 +126,8 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 		Email: email,
 	}
 
-	echoCtx1, rec1, _ := testutil.SetupEchoContextWithJSON(t,
+	echoCtx1, rec1, _ := testutil.SetupEchoContextWithJSON(
+		t,
 		http.MethodPost,
 		"/v1/users",
 		req1,
@@ -144,7 +147,8 @@ func TestService_CreateUser_DuplicateEmail(t *testing.T) {
 		Email: email,
 	}
 
-	echoCtx2, rec2, _ := testutil.SetupEchoContextWithJSON(t,
+	echoCtx2, rec2, _ := testutil.SetupEchoContextWithJSON(
+		t,
 		http.MethodPost,
 		"/v1/users",
 		req2,
@@ -169,7 +173,8 @@ func TestService_CreateUser_WithCache(t *testing.T) {
 		Email: testutil.RandomEmail(),
 	}
 
-	echoCtxCreate, recCreate, _ := testutil.SetupEchoContextWithJSON(t,
+	echoCtxCreate, recCreate, _ := testutil.SetupEchoContextWithJSON(
+		t,
 		http.MethodPost,
 		"/v1/users",
 		createReq,
@@ -185,7 +190,7 @@ func TestService_CreateUser_WithCache(t *testing.T) {
 	testutil.AssertStatusCode(t, recCreate, http.StatusOK)
 
 	testutil.Eventually(t, func() bool {
-		cacheKey := "user:email:" + createReq.Email
+		cacheKey := cache.BuildKey("user", "email", createReq.Email)
 		cachedID, err := redis.Get(ctx, cacheKey).Result()
 
 		return err == nil && cachedID != ""

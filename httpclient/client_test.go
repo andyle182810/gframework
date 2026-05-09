@@ -401,7 +401,8 @@ func TestWithQuery_URLEncodesSpecialCharacters(t *testing.T) {
 
 	client := httpclient.New(server.URL)
 
-	err := client.Get(t.Context(), "/test", nil,
+	err := client.Get(
+		t.Context(), "/test", nil,
 		httpclient.WithQuery("email", "test@example.com"),
 		httpclient.WithQuery("name", "John Doe"),
 	)

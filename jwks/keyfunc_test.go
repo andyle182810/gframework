@@ -101,7 +101,8 @@ func TestNew_CustomOptions(t *testing.T) {
 
 	customClient := &http.Client{Timeout: 5 * time.Second} //nolint:exhaustruct
 
-	keyFuncResult, err := jwks.New(t.Context(), []string{server.URL},
+	keyFuncResult, err := jwks.New(
+		t.Context(), []string{server.URL},
 		jwks.WithHTTPClient(customClient),
 		jwks.WithRateLimitBurst(10),
 		jwks.WithRefreshTimeout(15*time.Second),

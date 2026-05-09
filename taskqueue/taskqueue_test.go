@@ -174,7 +174,8 @@ func TestQueuePushAndProcess(t *testing.T) {
 	payload2 := taskqueue.Payload(`{"data":"value2"}`)
 	payload3 := taskqueue.Payload(`{"data":"value3"}`)
 
-	err = queue.Push(ctx,
+	err = queue.Push(
+		ctx,
 		taskqueue.Task{ID: "task1", Payload: payload1},
 		taskqueue.Task{ID: "task2", Payload: payload2},
 		taskqueue.Task{ID: "task3", Payload: payload3},

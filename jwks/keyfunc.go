@@ -79,8 +79,8 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 		RefreshErrorHandlerFunc: func(url string) func(ctx context.Context, err error) {
 			return func(_ context.Context, err error) {
 				log.Error().
-					Str("source", "gframework").
 					Err(err).
+					Str("source", "gframework").
 					Str("jwks_url", url).
 					Msg("JWKS key refresh failed")
 			}
@@ -92,8 +92,8 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 	keyFunc, err := keyfunc.NewDefaultOverrideCtx(ctx, urls, override)
 	if err != nil {
 		log.Error().
-			Str("source", "gframework").
 			Err(err).
+			Str("source", "gframework").
 			Strs("jwks_urls", urls).
 			Msg("Failed to initialize JWKS keyfunc")
 

@@ -1,15 +1,11 @@
-// Package authtoken provides OAuth2 client-credentials token management with automatic caching and refresh.
+// Package authtoken provides Keycloak service-account token management with automatic caching and refresh.
 //
 // The client uses an RWMutex with double-check locking to efficiently cache tokens across concurrent requests,
-// automatically refreshing expired tokens. A 30-second expiry buffer prevents race conditions during token refresh.
+// automatically refreshing expired tokens. A configurable expiry buffer prevents race conditions during token refresh.
 //
 // Basic usage:
 //
-//	client := authtoken.New(
-//	    "https://auth.example.com/oauth/token",
-//	    "client-id",
-//	    "client-secret",
-//	)
+//	client := authtoken.New("https://auth.example.com", "my-realm", "client-id", "client-secret")
 //
 //	token, err := client.GetToken(ctx)
 //	if err != nil {
@@ -22,65 +18,46 @@ package authtoken
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/Nerzal/gocloak/v13"
 )
 
-var (
-	ErrTokenRequestFailed = errors.New("authtoken: token request failed")
-	ErrNoAccessToken      = errors.New("authtoken: no access token in response")
-)
+var ErrNoAccessToken = errors.New("authtoken: no access token in response")
 
-const (
-	DefaultTimeout       = 10 * time.Second
-	tokenExpiryBuffer    = 30 * time.Second
-	headerContentType    = "Content-Type"
-	contentTypeForm      = "application/x-www-form-urlencoded"
-	grantTypeCredentials = "client_credentials"
-)
-
-//nolint:tagliatelle
-type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
-}
+const tokenExpiryBuffer = 30 * time.Second
 
 type Client struct {
-	tokenURL     string
+	gocloak      *gocloak.GoCloak
+	realm        string
 	clientID     string
 	clientSecret string
-	httpClient   *http.Client
-
-	mu          sync.RWMutex
-	accessToken string
-	expiresAt   time.Time
+	expiryBuffer time.Duration
+	mu           sync.RWMutex
+	accessToken  string
+	expiresAt    time.Time
 }
 
-func New(tokenURL, clientID, clientSecret string, opts ...Option) *Client {
-	c := &Client{
-		tokenURL:     tokenURL,
+func New(baseURL, realm, clientID, clientSecret string, opts ...Option) *Client {
+	client := &Client{ //nolint:exhaustruct
+		gocloak:      gocloak.NewClient(baseURL),
+		realm:        realm,
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		httpClient: &http.Client{ //nolint:exhaustruct
-			Timeout: DefaultTimeout,
-		},
-		mu:          sync.RWMutex{},
-		accessToken: "",
-		expiresAt:   time.Time{},
+		expiryBuffer: tokenExpiryBuffer,
+		mu:           sync.RWMutex{},
 	}
 
 	for _, opt := range opts {
-		opt(c)
+		if opt != nil {
+			opt(client)
+		}
 	}
 
-	return c
+	return client
 }
 
 func (c *Client) GetToken(ctx context.Context) (string, error) {
@@ -93,68 +70,32 @@ func (c *Client) GetToken(ctx context.Context) (string, error) {
 	}
 	c.mu.RUnlock()
 
-	return c.refreshToken(ctx)
+	return c.getToken(ctx)
 }
 
-func (c *Client) refreshToken(ctx context.Context) (string, error) {
+func (c *Client) getToken(ctx context.Context) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Double-check after acquiring write lock (another goroutine might have refreshed)
 	if c.accessToken != "" && time.Now().Before(c.expiresAt) {
 		return c.accessToken, nil
 	}
 
-	token, expiresIn, err := c.fetchToken(ctx)
+	jwt, err := c.gocloak.LoginClient(ctx, c.clientID, c.clientSecret, c.realm)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to fetch token: %w", err)
 	}
 
-	c.accessToken = token
-	// Refresh before actual expiry to avoid edge cases
-	c.expiresAt = time.Now().Add(time.Duration(expiresIn)*time.Second - tokenExpiryBuffer)
+	if jwt == nil || jwt.AccessToken == "" {
+		return "", ErrNoAccessToken
+	}
+
+	expiresIn := time.Duration(jwt.ExpiresIn) * time.Second
+
+	c.accessToken = jwt.AccessToken
+	c.expiresAt = time.Now().Add(expiresIn - c.expiryBuffer)
 
 	return c.accessToken, nil
-}
-
-func (c *Client) fetchToken(ctx context.Context) (string, int, error) {
-	data := url.Values{}
-	data.Set("grant_type", grantTypeCredentials)
-	data.Set("client_id", c.clientID)
-	data.Set("client_secret", c.clientSecret)
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		c.tokenURL,
-		strings.NewReader(data.Encode()),
-	)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to create token request: %w", err)
-	}
-
-	req.Header.Set(headerContentType, contentTypeForm)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to fetch token: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", 0, fmt.Errorf("%w: status %d", ErrTokenRequestFailed, resp.StatusCode)
-	}
-
-	var tokenResp tokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return "", 0, fmt.Errorf("failed to decode token response: %w", err)
-	}
-
-	if tokenResp.AccessToken == "" {
-		return "", 0, ErrNoAccessToken
-	}
-
-	return tokenResp.AccessToken, tokenResp.ExpiresIn, nil
 }
 
 func (c *Client) InvalidateToken() {

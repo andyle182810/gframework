@@ -28,7 +28,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// @title			Demo API
+// @title		Demo API.
 // @version		1.0
 // @description	A demo API built with gframework showcasing users CRUD, task queues, and message publishing.
 //
@@ -314,7 +314,7 @@ func initMultiSubscriber(valkeyClient *valkey.Valkey) (*redissub.MultiSubscriber
 
 	handler := handler.New()
 
-	// Subscribe to message topics
+	// Subscribe to message topics.
 	topics := map[string]redissub.MessageHandler{
 		"demo-api:orders":        handler.HandleOrder,
 		"demo-api:notifications": handler.HandleNotification,
