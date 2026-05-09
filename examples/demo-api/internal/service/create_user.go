@@ -3,6 +3,7 @@ package service
 import (
 	"time"
 
+	"github.com/andyle182810/gframework/cache"
 	"github.com/andyle182810/gframework/examples/demo-api/internal/repo"
 	"github.com/andyle182810/gframework/httpserver"
 	"github.com/labstack/echo/v5"
@@ -57,7 +58,7 @@ func (e *CreateUserExecutor) Execute(
 		return nil, httpserver.InternalError(err, "Failed to create user")
 	}
 
-	cacheKey := "user:email:" + req.Email
+	cacheKey := cache.BuildKey("user", "email", req.Email)
 
 	const cacheExpiration = 5 * time.Minute
 	if err := e.valkey.Set(ctx, cacheKey, user.ID, cacheExpiration).Err(); err != nil {

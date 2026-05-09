@@ -99,7 +99,8 @@ func TestWorkerPool_StartsAndStopsWorkers(t *testing.T) {
 	t.Parallel()
 
 	executor := newMockExecutor()
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(3),
 		workerpool.WithTickInterval(50*time.Millisecond),
 	)
@@ -171,7 +172,8 @@ func TestWorkerPool_ContinuesOnExecutorError(t *testing.T) {
 		execErr:      errExecutor,
 		execDuration: 0,
 	}
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(1),
 		workerpool.WithTickInterval(50*time.Millisecond),
 	)
@@ -192,7 +194,8 @@ func TestWorkerPool_RespectsParentContextCancellation(t *testing.T) {
 	t.Parallel()
 
 	executor := newMockExecutor()
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(2),
 		workerpool.WithTickInterval(50*time.Millisecond),
 	)
@@ -233,7 +236,8 @@ func TestWorkerPool_BusyWorkersAllowOthersToPickUpJobs(t *testing.T) {
 		execErr:      nil,
 		execDuration: 80 * time.Millisecond,
 	}
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(3),
 		workerpool.WithTickInterval(30*time.Millisecond),
 	)
@@ -258,7 +262,8 @@ func TestWorkerPool_AllWorkersBusyCausesTickToWait(t *testing.T) {
 		execErr:      nil,
 		execDuration: 200 * time.Millisecond,
 	}
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(2),
 		workerpool.WithTickInterval(20*time.Millisecond),
 	)
@@ -283,7 +288,8 @@ func TestWorkerPool_ExecutionTimeoutCancelsLongRunningTasks(t *testing.T) {
 		execErr:      nil,
 		execDuration: 500 * time.Millisecond,
 	}
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(1),
 		workerpool.WithTickInterval(50*time.Millisecond),
 		workerpool.WithExecutionTimeout(100*time.Millisecond),
@@ -309,7 +315,8 @@ func TestWorkerPool_NoTimeoutAllowsLongRunningTasksToComplete(t *testing.T) {
 		execErr:      nil,
 		execDuration: 100 * time.Millisecond,
 	}
-	pool := workerpool.New(executor,
+	pool := workerpool.New(
+		executor,
 		workerpool.WithWorkerCount(1),
 		workerpool.WithTickInterval(30*time.Millisecond),
 	)

@@ -61,7 +61,8 @@ func TestHealthCheck_WithMultipleOptions(t *testing.T) {
 
 	pg := setupTestPostgres(t)
 
-	err := pg.HealthCheck(ctx,
+	err := pg.HealthCheck(
+		ctx,
 		postgres.WithHealthCheckTimeout(5*time.Second),
 		postgres.WithCustomHealthCheckSQL("SELECT 1"),
 	)

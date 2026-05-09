@@ -1,10 +1,9 @@
 // Package keycloak provides a Keycloak integration with two complementary clients:
 //
 //   - AdminClient: a service-account-backed wrapper around gocloak/v13 for user
-//     and realm-role lifecycle management. A service-account token is cached
-//     in-memory behind an RWMutex with double-check locking and refreshed on
-//     expiry with a configurable safety buffer (default 60 s). Safe for
-//     concurrent use.
+//     and realm-role lifecycle management. Service-account token caching and
+//     refresh are delegated to the authtoken package with a configurable safety
+//     buffer (default 60 s). Safe for concurrent use.
 //
 //   - UMAClient: a stateless UMA 2.0 permission-decision client. Given an end-user
 //     access token, it calls the realm token endpoint with the uma-ticket grant
@@ -37,10 +36,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
+	"github.com/andyle182810/gframework/authtoken"
 )
 
 const defaultTokenSafetyBuffer = 60 * time.Second
@@ -51,16 +50,10 @@ var (
 )
 
 type AdminClient struct {
-	gocloak      *gocloak.GoCloak
-	realm        string
-	clientID     string
-	clientSecret string
-
+	gocloak           *gocloak.GoCloak
+	realm             string
 	tokenSafetyBuffer time.Duration
-
-	tokenMu     sync.RWMutex
-	cachedToken *gocloak.JWT
-	tokenExpiry time.Time
+	tokenProvider     *authtoken.Client
 }
 
 func NewAdminClient(
@@ -70,11 +63,11 @@ func NewAdminClient(
 	clientSecret string,
 	opts ...AdminOption,
 ) *AdminClient {
+	gocloakClient := gocloak.NewClient(baseURL)
+
 	c := &AdminClient{ //nolint:exhaustruct
-		gocloak:           gocloak.NewClient(baseURL),
+		gocloak:           gocloakClient,
 		realm:             realm,
-		clientID:          clientID,
-		clientSecret:      clientSecret,
 		tokenSafetyBuffer: defaultTokenSafetyBuffer,
 	}
 
@@ -82,47 +75,24 @@ func NewAdminClient(
 		opt(c)
 	}
 
+	c.tokenProvider = authtoken.New(
+		baseURL,
+		realm,
+		clientID,
+		clientSecret,
+		authtoken.WithGoCloakClient(c.gocloak),
+		authtoken.WithTokenExpiryBuffer(c.tokenSafetyBuffer),
+	)
+
 	return c
 }
 
 func (c *AdminClient) token(ctx context.Context) (string, error) {
-	c.tokenMu.RLock()
-	if c.cachedToken != nil && time.Now().Before(c.tokenExpiry) {
-		token := c.cachedToken.AccessToken
-		c.tokenMu.RUnlock()
-
-		return token, nil
-	}
-	c.tokenMu.RUnlock()
-
-	return c.refreshToken(ctx)
-}
-
-func (c *AdminClient) refreshToken(ctx context.Context) (string, error) {
-	c.tokenMu.Lock()
-	defer c.tokenMu.Unlock()
-
-	if c.cachedToken != nil && time.Now().Before(c.tokenExpiry) {
-		return c.cachedToken.AccessToken, nil
-	}
-
-	jwt, err := c.gocloak.LoginClient(ctx, c.clientID, c.clientSecret, c.realm)
-	if err != nil {
-		return "", err
-	}
-
-	c.cachedToken = jwt
-	c.tokenExpiry = time.Now().Add(time.Duration(jwt.ExpiresIn)*time.Second - c.tokenSafetyBuffer)
-
-	return jwt.AccessToken, nil
+	return c.tokenProvider.GetToken(ctx)
 }
 
 func (c *AdminClient) InvalidateToken() {
-	c.tokenMu.Lock()
-	defer c.tokenMu.Unlock()
-
-	c.cachedToken = nil
-	c.tokenExpiry = time.Time{}
+	c.tokenProvider.InvalidateToken()
 }
 
 type CreateUserParams struct {

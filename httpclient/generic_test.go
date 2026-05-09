@@ -143,7 +143,8 @@ func TestGetJSON_SupportsRequestOptions(t *testing.T) {
 
 	client := httpclient.New(server.URL)
 
-	user, err := httpclient.GetJSON[testUser](t.Context(), client, "/users",
+	user, err := httpclient.GetJSON[testUser](
+		t.Context(), client, "/users",
 		httpclient.WithRequestHeader("X-Custom", "value"),
 		httpclient.WithQuery("page", "1"),
 	)

@@ -160,3 +160,9 @@ linters-settings:
   funlen:
     lines: 80     # Allow up to 80 lines per function
     statements: 60 # (optional) adjust if you also get statement count warnings
+
+issues:
+  exclude-rules:
+    - path: (^examples/demo-api/main\.go$|^main\.go$)
+      linters:
+        - godot

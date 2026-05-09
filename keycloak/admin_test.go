@@ -67,7 +67,8 @@ func (s *keycloakStub) handleToken(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = fmt.Fprintf(w,
+	_, _ = fmt.Fprintf(
+		w,
 		`{"access_token":"svc-token","token_type":"Bearer","expires_in":%d}`,
 		s.expiresIn,
 	)

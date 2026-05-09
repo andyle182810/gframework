@@ -37,7 +37,7 @@ type TestUser struct {
 	Age  int    `json:"age"`
 }
 
-func TestCacheSetAndGet(t *testing.T) {
+func TestCache_SetAndGet(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -60,7 +60,7 @@ func TestCacheSetAndGet(t *testing.T) {
 	require.Equal(t, user.Age, retrieved.Age)
 }
 
-func TestCacheGetNonExistentKey(t *testing.T) {
+func TestCache_GetNonExistentKey(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -72,7 +72,7 @@ func TestCacheGetNonExistentKey(t *testing.T) {
 	require.Nil(t, retrieved)
 }
 
-func TestCacheDelete(t *testing.T) {
+func TestCache_Delete(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -96,7 +96,7 @@ func TestCacheDelete(t *testing.T) {
 	require.Nil(t, retrieved)
 }
 
-func TestCacheInvalidate(t *testing.T) {
+func TestCache_Invalidate(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -125,7 +125,7 @@ func TestCacheInvalidate(t *testing.T) {
 	require.Nil(t, retrieved2)
 }
 
-func TestCacheDefaultTTL(t *testing.T) {
+func TestCache_DefaultTTL(t *testing.T) {
 	t.Parallel()
 
 	container := testutil.SetupValkeyContainer(t)
@@ -154,7 +154,7 @@ func TestCacheDefaultTTL(t *testing.T) {
 	require.NotNil(t, retrieved)
 }
 
-func TestCacheWithIntKey(t *testing.T) {
+func TestCache_WithIntKey(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -172,7 +172,7 @@ func TestCacheWithIntKey(t *testing.T) {
 	require.Equal(t, user.Name, retrieved.Name)
 }
 
-func TestCacheWithUUIDKey(t *testing.T) {
+func TestCache_WithUUIDKey(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -190,7 +190,7 @@ func TestCacheWithUUIDKey(t *testing.T) {
 	require.Equal(t, user.Name, retrieved.Name)
 }
 
-func TestCacheUpdateExistingKey(t *testing.T) {
+func TestCache_UpdateExistingKey(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -213,7 +213,7 @@ func TestCacheUpdateExistingKey(t *testing.T) {
 	require.Equal(t, updatedUser.Age, retrieved.Age)
 }
 
-func TestCacheMultipleKeys(t *testing.T) {
+func TestCache_MultipleKeys(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -238,7 +238,7 @@ func TestCacheMultipleKeys(t *testing.T) {
 	}
 }
 
-func TestStringKeyEncoder(t *testing.T) {
+func TestStringKeyEncoder_Encode(t *testing.T) {
 	t.Parallel()
 
 	encoder := cache.NewStringKeyEncoder()
@@ -252,7 +252,7 @@ func TestStringKeyEncoder(t *testing.T) {
 	require.ErrorIs(t, err, cache.ErrCacheInvalidKeyType)
 }
 
-func TestIntKeyEncoder(t *testing.T) {
+func TestIntKeyEncoder_Encode(t *testing.T) {
 	t.Parallel()
 
 	encoder := cache.NewIntKeyEncoder()
@@ -266,7 +266,7 @@ func TestIntKeyEncoder(t *testing.T) {
 	require.ErrorIs(t, err, cache.ErrCacheInvalidKeyType)
 }
 
-func TestUUIDKeyEncoder(t *testing.T) {
+func TestUUIDKeyEncoder_Encode(t *testing.T) {
 	t.Parallel()
 
 	encoder := cache.NewUUIDKeyEncoder()
@@ -281,7 +281,7 @@ func TestUUIDKeyEncoder(t *testing.T) {
 	require.ErrorIs(t, err, cache.ErrCacheInvalidKeyType)
 }
 
-func TestKeyEncoderValidation(t *testing.T) {
+func TestKeyEncoder_Validation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
