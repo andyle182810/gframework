@@ -54,8 +54,11 @@ import (
 )
 
 const (
-	// DefaultTTL is used when New is called with a zero TTL.
-	DefaultTTL = time.Hour
+	DefaultTTL5Minutes  = 5 * time.Minute
+	DefaultTTL10Minutes = 10 * time.Minute
+	DefaultTTL30Minutes = 30 * time.Minute
+	DefaultTTLOneHour   = time.Hour
+	DefaultTTL24Hours   = 24 * time.Hour
 )
 
 var (
@@ -83,7 +86,7 @@ func New[K any, V any](
 	keyEncoder KeyEncoder,
 ) *Cache[K, V] {
 	if ttl == 0 {
-		ttl = DefaultTTL
+		ttl = DefaultTTL5Minutes
 	}
 
 	return &Cache[K, V]{
