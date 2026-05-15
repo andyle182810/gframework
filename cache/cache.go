@@ -54,11 +54,11 @@ import (
 )
 
 const (
-	DefaultTTL5Minutes  = 5 * time.Minute
-	DefaultTTL10Minutes = 10 * time.Minute
-	DefaultTTL30Minutes = 30 * time.Minute
-	DefaultTTLOneHour   = time.Hour
-	DefaultTTL24Hours   = 24 * time.Hour
+	DefaultTTL5m  = 5 * time.Minute
+	DefaultTTL10m = 10 * time.Minute
+	DefaultTTL30m = 30 * time.Minute
+	DefaultTTL1h  = time.Hour
+	DefaultTTL24h = 24 * time.Hour
 )
 
 var (
@@ -86,7 +86,7 @@ func New[K any, V any](
 	keyEncoder KeyEncoder,
 ) *Cache[K, V] {
 	if ttl == 0 {
-		ttl = DefaultTTL5Minutes
+		ttl = DefaultTTL5m
 	}
 
 	return &Cache[K, V]{
