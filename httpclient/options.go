@@ -50,16 +50,24 @@ type AuthConfig struct {
 	ClientSecret string
 	BaseURL      string
 	Realm        string
+	ExpiryBuffer time.Duration
 }
 
 func WithAuth(cfg AuthConfig) Option {
 	return func(c *Client) {
 		c.authConfig = &cfg
+
+		var opts []authtoken.Option
+		if cfg.ExpiryBuffer > 0 {
+			opts = append(opts, authtoken.WithTokenExpiryBuffer(cfg.ExpiryBuffer))
+		}
+
 		c.tokenProvider = authtoken.New(
 			cfg.BaseURL,
 			cfg.Realm,
 			cfg.ClientID,
 			cfg.ClientSecret,
+			opts...,
 		)
 	}
 }
