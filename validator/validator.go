@@ -78,7 +78,7 @@ func DefaultRestValidator() *Validator {
 		return nil
 	}, decimal.Decimal{})
 
-	v.RegisterValidation("regexp", func(fl validator.FieldLevel) bool {
+	_ = v.RegisterValidation("regexp", func(fl validator.FieldLevel) bool {
 		pattern := fl.Param()
 		value := fl.Field().String()
 
@@ -156,7 +156,7 @@ func (v *Validator) getSimpleErrorMessage(field, tag string) string {
 	}
 }
 
-func (v *Validator) getParameterizedErrorMessage(field string, err validator.FieldError) string {
+func (v *Validator) getParameterizedErrorMessage(field string, err validator.FieldError) string { //nolint:cyclop
 	param := err.Param()
 	tag := err.Tag()
 
@@ -178,7 +178,7 @@ func (v *Validator) getParameterizedErrorMessage(field string, err validator.Fie
 	case "oneof":
 		return fmt.Sprintf("%s must be one of [%s]", field, param)
 	case "regexp":
-		return fmt.Sprintf("%s must match the required pattern", field)
+		return field + " must match the required pattern"
 	default:
 		return fmt.Sprintf("%s failed validation on '%s'", field, err.Tag())
 	}
