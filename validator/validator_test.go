@@ -425,6 +425,114 @@ func TestValidate_OneOfValidation(t *testing.T) {
 	require.Equal(t, "oneOf must be one of [red green blue]", found.Message)
 }
 
+func TestValidate_RegexpValidation_Success(t *testing.T) {
+	t.Parallel()
+
+	validatorInstance := validator.DefaultRestValidator()
+
+	type RegexpStruct struct {
+		Slug  string `json:"slug"  validate:"regexp=^[a-z0-9-]+$"`
+		Phone string `json:"phone" validate:"regexp=^\\+?[0-9]+$"`
+	}
+
+	tests := []struct {
+		name  string
+		input RegexpStruct
+	}{
+		{
+			name:  "valid slug and phone",
+			input: RegexpStruct{Slug: "hello-world-123", Phone: "+14155552671"},
+		},
+		{
+			name:  "single character slug",
+			input: RegexpStruct{Slug: "a", Phone: "0123456789"},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validatorInstance.Validate(testCase.input)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestValidate_RegexpValidation_Failure(t *testing.T) {
+	t.Parallel()
+
+	validatorInstance := validator.DefaultRestValidator()
+
+	type RegexpStruct struct {
+		Slug string `json:"slug" validate:"regexp=^[a-z0-9-]+$"`
+	}
+
+	tests := []struct {
+		name          string
+		input         RegexpStruct
+		expectedField string
+	}{
+		{
+			name:          "uppercase not allowed",
+			input:         RegexpStruct{Slug: "Hello-World"},
+			expectedField: "slug",
+		},
+		{
+			name:          "special chars not allowed",
+			input:         RegexpStruct{Slug: "hello_world!"},
+			expectedField: "slug",
+		},
+		{
+			name:          "empty string fails non-empty pattern",
+			input:         RegexpStruct{Slug: ""},
+			expectedField: "slug",
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validatorInstance.Validate(testCase.input)
+			require.Error(t, err)
+
+			var validationErrors validator.ValidationErrors
+			ok := errors.As(err, &validationErrors)
+			require.True(t, ok)
+
+			found := findValidationError(validationErrors, testCase.expectedField)
+			require.NotNil(t, found)
+			require.Equal(t, "regexp", found.Tag)
+			require.Equal(t, testCase.expectedField+" must match the required pattern", found.Message)
+		})
+	}
+}
+
+func TestValidate_RegexpValidation_InvalidPattern(t *testing.T) {
+	t.Parallel()
+
+	validatorInstance := validator.DefaultRestValidator()
+
+	type InvalidPatternStruct struct {
+		Field string `json:"field" validate:"regexp=[unclosed"`
+	}
+
+	input := InvalidPatternStruct{Field: "anything"}
+
+	err := validatorInstance.Validate(input)
+	require.Error(t, err)
+
+	var validationErrors validator.ValidationErrors
+	ok := errors.As(err, &validationErrors)
+	require.True(t, ok)
+
+	found := findValidationError(validationErrors, "field")
+	require.NotNil(t, found)
+	require.Equal(t, "regexp", found.Tag)
+	require.Equal(t, "field must match the required pattern", found.Message)
+}
+
 func TestValidate_MultipleErrors(t *testing.T) {
 	t.Parallel()
 

@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -76,6 +77,18 @@ func DefaultRestValidator() *Validator {
 
 		return nil
 	}, decimal.Decimal{})
+
+	v.RegisterValidation("regexp", func(fl validator.FieldLevel) bool {
+		pattern := fl.Param()
+		value := fl.Field().String()
+
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return false
+		}
+
+		return re.MatchString(value)
+	})
 
 	return &Validator{Validator: v}
 }
@@ -164,6 +177,8 @@ func (v *Validator) getParameterizedErrorMessage(field string, err validator.Fie
 		return fmt.Sprintf("%s must be less than or equal to %s", field, param)
 	case "oneof":
 		return fmt.Sprintf("%s must be one of [%s]", field, param)
+	case "regexp":
+		return fmt.Sprintf("%s must match the required pattern", field)
 	default:
 		return fmt.Sprintf("%s failed validation on '%s'", field, err.Tag())
 	}
