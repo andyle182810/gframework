@@ -73,6 +73,7 @@ func (c *Client) doHead(ctx context.Context, method, path string, opts ...Reques
 		}
 
 		cfg.headers[HeaderAuthorization] = "Bearer " + token
+		cfg.headers[HeaderXInternalAuthorization] = "Bearer " + token
 	}
 
 	req, err := c.buildRequest(ctx, method, path, nil, cfg)

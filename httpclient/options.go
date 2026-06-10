@@ -9,12 +9,13 @@ import (
 )
 
 const (
-	DefaultTimeout            = 30 * time.Second
-	HeaderContentType         = "Content-Type"
-	HeaderXRequestID          = "X-Request-ID"
-	HeaderAuthorization       = "Authorization"
-	ContentTypeJSON           = "application/json"
-	ContentTypeFormURLEncoded = "application/x-www-form-urlencoded"
+	DefaultTimeout               = 30 * time.Second
+	HeaderContentType            = "Content-Type"
+	HeaderXRequestID             = "X-Request-ID"
+	HeaderAuthorization          = "Authorization"
+	HeaderXInternalAuthorization = "X-Internal-Authorization"
+	ContentTypeJSON              = "application/json"
+	ContentTypeFormURLEncoded    = "application/x-www-form-urlencoded"
 )
 
 type Option func(*Client)

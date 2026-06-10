@@ -43,10 +43,11 @@ const (
 )
 
 const (
-	HeaderXAPIKey    = "X-Api-Key" //nolint:gosec
-	HeaderXRequestID = "X-Request-ID"
-	HeaderXSignature = "X-Signature"
-	HeaderXTimestamp = "X-Timestamp"
+	HeaderXAPIKey                = "X-Api-Key" //nolint:gosec
+	HeaderXRequestID             = "X-Request-ID"
+	HeaderXSignature             = "X-Signature"
+	HeaderXTimestamp             = "X-Timestamp"
+	HeaderXInternalAuthorization = "X-Internal-Authorization"
 )
 
 const (

@@ -163,6 +163,7 @@ func (c *Client) do(
 		}
 
 		cfg.headers[HeaderAuthorization] = "Bearer " + token
+		cfg.headers[HeaderXInternalAuthorization] = "Bearer " + token
 	}
 
 	req, err := c.buildRequest(reqCtx, method, path, body, cfg)
