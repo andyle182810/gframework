@@ -17,7 +17,7 @@ type ComplexRequest struct {
 	RequiredEnum string    `json:"requiredEnum"         validate:"required,oneof=alpha beta"`
 	// 0x2C is go-playground/validator's escape for a literal comma inside a tag value.
 	// Without it the tag parser splits "\\d{4,5}" on the comma and panics.
-	PatternField    string     `json:"patternField"              validate:"required,regexp=^\\d{2}[a-zA-Z]-?\\d{40x2C5}$"`
+	PatternField    string     `json:"patternField"              validate:"required,regexp=^\\d{2}[a-zA-Z][ -]?\\d{40x2C5}$"`
 	OptionalText    string     `json:"optionalText"              validate:"omitempty,max=2000"`
 	OptionalShort   *string    `json:"optionalShort,omitempty"   validate:"omitempty,max=100"`
 	OptionalNumber1 *float64   `json:"optionalNumber1,omitempty" validate:"omitempty,min=0"`
@@ -252,6 +252,9 @@ func TestComplexStruct_PatternFieldValidFormats(t *testing.T) {
 		"51F-1234",
 		"51F1234",
 		"30b-12345",
+		"29A 12345",
+		"29a 12345",
+		"29A 1234",
 	}
 
 	for _, val := range validValues {
