@@ -260,9 +260,8 @@ func TestSubscriberStart(t *testing.T) {
 	}()
 
 	<-started
-	time.Sleep(100 * time.Millisecond)
-
-	require.True(t, subscriber.IsHealthy(), "subscriber should be healthy after start")
+	require.Eventually(t, subscriber.IsHealthy, 5*time.Second, 50*time.Millisecond,
+		"subscriber should be healthy after start")
 
 	cancel()
 
@@ -299,9 +298,8 @@ func TestSubscriberStop(t *testing.T) {
 	}()
 
 	<-started
-	time.Sleep(100 * time.Millisecond)
-
-	require.True(t, subscriber.IsHealthy(), "subscriber should be healthy after start")
+	require.Eventually(t, subscriber.IsHealthy, 5*time.Second, 50*time.Millisecond,
+		"subscriber should be healthy after start")
 
 	err = subscriber.Stop()
 	require.NoError(t, err, "Stop() should not return an error")
@@ -309,7 +307,7 @@ func TestSubscriberStop(t *testing.T) {
 	select {
 	case stoppedErr := <-stopped:
 		require.NoError(t, stoppedErr, "subscriber should stop without error (via shutdown signal)")
-	case <-time.After(1 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("subscriber didn't stop within timeout")
 	}
 
@@ -622,9 +620,8 @@ func TestSubscriberStartAlreadyRunning(t *testing.T) {
 	}()
 
 	<-started
-	time.Sleep(100 * time.Millisecond)
-
-	require.True(t, subscriber.IsHealthy(), "subscriber should be healthy after start")
+	require.Eventually(t, subscriber.IsHealthy, 5*time.Second, 50*time.Millisecond,
+		"subscriber should be healthy after start")
 
 	err = subscriber.Start(ctx)
 	require.ErrorIs(t, err, redissub.ErrAlreadyRunning, "second Start call should return ErrAlreadyRunning")

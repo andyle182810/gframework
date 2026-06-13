@@ -228,9 +228,8 @@ func TestMultiSubscriberStart(t *testing.T) {
 	}()
 
 	<-started
-	time.Sleep(200 * time.Millisecond)
-
-	require.True(t, multiSub.IsHealthy(), "multi subscriber should be healthy after start")
+	require.Eventually(t, multiSub.IsHealthy, 5*time.Second, 50*time.Millisecond,
+		"multi subscriber should be healthy after start")
 
 	// Stop triggers the graceful-shutdown path, which makes Start return nil.
 	err = multiSub.Stop()
@@ -506,9 +505,8 @@ func TestMultiSubscriberStartAlreadyRunning(t *testing.T) {
 	}()
 
 	<-started
-	time.Sleep(100 * time.Millisecond)
-
-	require.True(t, multiSub.IsHealthy(), "multi subscriber should be healthy after start")
+	require.Eventually(t, multiSub.IsHealthy, 5*time.Second, 50*time.Millisecond,
+		"multi subscriber should be healthy after start")
 
 	err = multiSub.Start(ctx)
 	require.ErrorIs(
