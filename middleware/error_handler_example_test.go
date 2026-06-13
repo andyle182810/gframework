@@ -2,8 +2,11 @@ package middleware_test
 
 import (
 	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/labstack/echo/v5"
@@ -12,6 +15,7 @@ import (
 
 func Example_errorHandlerBasic() {
 	e := echo.New()
+	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	e.HTTPErrorHandler = middleware.ErrorHandler(e.HTTPErrorHandler)
 
@@ -19,12 +23,16 @@ func Example_errorHandlerBasic() {
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 	})
 
-	_ = e.Start(":8080")
+	go func() {
+		_ = e.Start(":9090")
+	}()
+	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
 
 func Example_errorHandlerWithLogging() {
 	e := echo.New()
+	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -37,12 +45,16 @@ func Example_errorHandlerWithLogging() {
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 	})
 
-	_ = e.Start(":8080")
+	go func() {
+		_ = e.Start(":9091")
+	}()
+	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
 
 func Example_errorHandlerWithInternalErrors() {
 	e := echo.New()
+	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -59,12 +71,16 @@ func Example_errorHandlerWithInternalErrors() {
 		return baseErr.Wrap(dbErr)
 	})
 
-	_ = e.Start(":8080")
+	go func() {
+		_ = e.Start(":9092")
+	}()
+	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
 
 func Example_errorHandlerCustomResponse() {
 	e := echo.New()
+	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
 		CustomErrorResponse: func(ctx *echo.Context, err error, code int) map[string]any {
@@ -85,12 +101,16 @@ func Example_errorHandlerCustomResponse() {
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 	})
 
-	_ = e.Start(":8080")
+	go func() {
+		_ = e.Start(":9093")
+	}()
+	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
 
 func Example_errorHandlerProduction() {
 	e := echo.New()
+	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -107,6 +127,9 @@ func Example_errorHandlerProduction() {
 		return baseErr.Wrap(dbErr)
 	})
 
-	_ = e.Start(":8080")
+	go func() {
+		_ = e.Start(":9094")
+	}()
+	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
