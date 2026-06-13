@@ -10,11 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const loopbackHost = "127.0.0.1"
+
 func TestNew_AppliesSecureTimeoutDefaults(t *testing.T) {
 	t.Parallel()
 
 	srv := New(&Config{ //nolint:exhaustruct
-		Host: "127.0.0.1",
+		Host: loopbackHost,
 		Port: 0,
 	})
 
@@ -33,7 +35,7 @@ func TestNew_ExplicitTimeoutsAreKept(t *testing.T) {
 	t.Parallel()
 
 	srv := New(&Config{ //nolint:exhaustruct
-		Host:              "127.0.0.1",
+		Host:              loopbackHost,
 		Port:              0,
 		ReadHeaderTimeout: 1 * time.Second,
 		ReadTimeout:       2 * time.Second,
@@ -54,7 +56,9 @@ func TestNew_ExplicitTimeoutsAreKept(t *testing.T) {
 func TestStart_ReturnsErrorWhenPortInUse(t *testing.T) {
 	t.Parallel()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+
+	listener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	t.Cleanup(func() { _ = listener.Close() })
@@ -63,7 +67,7 @@ func TestStart_ReturnsErrorWhenPortInUse(t *testing.T) {
 	require.True(t, ok)
 
 	srv := New(&Config{ //nolint:exhaustruct
-		Host: "127.0.0.1",
+		Host: loopbackHost,
 		Port: addr.Port,
 	})
 
@@ -77,7 +81,7 @@ func TestStart_ServesRequests(t *testing.T) {
 	t.Parallel()
 
 	srv := New(&Config{ //nolint:exhaustruct
-		Host: "127.0.0.1",
+		Host: loopbackHost,
 		Port: 0,
 	})
 

@@ -12,6 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	apiTestPath       = "/api/test"
+	apiGatewayService = "api-gateway-service"
+)
+
 func internalToken(t *testing.T, key *mockKeyfunc, azp string) string {
 	t.Helper()
 
@@ -34,7 +39,7 @@ func internalAuthContext(t *testing.T, header string) *echo.Context {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/api/test",
+		Path:          apiTestPath,
 		Body:          nil,
 		Headers:       headers,
 		QueryParams:   nil,
@@ -50,10 +55,10 @@ func TestInternalAuth_AllowedClient(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	token := internalToken(t, mock, "api-gateway-service")
+	token := internalToken(t, mock, apiGatewayService)
 	ctx := internalAuthContext(t, "Bearer "+token)
 
-	mw := middleware.InternalAuth(mock, []string{"api-gateway-service", "purchase-order-service"})
+	mw := middleware.InternalAuth(mock, []string{apiGatewayService, "purchase-order-service"})
 
 	err := mw(echoSuccessHandler)(ctx)
 
@@ -67,7 +72,7 @@ func TestInternalAuth_ClientNotAllowed(t *testing.T) {
 	token := internalToken(t, mock, "operations-portal")
 	ctx := internalAuthContext(t, "Bearer "+token)
 
-	mw := middleware.InternalAuth(mock, []string{"api-gateway-service"})
+	mw := middleware.InternalAuth(mock, []string{apiGatewayService})
 
 	err := mw(echoSuccessHandler)(ctx)
 
@@ -83,7 +88,7 @@ func TestInternalAuth_MissingHeader(t *testing.T) {
 	mock := newMockKeyfunc(t)
 	ctx := internalAuthContext(t, "")
 
-	mw := middleware.InternalAuth(mock, []string{"api-gateway-service"})
+	mw := middleware.InternalAuth(mock, []string{apiGatewayService})
 
 	err := mw(echoSuccessHandler)(ctx)
 
@@ -99,7 +104,7 @@ func TestInternalAuth_InvalidToken(t *testing.T) {
 	mock := newMockKeyfunc(t)
 	ctx := internalAuthContext(t, "Bearer not-a-real-token")
 
-	mw := middleware.InternalAuth(mock, []string{"api-gateway-service"})
+	mw := middleware.InternalAuth(mock, []string{apiGatewayService})
 
 	err := mw(echoSuccessHandler)(ctx)
 
@@ -113,7 +118,7 @@ func TestInternalAuth_EmptyAllowlistRejects(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	token := internalToken(t, mock, "api-gateway-service")
+	token := internalToken(t, mock, apiGatewayService)
 	ctx := internalAuthContext(t, "Bearer "+token)
 
 	mw := middleware.InternalAuth(mock, nil)

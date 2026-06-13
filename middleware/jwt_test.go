@@ -19,6 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	clientAppName   = "my-client-app"
+	serviceAudience = "my-service"
+)
+
 var errMockKeyfunc = errors.New("mock keyfunc error")
 
 type mockKeyfunc struct {
@@ -75,7 +80,7 @@ func TestJWT_ValidToken(t *testing.T) {
 
 	mock := newMockKeyfunc(t)
 	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: "my-client-app",
+		Azp: clientAppName,
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
@@ -86,7 +91,7 @@ func TestJWT_ValidToken(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -108,7 +113,7 @@ func TestJWT_ValidToken(t *testing.T) {
 
 	storedClaims, err := middleware.GetExtendedClaimsFromContext(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "my-client-app", storedClaims.GetAzp())
+	require.Equal(t, clientAppName, storedClaims.GetAzp())
 }
 
 func TestJWT_MissingToken(t *testing.T) {
@@ -118,7 +123,7 @@ func TestJWT_MissingToken(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -145,7 +150,7 @@ func TestJWT_InvalidToken(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -170,7 +175,7 @@ func TestJWT_ExpiredToken(t *testing.T) {
 
 	mock := newMockKeyfunc(t)
 	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: "my-client-app",
+		Azp: clientAppName,
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Hour)),
@@ -181,7 +186,7 @@ func TestJWT_ExpiredToken(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -246,7 +251,7 @@ func TestJWTWithConfig_CustomLogger(t *testing.T) {
 
 	mock := newMockKeyfunc(t)
 	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: "my-client-app",
+		Azp: clientAppName,
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
@@ -259,7 +264,7 @@ func TestJWTWithConfig_CustomLogger(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -295,7 +300,7 @@ func TestJWTWithConfig_CustomContextKey(t *testing.T) {
 
 	mock := newMockKeyfunc(t)
 	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: "my-client-app",
+		Azp: clientAppName,
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
@@ -306,7 +311,7 @@ func TestJWTWithConfig_CustomContextKey(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -380,7 +385,7 @@ func TestJWTWithConfig_NilDefaults(t *testing.T) {
 
 	mock := newMockKeyfunc(t)
 	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: "my-client-app",
+		Azp: clientAppName,
 		//nolint:exhaustruct
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
@@ -391,7 +396,7 @@ func TestJWTWithConfig_NilDefaults(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -429,7 +434,7 @@ func TestJWTWithConfig_DefaultSkipper(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -491,7 +496,7 @@ func authContext(t *testing.T, token string) *echo.Context {
 
 	ctx, _, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -552,13 +557,13 @@ func TestJWTWithConfig_IssuerValidation(t *testing.T) {
 	const trustedIssuer = "https://auth.example.com/realms/my-realm"
 
 	tests := []struct {
-		name     string
-		tokenIss string
-		wantOK   bool
+		name   string
+		issuer string
+		wantOK bool
 	}{
-		{name: "matching issuer accepted", tokenIss: trustedIssuer, wantOK: true},
-		{name: "foreign issuer rejected", tokenIss: "https://auth.example.com/realms/other", wantOK: false},
-		{name: "missing issuer rejected", tokenIss: "", wantOK: false},
+		{name: "matching issuer accepted", issuer: trustedIssuer, wantOK: true},
+		{name: "foreign issuer rejected", issuer: "https://auth.example.com/realms/other", wantOK: false},
+		{name: "missing issuer rejected", issuer: "", wantOK: false},
 	}
 
 	for _, testCase := range tests {
@@ -569,7 +574,7 @@ func TestJWTWithConfig_IssuerValidation(t *testing.T) {
 			claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
 				//nolint:exhaustruct
 				RegisteredClaims: jwt.RegisteredClaims{
-					Issuer:    testCase.tokenIss,
+					Issuer:    testCase.issuer,
 					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 				},
 			}
@@ -597,8 +602,8 @@ func TestJWTWithConfig_AudienceValidation(t *testing.T) {
 		tokenAud jwt.ClaimStrings
 		wantOK   bool
 	}{
-		{name: "matching audience accepted", tokenAud: jwt.ClaimStrings{"my-service"}, wantOK: true},
-		{name: "one of several audiences accepted", tokenAud: jwt.ClaimStrings{"other", "my-service"}, wantOK: true},
+		{name: "matching audience accepted", tokenAud: jwt.ClaimStrings{serviceAudience}, wantOK: true},
+		{name: "one of several audiences accepted", tokenAud: jwt.ClaimStrings{"other", serviceAudience}, wantOK: true},
 		{name: "foreign audience rejected", tokenAud: jwt.ClaimStrings{"other-service"}, wantOK: false},
 		{name: "missing audience rejected", tokenAud: nil, wantOK: false},
 	}
@@ -619,7 +624,7 @@ func TestJWTWithConfig_AudienceValidation(t *testing.T) {
 
 			ctx := authContext(t, token)
 
-			mw := middleware.JWTWithConfig(securityTestConfig(mock, "", []string{"my-service"}))
+			mw := middleware.JWTWithConfig(securityTestConfig(mock, "", []string{serviceAudience}))
 			err := mw(echoSuccessHandler)(ctx)
 
 			if testCase.wantOK {

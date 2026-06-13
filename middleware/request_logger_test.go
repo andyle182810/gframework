@@ -17,7 +17,7 @@ import (
 func BenchmarkRequestLogger(b *testing.B) {
 	e := echo.New()
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
@@ -43,7 +43,7 @@ func TestRequestLogger_RedactsSensitiveQueryParams(t *testing.T) {
 
 	e := echo.New()
 
-	req := httptest.NewRequest(http.MethodGet, "/callback?token=super-secret&page=1", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/callback?token=super-secret&page=1", nil)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 

@@ -71,7 +71,7 @@ func TestNewMultiSubscriber(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	require.NotNil(t, multiSub)
@@ -96,7 +96,7 @@ func TestMultiSubscriberSubscribe(t *testing.T) {
 	}{
 		{
 			name:        "valid subscription",
-			topic:       "test-topic",
+			topic:       testTopic,
 			handler:     handler,
 			expectError: nil,
 		},
@@ -108,7 +108,7 @@ func TestMultiSubscriberSubscribe(t *testing.T) {
 		},
 		{
 			name:        "nil handler",
-			topic:       "test-topic",
+			topic:       testTopic,
 			handler:     nil,
 			expectError: redissub.ErrNilMessageHandler,
 		},
@@ -119,7 +119,7 @@ func TestMultiSubscriberSubscribe(t *testing.T) {
 			multiSub := redissub.NewMultiSubscriber(
 				"test-multi-sub",
 				valkeyClient.Client,
-				"test-group",
+				testGroup,
 			)
 
 			err := multiSub.Subscribe(testCase.topic, testCase.handler)
@@ -142,7 +142,7 @@ func TestMultiSubscriberName(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"my-multi-subscriber",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	require.Equal(t, "my-multi-subscriber", multiSub.Name())
@@ -160,7 +160,7 @@ func TestMultiSubscriberSubscriberCount(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	require.Equal(t, 0, multiSub.SubscriberCount())
@@ -190,7 +190,7 @@ func TestMultiSubscriberIsHealthy(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	require.False(t, multiSub.IsHealthy(), "multi subscriber should not be healthy before start")
@@ -213,7 +213,7 @@ func TestMultiSubscriberStart(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	err := multiSub.Subscribe("test-topic-startstop", handler)
@@ -250,7 +250,7 @@ func TestMultiSubscriberStartWithNoSubscribers(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	startCtx, cancel := context.WithCancel(t.Context())
@@ -284,7 +284,7 @@ func TestMultiSubscriberStop(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	err := multiSub.Subscribe("test-topic-stop", handler)
@@ -336,7 +336,7 @@ func TestMultiSubscriberProcessMessages(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	err := multiSub.Subscribe(topic1, handler1)
@@ -383,7 +383,7 @@ func TestMultiSubscriberWithOptions(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		redissub.WithBlockTime(5*time.Second),
 		redissub.WithClaimInterval(10*time.Second),
 		redissub.WithMaxIdleTime(30*time.Second),
@@ -417,7 +417,7 @@ func TestMultiSubscriberConcurrentProcessing(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	for _, topic := range topics {
@@ -464,7 +464,7 @@ func TestMultiSubscriberStopWhenNotRunning(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	err := multiSub.Subscribe("test-topic-stop-not-running", handler)
@@ -490,7 +490,7 @@ func TestMultiSubscriberStartAlreadyRunning(t *testing.T) {
 	multiSub := redissub.NewMultiSubscriber(
 		"test-multi-sub",
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 	)
 
 	err := multiSub.Subscribe("test-topic-already-running", handler)

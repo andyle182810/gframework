@@ -14,6 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testPath          = "/test"
+	badRequestMessage = "Bad Request"
+)
+
 var ErrGeneric = errors.New("generic error")
 
 func TestErrorHandler_HTTPError(t *testing.T) {
@@ -21,7 +26,7 @@ func TestErrorHandler_HTTPError(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodPost,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -40,7 +45,7 @@ func TestErrorHandler_HTTPError(t *testing.T) {
 
 	httpErr := &echo.HTTPError{
 		Code:    http.StatusBadRequest,
-		Message: "Bad Request",
+		Message: badRequestMessage,
 	}
 	errorHandler(ctx, httpErr)
 
@@ -56,7 +61,7 @@ func TestErrorHandler_GenericError(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodPost,
-		Path:          "/test",
+		Path:          testPath,
 		Body:          nil,
 		Headers:       nil,
 		QueryParams:   nil,
@@ -81,14 +86,14 @@ func TestErrorHandler_GenericError(t *testing.T) {
 func BenchmarkErrorHandler_HTTPError(b *testing.B) {
 	e := echo.New()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/", nil)
 	ctx := e.NewContext(req, rec)
 
 	errorHandler := middleware.ErrorHandler(nil)
 
 	httpErr := &echo.HTTPError{
 		Code:    400,
-		Message: "Bad Request",
+		Message: badRequestMessage,
 	}
 
 	b.ResetTimer()
@@ -102,7 +107,7 @@ func BenchmarkErrorHandler_HTTPError(b *testing.B) {
 func BenchmarkErrorHandler_GenericError(b *testing.B) {
 	e := echo.New()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(b.Context(), http.MethodGet, "/", nil)
 	ctx := e.NewContext(req, rec)
 
 	next := func(_ *echo.Context, _ error) {}
@@ -123,7 +128,7 @@ func TestErrorHandler_WithLogging(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodGet,
-		Path:   "/test",
+		Path:   testPath,
 	})
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -149,7 +154,7 @@ func TestErrorHandler_WithWrappedError(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodPost,
-		Path:   "/test",
+		Path:   testPath,
 	})
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -179,7 +184,7 @@ func TestErrorHandler_CustomErrorResponse(t *testing.T) {
 
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodGet,
-		Path:   "/test",
+		Path:   testPath,
 	})
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -195,7 +200,7 @@ func TestErrorHandler_CustomErrorResponse(t *testing.T) {
 
 	httpErr := &echo.HTTPError{
 		Code:    http.StatusBadRequest,
-		Message: "Bad Request",
+		Message: badRequestMessage,
 	}
 	errorHandler(ctx, httpErr)
 
@@ -212,7 +217,7 @@ func TestErrorHandler_NonHTTPError_WithLogging(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
 		Method: http.MethodPost,
-		Path:   "/test",
+		Path:   testPath,
 	})
 
 	var nextCalled bool

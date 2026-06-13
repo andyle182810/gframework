@@ -28,7 +28,7 @@ func TestInjectInternalToken_SetsHeaderAndStripsInbound(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/api/test",
+		Path:          apiTestPath,
 		Body:          nil,
 		Headers:       map[string]string{middleware.HeaderXInternalAuthorization: "Bearer spoofed"},
 		QueryParams:   nil,
@@ -50,7 +50,7 @@ func TestInjectInternalToken_FailsClosed(t *testing.T) {
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{
 		Method:        http.MethodGet,
-		Path:          "/api/test",
+		Path:          apiTestPath,
 		Body:          nil,
 		Headers:       map[string]string{middleware.HeaderXInternalAuthorization: "Bearer spoofed"},
 		QueryParams:   nil,

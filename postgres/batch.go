@@ -24,7 +24,7 @@ func (p *Postgres) BulkInsert(
 
 	copySource := pgx.CopyFromRows(rows)
 
-	count, err := p.DBPool.CopyFrom(
+	count, err := p.CopyFrom(
 		ctx,
 		pgx.Identifier{tableName},
 		columns,

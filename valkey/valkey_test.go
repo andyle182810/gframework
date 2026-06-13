@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testHost = "localhost"
+
 func TestValkeyConnection(t *testing.T) {
 	t.Parallel()
 
@@ -52,7 +54,7 @@ func TestValkeyConfigValidation(t *testing.T) {
 		{
 			name: "valid config",
 			config: &valkey.Config{
-				Host: "localhost",
+				Host: testHost,
 				Port: 6379,
 				DB:   0,
 			},
@@ -70,7 +72,7 @@ func TestValkeyConfigValidation(t *testing.T) {
 		{
 			name: "invalid port - too low",
 			config: &valkey.Config{
-				Host: "localhost",
+				Host: testHost,
 				Port: 0,
 				DB:   0,
 			},
@@ -80,7 +82,7 @@ func TestValkeyConfigValidation(t *testing.T) {
 		{
 			name: "invalid port - too high",
 			config: &valkey.Config{
-				Host: "localhost",
+				Host: testHost,
 				Port: 70000,
 				DB:   0,
 			},
@@ -90,7 +92,7 @@ func TestValkeyConfigValidation(t *testing.T) {
 		{
 			name: "negative DB",
 			config: &valkey.Config{
-				Host: "localhost",
+				Host: testHost,
 				Port: 6379,
 				DB:   -1,
 			},
@@ -116,7 +118,7 @@ func TestValkeyConfigDefaults(t *testing.T) {
 	t.Parallel()
 
 	cfg := &valkey.Config{
-		Host: "localhost",
+		Host: testHost,
 		Port: 6379,
 	}
 

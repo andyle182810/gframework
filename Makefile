@@ -1,4 +1,4 @@
-.PHONY: help test test-coverage test-clean pre-lint lint lint-fix pre-gci gci pre-benchmark benchmark deps
+.PHONY: help test test-coverage test-clean pre-lint fmt lint lint-fix pre-benchmark benchmark deps
 
 .DEFAULT_GOAL := help
 
@@ -22,26 +22,22 @@ test-clean: ## Clean test cache and coverage reports
 	rm -f coverage.out coverage.html
 
 ## Linting commands
-pre-gci: ## Install gci tool
-	go install github.com/daixiang0/gci@latest
+pre-lint: ## Install golangci-lint v2
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
-gci: pre-gci ## Format imports using gci
-	gci write --skip-generated -s standard -s default .
+fmt: pre-lint ## Format code (gci/gofmt/gofumpt/goimports via golangci-lint v2)
+	golangci-lint fmt
 
-pre-lint: ## Install linting tools
-	go install mvdan.cc/gofumpt@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-lint: gci pre-lint ## Run all linters and formatters
+lint: pre-lint ## Run all formatters and linters
 	go mod tidy
-	gofumpt -l -w .
 	go vet ./...
+	golangci-lint fmt
 	golangci-lint cache clean && golangci-lint run ./...
 
-lint-fix: gci pre-lint ## Run all linters with auto-fix
+lint-fix: pre-lint ## Run all formatters and linters with auto-fix
 	go mod tidy
-	gofumpt -l -w .
 	go vet ./...
+	golangci-lint fmt
 	golangci-lint cache clean && golangci-lint run --fix ./...
 
 ## Benchmark commands

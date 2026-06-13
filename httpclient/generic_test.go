@@ -88,7 +88,7 @@ func TestPatchJSON_SendsBodyAndReturnsTypedResponse(t *testing.T) {
 
 	client := httpclient.New(server.URL)
 
-	user, err := httpclient.PatchJSON[testUser](t.Context(), client, "/users/1", map[string]string{"name": "Patched"})
+	user, err := httpclient.PatchJSON[testUser](t.Context(), client, "/users/1", map[string]string{nameField: "Patched"})
 
 	require.NoError(t, err)
 	require.Equal(t, "Patched", user.Name)

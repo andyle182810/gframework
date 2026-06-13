@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,11 @@ import (
 	echomiddleware "github.com/labstack/echo/v5/middleware"
 )
 
+const (
+	requestIDKey    = "request_id"
+	userListMessage = "User list"
+)
+
 func ExampleRequestID() {
 	e := echo.New()
 
@@ -21,12 +27,12 @@ func ExampleRequestID() {
 		requestID := middleware.GetRequestID(c)
 
 		return c.JSON(http.StatusOK, map[string]string{
-			"request_id": requestID,
-			"message":    "User list",
+			requestIDKey: requestID,
+			messageKey:   userListMessage,
 		})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/users", nil)
 	req.Header.Set(middleware.HeaderXRequestID, uuid.New().String())
 
 	rec := httptest.NewRecorder()
@@ -52,12 +58,12 @@ func ExampleRequestIDWithConfig_autoGenerate() {
 		requestID := middleware.GetRequestID(c)
 
 		return c.JSON(http.StatusOK, map[string]string{
-			"request_id": requestID,
-			"message":    "User list",
+			requestIDKey: requestID,
+			messageKey:   userListMessage,
 		})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/users", nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)
@@ -92,12 +98,12 @@ func ExampleRequestIDWithConfig_custom() {
 		requestID := middleware.GetRequestID(c)
 
 		return c.JSON(http.StatusOK, map[string]string{
-			"request_id": requestID,
-			"message":    "User list",
+			requestIDKey: requestID,
+			messageKey:   userListMessage,
 		})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/users", nil)
 	req.Header.Set(middleware.HeaderXRequestID, "CUSTOM-123-ABC")
 
 	rec := httptest.NewRecorder()

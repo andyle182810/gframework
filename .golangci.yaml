@@ -1,8 +1,6 @@
-version: "1"
-
+# golangci-lint v2 configuration.
+version: "2"
 linters:
-  # Enable specific linter
-  # https://golangci-lint.run/usage/linters/#enabled-by-default
   enable:
     - asasalint
     - asciicheck
@@ -19,7 +17,6 @@ linters:
     - dupword
     - durationcheck
     - err113
-    - errcheck
     - errchkjson
     - errname
     - errorlint
@@ -30,7 +27,6 @@ linters:
     - forbidigo
     - forcetypeassert
     - funlen
-    - gci
     - ginkgolinter
     - gocheckcompilerdirectives
     - gochecknoglobals
@@ -42,21 +38,15 @@ linters:
     - gocyclo
     - godot
     - godox
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
-    - gomodguard
+    - gomodguard # deprecated in v2.12.0 (use gomodguard_v2); still works, no-op without settings
     - goprintffuncname
     - gosec
-    - gosimple
     - gosmopolitan
-    - govet
     - grouper
     - iface
     - importas
     - inamedparam
-    - ineffassign
     - interfacebloat
     - intrange
     - ireturn
@@ -92,7 +82,6 @@ linters:
     - spancheck
     - sqlclosecheck
     - staticcheck
-    - stylecheck
     - tagalign
     - tagliatelle
     - testableexamples
@@ -102,69 +91,69 @@ linters:
     - tparallel
     - unconvert
     - unparam
-    - unused
     - usestdlibvars
     - usetesting
     - varnamelen
     - wastedassign
     - whitespace
-    - wsl
+    - wsl # deprecated in v2.2.0 (use wsl_v5); still works. Migrate deliberately — wsl_v5 changes whitespace rules
     - zerologlint
   disable:
     - depguard
-    - wrapcheck
     - gomoddirectives
-  # Enable presets.
-  # https://golangci-lint.run/usage/linters
-  # Default: []
-  presets:
-    - bugs
-    - comment
-    - complexity
-    - error
-    - format
-    - import
-    - metalinter
-    - module
-    - performance
-    - sql
-    - style
-    - test
-    - unused
-  # Enable only fast linters from enabled linters set (first run won't be fast)
-  # Default: false
-  fast: true
-
-linters-settings:
-  gocritic:
-    disabled-checks:
-      - exitAfterDefer
-  varnamelen:
-    min-name-length: 3
-    ignore-names:
-      - id
-      - db
-      - ctx
-      - err
-      - v1
-      - pg
-      - wg
-      - tx
-      - tt
-      - c
-      - e
-      - v
-      - w
-      - r
-  lll:
-    line-length: 130
-    tab-width: 1
-  funlen:
-    lines: 80     # Allow up to 80 lines per function
-    statements: 60 # (optional) adjust if you also get statement count warnings
-
-issues:
-  exclude-rules:
-    - path: (^examples/demo-api/main\.go$|^main\.go$)
-      linters:
-        - godot
+    - wrapcheck
+  settings:
+    funlen:
+      lines: 80
+      statements: 60
+    gocritic:
+      disabled-checks:
+        - exitAfterDefer
+    lll:
+      line-length: 130
+      tab-width: 1
+    varnamelen:
+      min-name-length: 3
+      ignore-names:
+        - id
+        - db
+        - ctx
+        - err
+        - v1
+        - pg
+        - wg
+        - tx
+        - tt
+        - c
+        - e
+        - v
+        - w
+        - r
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Entry-point files use comment styles godot would otherwise flag.
+      - linters:
+          - godot
+        path: (^examples/demo-api/main\.go$|^main\.go$)
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

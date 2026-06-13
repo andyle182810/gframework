@@ -291,7 +291,7 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 		Str("topic", s.Topic()).
 		Msg("The subscription is being started")
 
-	msgChan, err := s.Subscriber.Subscribe(ctx, s.Topic())
+	msgChan, err := s.Subscribe(ctx, s.Topic())
 	if err != nil {
 		return fmt.Errorf("subscription to topic %s failed: %w", s.Topic(), err)
 	}

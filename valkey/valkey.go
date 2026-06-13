@@ -267,7 +267,7 @@ func (v *Valkey) Stop() error {
 		Str("service_name", v.Name()).
 		Msg("The Valkey client pool is being closed")
 
-	if err := v.Client.Close(); err != nil {
+	if err := v.Close(); err != nil {
 		return fmt.Errorf("failed to close Valkey client: %w", err)
 	}
 

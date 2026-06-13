@@ -144,7 +144,7 @@ func parseBodyLimit(limit string) int64 {
 	return size * multiplier
 }
 
-func (s *Server) Start(_ context.Context) error {
+func (s *Server) Start(ctx context.Context) error {
 	s.httpServer = &http.Server{ //nolint:exhaustruct
 		Addr:              s.address,
 		Handler:           s.Echo,
@@ -154,7 +154,9 @@ func (s *Server) Start(_ context.Context) error {
 		IdleTimeout:       s.idleTimeout,
 	}
 
-	listener, err := net.Listen("tcp", s.address)
+	var lc net.ListenConfig
+
+	listener, err := lc.Listen(ctx, "tcp", s.address)
 	if err != nil {
 		return fmt.Errorf("failed to bind HTTP server to %s: %w", s.address, err)
 	}

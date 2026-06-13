@@ -141,7 +141,7 @@ func (p *Postgres) Stop() error {
 		Str("source", "gframework").
 		Str("service_name", p.Name()).
 		Msg("The PostgreSQL connection pool is being closed")
-	p.DBPool.Close()
+	p.Close()
 
 	log.Info().
 		Str("source", "gframework").

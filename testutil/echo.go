@@ -47,7 +47,7 @@ func SetupEchoContext(
 		requestPath = fmt.Sprintf("%s?%s", opts.Path, query.Encode())
 	}
 
-	req := httptest.NewRequest(opts.Method, requestPath, bytes.NewBuffer(opts.Body))
+	req := httptest.NewRequestWithContext(t.Context(), opts.Method, requestPath, bytes.NewBuffer(opts.Body))
 
 	if !opts.SkipRequestID {
 		requestID := uuid.New().String()

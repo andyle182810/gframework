@@ -9,6 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// notAUUID is a shared invalid-UUID test input used across the validator_test package.
+	notAUUID = "not-a-uuid"
+	// validPlateLong is a valid 5-digit license-plate test input.
+	validPlateLong = "29A-12345"
+	// validPlateShort is a valid 4-digit license-plate test input.
+	validPlateShort = "51F1234"
+)
+
 type ComplexRequest struct {
 	RequiredID   string    `json:"requiredId"           validate:"required,uuid"`
 	RequiredID2  string    `json:"requiredId2"          validate:"required,uuid"`
@@ -38,7 +47,7 @@ func validComplexRequest() ComplexRequest {
 		OptionalID:      &optID,
 		RequiredTime:    time.Date(2026, time.May, 20, 8, 0, 0, 0, time.UTC),
 		RequiredEnum:    "alpha",
-		PatternField:    "29A-12345",
+		PatternField:    validPlateLong,
 		OptionalText:    "some descriptive text",
 		OptionalShort:   &short,
 		OptionalNumber1: &num1,
@@ -82,7 +91,7 @@ func TestComplexStruct_ValidWithOptionalFieldsOmitted(t *testing.T) {
 		RequiredID2:  "1d8e8b3a-7b1d-4f2c-9b0a-2a6b6f3e9a02",
 		RequiredTime: time.Date(2026, time.May, 20, 8, 0, 0, 0, time.UTC),
 		RequiredEnum: "beta",
-		PatternField: "51F1234",
+		PatternField: validPlateShort,
 	}
 
 	require.NoError(t, v.Validate(input))
@@ -108,7 +117,7 @@ func TestComplexStruct_RequiredIDInvalidUUID(t *testing.T) {
 
 	v := validator.DefaultRestValidator()
 	input := validComplexRequest()
-	input.RequiredID = "not-a-uuid"
+	input.RequiredID = notAUUID
 
 	err := v.Validate(input)
 	require.Error(t, err)
@@ -160,7 +169,7 @@ func TestComplexStruct_OptionalIDInvalidUUID(t *testing.T) {
 	t.Parallel()
 
 	v := validator.DefaultRestValidator()
-	bad := "not-a-uuid"
+	bad := notAUUID
 	input := validComplexRequest()
 	input.OptionalID = &bad
 
@@ -247,10 +256,10 @@ func TestComplexStruct_PatternFieldValidFormats(t *testing.T) {
 	v := validator.DefaultRestValidator()
 
 	validValues := []string{
-		"29A-12345",
+		validPlateLong,
 		"29A12345",
 		"51F-1234",
-		"51F1234",
+		validPlateShort,
 		"30b-12345",
 		"29A 12345",
 		"29a 12345",
@@ -453,10 +462,10 @@ func TestComplexStruct_RegexpCommaEscapedQuantifier(t *testing.T) {
 		t.Parallel()
 
 		validPlates := []string{
-			"29A-12345",
+			validPlateLong,
 			"29A12345",
 			"51F-1234",
-			"51F1234",
+			validPlateShort,
 			"30b-12345",
 		}
 

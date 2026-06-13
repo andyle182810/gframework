@@ -257,7 +257,7 @@ func TestWithLock_ConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 
-	require.Equal(t, int32(workerCount*iterationsPerWorker), counter.Load()) //nolint:gosec
+	require.Equal(t, int32(workerCount*iterationsPerWorker), counter.Load())
 
 	require.Equal(t, int32(1), maxConcurrent.Load())
 }

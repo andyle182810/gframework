@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const userKeyPart = "user"
+
 func TestBuildKey(t *testing.T) {
 	t.Parallel()
 
@@ -23,17 +25,17 @@ func TestBuildKey(t *testing.T) {
 		},
 		{
 			name:     "returns single part as-is",
-			parts:    []any{"user"},
-			expected: "user",
+			parts:    []any{userKeyPart},
+			expected: userKeyPart,
 		},
 		{
 			name:     "joins multiple string parts",
-			parts:    []any{"user", "email", "john@example.com"},
+			parts:    []any{userKeyPart, "email", "john@example.com"},
 			expected: "user:email:john@example.com",
 		},
 		{
 			name:     "joins mixed value types",
-			parts:    []any{"user", 123, uuid.Nil},
+			parts:    []any{userKeyPart, 123, uuid.Nil},
 			expected: "user:123:00000000-0000-0000-0000-000000000000",
 		},
 	}
@@ -67,7 +69,7 @@ func TestBuildHashedKey(t *testing.T) {
 		},
 		{
 			name:     "hashes mixed value types",
-			parts:    []any{"user", 123, uuid.Nil},
+			parts:    []any{userKeyPart, 123, uuid.Nil},
 			expected: "63ec4966fa69c2e6c35c442318d92ad128ff0f0a3ecef6b84c1acbef237ffe0d",
 		},
 		{

@@ -28,6 +28,15 @@ type testProduct struct {
 	Description string
 }
 
+const (
+	userAlice   = "Alice"
+	userBob     = "Bob"
+	columnID    = "id"
+	columnName  = "name"
+	columnAge   = "age"
+	columnEmail = "email"
+)
+
 func setupTestPostgres(t *testing.T) *postgres.Postgres {
 	t.Helper()
 
@@ -78,10 +87,10 @@ func TestBulkInsert_Success(t *testing.T) {
 	_, err := pg.Exec(ctx, createTableSQL)
 	require.NoError(t, err)
 
-	columns := []string{"name", "email", "age"}
+	columns := []string{columnName, columnEmail, columnAge}
 	rows := [][]any{
-		{"Alice", "alice@example.com", 25},
-		{"Bob", "bob@example.com", 30},
+		{userAlice, "alice@example.com", 25},
+		{userBob, "bob@example.com", 30},
 		{"Charlie", "charlie@example.com", 35},
 		{"Diana", "diana@example.com", 28},
 		{"Eve", "eve@example.com", 32},
@@ -100,10 +109,10 @@ func TestBulkInsert_Success(t *testing.T) {
 
 	var age int
 
-	err = pg.QueryRow(ctx, "SELECT name, email, age FROM test_users WHERE name = $1", "Alice").
+	err = pg.QueryRow(ctx, "SELECT name, email, age FROM test_users WHERE name = $1", userAlice).
 		Scan(&name, &email, &age)
 	require.NoError(t, err)
-	assert.Equal(t, "Alice", name)
+	assert.Equal(t, userAlice, name)
 	assert.Equal(t, "alice@example.com", email)
 	assert.Equal(t, 25, age)
 }
@@ -124,7 +133,7 @@ func TestBulkInsert_EmptyRows(t *testing.T) {
 	_, err := pg.Exec(ctx, createTableSQL)
 	require.NoError(t, err)
 
-	columns := []string{"name"}
+	columns := []string{columnName}
 	rows := [][]any{}
 
 	count, err := pg.BulkInsert(ctx, "test_empty", columns, rows)
@@ -139,7 +148,7 @@ func TestBulkInsert_NilConnectionPool(t *testing.T) {
 
 	pg := &postgres.Postgres{}
 
-	columns := []string{"name"}
+	columns := []string{columnName}
 	rows := [][]any{{"test"}}
 
 	count, err := pg.BulkInsert(ctx, "test_table", columns, rows)
@@ -155,7 +164,7 @@ func TestBulkInsert_InvalidTable(t *testing.T) {
 
 	pg := setupTestPostgres(t)
 
-	columns := []string{"name"}
+	columns := []string{columnName}
 	rows := [][]any{{"test"}}
 
 	count, err := pg.BulkInsert(ctx, "nonexistent_table", columns, rows)
@@ -181,9 +190,9 @@ func TestBulkInsert_MismatchedColumns(t *testing.T) {
 	_, err := pg.Exec(ctx, createTableSQL)
 	require.NoError(t, err)
 
-	columns := []string{"name", "age"}
+	columns := []string{columnName, columnAge}
 	rows := [][]any{
-		{"Alice", 25, "extra_value"},
+		{userAlice, 25, "extra_value"},
 	}
 
 	count, err := pg.BulkInsert(ctx, "test_mismatch", columns, rows)
@@ -208,7 +217,7 @@ func TestBulkInsert_LargeDataset(t *testing.T) {
 	_, err := pg.Exec(ctx, createTableSQL)
 	require.NoError(t, err)
 
-	columns := []string{"name", "value"}
+	columns := []string{columnName, "value"}
 
 	rows := make([][]any, 1000)
 	for i := range 1000 {
@@ -244,12 +253,12 @@ func TestBulkInsertStructs_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	users := []testUser{
-		{ID: 1, Name: "Alice", Email: "alice@example.com", Age: 25},
-		{ID: 2, Name: "Bob", Email: "bob@example.com", Age: 30},
+		{ID: 1, Name: userAlice, Email: "alice@example.com", Age: 25},
+		{ID: 2, Name: userBob, Email: "bob@example.com", Age: 30},
 		{ID: 3, Name: "Charlie", Email: "charlie@example.com", Age: 35},
 	}
 
-	columns := []string{"id", "name", "email", "age"}
+	columns := []string{columnID, columnName, columnEmail, columnAge}
 
 	valueExtractor := func(u testUser) []any {
 		return []any{u.ID, u.Name, u.Email, u.Age}
@@ -271,7 +280,7 @@ func TestBulkInsertStructs_Success(t *testing.T) {
 	err = pg.QueryRow(ctx, "SELECT name, email, age FROM test_struct_users WHERE id = $1", 1).
 		Scan(&name, &email, &age)
 	require.NoError(t, err)
-	assert.Equal(t, "Alice", name)
+	assert.Equal(t, userAlice, name)
 	assert.Equal(t, "alice@example.com", email)
 	assert.Equal(t, 25, age)
 }
@@ -293,7 +302,7 @@ func TestBulkInsertStructs_EmptySlice(t *testing.T) {
 	require.NoError(t, err)
 
 	users := []testUser{}
-	columns := []string{"id", "name"}
+	columns := []string{columnID, columnName}
 
 	valueExtractor := func(u testUser) []any {
 		return []any{u.ID, u.Name}
@@ -328,7 +337,7 @@ func TestBulkInsertStructs_DifferentTypes(t *testing.T) {
 		{ID: 3, Name: "Keyboard", Price: 79.99, Description: "Mechanical keyboard"},
 	}
 
-	columns := []string{"id", "name", "price", "description"}
+	columns := []string{columnID, columnName, "price", "description"}
 
 	valueExtractor := func(p testProduct) []any {
 		return []any{p.ID, p.Name, p.Price, p.Description}
@@ -373,11 +382,11 @@ func TestBulkInsertStructs_WithPartialColumns(t *testing.T) {
 	}
 
 	users := []partialUser{
-		{Name: "Alice"},
-		{Name: "Bob"},
+		{Name: userAlice},
+		{Name: userBob},
 	}
 
-	columns := []string{"name"}
+	columns := []string{columnName}
 
 	valueExtractor := func(u partialUser) []any {
 		return []any{u.Name}
@@ -391,10 +400,10 @@ func TestBulkInsertStructs_WithPartialColumns(t *testing.T) {
 
 	var age int
 
-	err = pg.QueryRow(ctx, "SELECT name, email, age FROM test_partial WHERE name = $1", "Alice").
+	err = pg.QueryRow(ctx, "SELECT name, email, age FROM test_partial WHERE name = $1", userAlice).
 		Scan(&name, &email, &age)
 	require.NoError(t, err)
-	assert.Equal(t, "Alice", name)
+	assert.Equal(t, userAlice, name)
 	assert.Equal(t, "no-email@example.com", email)
 	assert.Equal(t, 0, age)
 }
@@ -427,7 +436,7 @@ func TestBulkInsertStructs_LargeDataset(t *testing.T) {
 		}
 	}
 
-	columns := []string{"id", "name", "email", "age"}
+	columns := []string{columnID, columnName, columnEmail, columnAge}
 
 	valueExtractor := func(u testUser) []any {
 		return []any{u.ID, u.Name, u.Email, u.Age}

@@ -1,6 +1,7 @@
 package keycloak_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testRealm = "my-realm"
+const (
+	testRealm     = "my-realm"
+	testUserName  = "alice"
+	testUserEmail = "alice@example.com"
+)
 
 // keycloakStub is a minimal fake of the subset of Keycloak endpoints used by
 // AdminClient tests. Any unexpected path returns 501 so missing routes fail
@@ -133,8 +138,15 @@ func (s *keycloakStub) handleRole(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
 	roleName := parts[len(parts)-1]
 
+	body, err := json.Marshal(map[string]string{"id": "role-id", "name": roleName})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = fmt.Fprintf(w, `{"id":"role-id","name":%q}`, roleName)
+	_, _ = w.Write(body)
 }
 
 func TestClient_CreateUser_Happy(t *testing.T) {
@@ -148,8 +160,8 @@ func TestClient_CreateUser_Happy(t *testing.T) {
 	client := keycloak.NewAdminClient(server.URL, testRealm, "svc", "sec")
 
 	id, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{
-		Username:  "alice",
-		Email:     "alice@example.com",
+		Username:  testUserName,
+		Email:     testUserEmail,
 		FirstName: "Alice",
 		LastName:  "Liddell",
 		Password:  "s3cret",
@@ -173,8 +185,8 @@ func TestClient_CreateUser_SetPasswordFailureReturnsUserID(t *testing.T) {
 	client := keycloak.NewAdminClient(server.URL, testRealm, "svc", "sec")
 
 	id, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{
-		Username:  "alice",
-		Email:     "alice@example.com",
+		Username:  testUserName,
+		Email:     testUserEmail,
 		FirstName: "Alice",
 		LastName:  "Liddell",
 		Password:  "s3cret",
@@ -283,8 +295,8 @@ func TestClient_Token_CachesAcrossCalls(t *testing.T) {
 
 	for range 5 {
 		_, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{
-			Username:  "alice",
-			Email:     "alice@example.com",
+			Username:  testUserName,
+			Email:     testUserEmail,
 			FirstName: "",
 			LastName:  "",
 			Password:  "",

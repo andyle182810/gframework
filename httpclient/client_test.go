@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const nameField = "name"
+
 var (
 	errTokenFetchFailed = errors.New("token fetch failed")
 	errSomeOtherError   = errors.New("some other error")
@@ -162,7 +164,7 @@ func TestClient_Post(t *testing.T) {
 
 		var body map[string]string
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		assert.Equal(t, "test", body["name"])
+		assert.Equal(t, "test", body[nameField])
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]int{"id": 1})
@@ -172,7 +174,7 @@ func TestClient_Post(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]int
-	err := client.Post(t.Context(), "/test", map[string]string{"name": "test"}, &response)
+	err := client.Post(t.Context(), "/test", map[string]string{nameField: "test"}, &response)
 
 	require.NoError(t, err)
 	require.Equal(t, 1, response["id"])
@@ -191,7 +193,7 @@ func TestClient_Put(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]string
-	err := client.Put(t.Context(), "/test/1", map[string]string{"name": "updated"}, &response)
+	err := client.Put(t.Context(), "/test/1", map[string]string{nameField: "updated"}, &response)
 
 	require.NoError(t, err)
 	require.Equal(t, "updated", response["status"])
@@ -394,7 +396,7 @@ func TestWithQuery_URLEncodesSpecialCharacters(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "test@example.com", r.URL.Query().Get("email"))
-		assert.Equal(t, "John Doe", r.URL.Query().Get("name"))
+		assert.Equal(t, "John Doe", r.URL.Query().Get(nameField))
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -404,7 +406,7 @@ func TestWithQuery_URLEncodesSpecialCharacters(t *testing.T) {
 	err := client.Get(
 		t.Context(), "/test", nil,
 		httpclient.WithQuery("email", "test@example.com"),
-		httpclient.WithQuery("name", "John Doe"),
+		httpclient.WithQuery(nameField, "John Doe"),
 	)
 
 	require.NoError(t, err)

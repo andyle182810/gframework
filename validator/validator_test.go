@@ -11,6 +11,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// testName is a valid name test input.
+	testName = "John Doe"
+	// tagGte is the "greater than or equal" validator tag name.
+	tagGte = "gte"
+	// testURL is a valid URL test input.
+	testURL = "https://example.com"
+	// testEmailDotted is a valid email test input.
+	testEmailDotted = "john.doe@example.com"
+	// testEmailShort is a valid email test input.
+	testEmailShort = "john@example.com"
+	// fieldName is the "name" JSON field/validation field name.
+	fieldName = "name"
+	// testPassword is a password test input.
+	testPassword = "secret123"
+	// fieldSlug is the "slug" JSON field/validation field name.
+	fieldSlug = "slug"
+)
+
 type TestStruct struct {
 	Name  string `json:"name"  validate:"required,min=3,max=20"`
 	Email string `json:"email" validate:"required,email"`
@@ -43,8 +62,8 @@ func TestValidate_Success(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	validInput := TestStruct{
-		Name:  "John Doe",
-		Email: "john.doe@example.com",
+		Name:  testName,
+		Email: testEmailDotted,
 		Age:   25,
 	}
 
@@ -59,7 +78,7 @@ func TestValidate_RequiredFieldMissing(t *testing.T) {
 
 	invalidInput := TestStruct{
 		Name:  "",
-		Email: "john.doe@example.com",
+		Email: testEmailDotted,
 		Age:   25,
 	}
 
@@ -71,7 +90,7 @@ func TestValidate_RequiredFieldMissing(t *testing.T) {
 	require.True(t, ok)
 
 	require.Len(t, validationErrors, 1)
-	require.Equal(t, "name", validationErrors[0].Field)
+	require.Equal(t, fieldName, validationErrors[0].Field)
 	require.Equal(t, "required", validationErrors[0].Tag)
 	require.Equal(t, "name is required", validationErrors[0].Message)
 }
@@ -82,7 +101,7 @@ func TestValidate_InvalidEmail(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := TestStruct{
-		Name:  "John Doe",
+		Name:  testName,
 		Email: "invalid-email",
 		Age:   25,
 	}
@@ -106,8 +125,8 @@ func TestValidate_AgeOutOfRange(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := TestStruct{
-		Name:  "John Doe",
-		Email: "john.doe@example.com",
+		Name:  testName,
+		Email: testEmailDotted,
 		Age:   17,
 	}
 
@@ -120,7 +139,7 @@ func TestValidate_AgeOutOfRange(t *testing.T) {
 
 	require.Len(t, validationErrors, 1)
 	require.Equal(t, "age", validationErrors[0].Field)
-	require.Equal(t, "gte", validationErrors[0].Tag)
+	require.Equal(t, tagGte, validationErrors[0].Tag)
 	require.Equal(t, "age must be greater than or equal to 18", validationErrors[0].Message)
 }
 
@@ -139,27 +158,27 @@ func TestValidate_MinMaxValidation(t *testing.T) {
 			name: "name too short",
 			input: TestStruct{
 				Name:  "Jo",
-				Email: "john@example.com",
+				Email: testEmailShort,
 				Age:   25,
 			},
-			expectedField: "name",
+			expectedField: fieldName,
 			expectedMsg:   "name must be at least 3",
 		},
 		{
 			name: "name too long",
 			input: TestStruct{
 				Name:  "John Doe With Very Long Name",
-				Email: "john@example.com",
+				Email: testEmailShort,
 				Age:   25,
 			},
-			expectedField: "name",
+			expectedField: fieldName,
 			expectedMsg:   "name must be at most 20",
 		},
 		{
 			name: "age too high",
 			input: TestStruct{
-				Name:  "John Doe",
-				Email: "john@example.com",
+				Name:  testName,
+				Email: testEmailShort,
 				Age:   101,
 			},
 			expectedField: "age",
@@ -221,9 +240,9 @@ func TestValidate_UUIDValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
-		UUID:        "not-a-uuid",
+		UUID:        notAUUID,
 		AlphaNum:    "",
 		Numeric:     "",
 		Length:      "",
@@ -251,7 +270,7 @@ func TestValidate_AlphanumValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
 		UUID:        "",
 		AlphaNum:    "abc123!@#",
@@ -281,7 +300,7 @@ func TestValidate_NumericValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
 		UUID:        "",
 		AlphaNum:    "",
@@ -311,7 +330,7 @@ func TestValidate_LengthValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
 		UUID:        "",
 		AlphaNum:    "",
@@ -341,7 +360,7 @@ func TestValidate_GreaterThanValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
 		UUID:        "",
 		AlphaNum:    "",
@@ -371,7 +390,7 @@ func TestValidate_LessThanValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
 		UUID:        "",
 		AlphaNum:    "",
@@ -401,7 +420,7 @@ func TestValidate_OneOfValidation(t *testing.T) {
 	validatorInstance := validator.DefaultRestValidator()
 
 	invalidInput := ExtendedTestStruct{
-		URL:         "https://example.com",
+		URL:         testURL,
 		URI:         "",
 		UUID:        "",
 		AlphaNum:    "",
@@ -476,17 +495,17 @@ func TestValidate_RegexpValidation_Failure(t *testing.T) {
 		{
 			name:          "uppercase not allowed",
 			input:         RegexpStruct{Slug: "Hello-World"},
-			expectedField: "slug",
+			expectedField: fieldSlug,
 		},
 		{
 			name:          "special chars not allowed",
 			input:         RegexpStruct{Slug: "hello_world!"},
-			expectedField: "slug",
+			expectedField: fieldSlug,
 		},
 		{
 			name:          "empty string fails non-empty pattern",
 			input:         RegexpStruct{Slug: ""},
-			expectedField: "slug",
+			expectedField: fieldSlug,
 		},
 	}
 
@@ -641,14 +660,14 @@ func TestRegisterStructValidation(t *testing.T) {
 	})
 
 	validInput := PasswordStruct{
-		Password:        "secret123",
-		PasswordConfirm: "secret123",
+		Password:        testPassword,
+		PasswordConfirm: testPassword,
 	}
 	err := validatorInstance.Validate(validInput)
 	require.NoError(t, err)
 
 	invalidInput := PasswordStruct{
-		Password:        "secret123",
+		Password:        testPassword,
 		PasswordConfirm: "different",
 	}
 	err = validatorInstance.Validate(invalidInput)
@@ -659,9 +678,9 @@ func TestValidationError_ErrorMethod(t *testing.T) {
 	t.Parallel()
 
 	validationErrs := validator.ValidationErrors{
-		{Field: "name", Tag: "required", Value: "", Message: "name is required"},
+		{Field: fieldName, Tag: "required", Value: "", Message: "name is required"},
 		{Field: "email", Tag: "email", Value: "invalid", Message: "email must be a valid email address"},
-		{Field: "age", Tag: "gte", Value: "17", Message: "age must be greater than or equal to 18"},
+		{Field: "age", Tag: tagGte, Value: "17", Message: "age must be greater than or equal to 18"},
 	}
 
 	errorMsg := validationErrs.Error()
@@ -752,7 +771,7 @@ func TestValidate_DecimalGteFailure(t *testing.T) {
 				Limit:  nil,
 			},
 			expectedField: "amount",
-			expectedTag:   "gte",
+			expectedTag:   tagGte,
 			expectedMsg:   "amount must be greater than or equal to 0",
 		},
 		{
@@ -763,7 +782,7 @@ func TestValidate_DecimalGteFailure(t *testing.T) {
 				Limit:  nil,
 			},
 			expectedField: "fee",
-			expectedTag:   "gte",
+			expectedTag:   tagGte,
 			expectedMsg:   "fee must be greater than or equal to 0",
 		},
 		{
@@ -785,7 +804,7 @@ func TestValidate_DecimalGteFailure(t *testing.T) {
 				Limit:  decimalPtr(decimal.NewFromFloat(-10)),
 			},
 			expectedField: "limit",
-			expectedTag:   "gte",
+			expectedTag:   tagGte,
 			expectedMsg:   "limit must be greater than or equal to 0",
 		},
 	}

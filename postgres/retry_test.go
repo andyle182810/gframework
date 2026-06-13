@@ -18,6 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// sqlStateDeadlock is the Postgres SQLSTATE code for deadlock_detected.
+const sqlStateDeadlock = "40P01"
+
 func setupRetryTestPostgres(t *testing.T) (*postgres.Postgres, context.Context) {
 	t.Helper()
 
@@ -62,11 +65,11 @@ func TestDefaultRetryConfig(t *testing.T) {
 	require.Equal(t, 5*time.Second, config.MaxDelay)
 	require.InEpsilon(t, float64(2), config.Multiplier, 0.01)
 	require.Len(t, config.RetryableErrs, 5)
-	require.Contains(t, config.RetryableErrs, "40001") // serialization_failure
-	require.Contains(t, config.RetryableErrs, "40P01") // deadlock_detected
-	require.Contains(t, config.RetryableErrs, "53300") // too_many_connections
-	require.Contains(t, config.RetryableErrs, "08006") // connection_failure
-	require.Contains(t, config.RetryableErrs, "08003") // connection_does_not_exist
+	require.Contains(t, config.RetryableErrs, "40001")          // serialization_failure
+	require.Contains(t, config.RetryableErrs, sqlStateDeadlock) // deadlock_detected
+	require.Contains(t, config.RetryableErrs, "53300")          // too_many_connections
+	require.Contains(t, config.RetryableErrs, "08006")          // connection_failure
+	require.Contains(t, config.RetryableErrs, "08003")          // connection_does_not_exist
 }
 
 func TestIsRetryableError_WithPgError(t *testing.T) {
@@ -81,19 +84,19 @@ func TestIsRetryableError_WithPgError(t *testing.T) {
 		{
 			name:           "serialization_failure is retryable",
 			errorCode:      "40001",
-			retryableCodes: []string{"40001", "40P01"},
+			retryableCodes: []string{"40001", sqlStateDeadlock},
 			expected:       true,
 		},
 		{
 			name:           "deadlock_detected is retryable",
-			errorCode:      "40P01",
-			retryableCodes: []string{"40001", "40P01"},
+			errorCode:      sqlStateDeadlock,
+			retryableCodes: []string{"40001", sqlStateDeadlock},
 			expected:       true,
 		},
 		{
 			name:           "non-retryable error code",
 			errorCode:      "23505", // unique_violation
-			retryableCodes: []string{"40001", "40P01"},
+			retryableCodes: []string{"40001", sqlStateDeadlock},
 			expected:       false,
 		},
 		{
@@ -119,7 +122,7 @@ func TestIsRetryableError_WithNonPgError(t *testing.T) {
 	t.Parallel()
 
 	regularErr := errors.New("regular error") //nolint:err113
-	result := postgres.IsRetryableError(regularErr, []string{"40001", "40P01"})
+	result := postgres.IsRetryableError(regularErr, []string{"40001", sqlStateDeadlock})
 	require.False(t, result)
 }
 
@@ -129,7 +132,7 @@ func TestIsRetryableError_WithWrappedPgError(t *testing.T) {
 	pgErr := &pgconn.PgError{Code: "40001"}
 	wrappedErr := fmt.Errorf("wrapped: %w", pgErr)
 
-	result := postgres.IsRetryableError(wrappedErr, []string{"40001", "40P01"})
+	result := postgres.IsRetryableError(wrappedErr, []string{"40001", sqlStateDeadlock})
 	require.True(t, result)
 }
 

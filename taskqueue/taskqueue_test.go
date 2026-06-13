@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testQueueKey = "test:queue"
+
 type mockExecutor struct {
 	fn func(ctx context.Context, taskID string, payload taskqueue.Payload) error
 }
@@ -62,14 +64,14 @@ func TestNew(t *testing.T) {
 		{
 			name:        "valid configuration",
 			client:      func() *valkey.Valkey { return valkeyClient },
-			queueKey:    "test:queue",
+			queueKey:    testQueueKey,
 			executor:    executor,
 			expectError: nil,
 		},
 		{
 			name:        "nil client",
 			client:      func() *valkey.Valkey { return nil },
-			queueKey:    "test:queue",
+			queueKey:    testQueueKey,
 			executor:    executor,
 			expectError: taskqueue.ErrNilClient,
 		},
@@ -83,7 +85,7 @@ func TestNew(t *testing.T) {
 		{
 			name:        "nil executor",
 			client:      func() *valkey.Valkey { return valkeyClient },
-			queueKey:    "test:queue",
+			queueKey:    testQueueKey,
 			executor:    nil,
 			expectError: taskqueue.ErrNilExecutor,
 		},

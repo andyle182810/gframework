@@ -99,7 +99,7 @@ func defaultDuration(value, fallback time.Duration) time.Duration {
 
 // Start binds the listener synchronously so bind failures are returned to the
 // caller, then serves requests in a background goroutine.
-func (s *Server) Start(_ context.Context) error {
+func (s *Server) Start(ctx context.Context) error {
 	s.httpServer = &http.Server{ //nolint:exhaustruct
 		Addr:              s.address,
 		Handler:           s.echo,
@@ -109,7 +109,9 @@ func (s *Server) Start(_ context.Context) error {
 		IdleTimeout:       s.idleTimeout,
 	}
 
-	listener, err := net.Listen("tcp", s.address)
+	var lc net.ListenConfig
+
+	listener, err := lc.Listen(ctx, "tcp", s.address)
 	if err != nil {
 		return fmt.Errorf("failed to bind metrics server to %s: %w", s.address, err)
 	}

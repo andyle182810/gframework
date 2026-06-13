@@ -123,7 +123,7 @@ Run everything:
 
 ```bash
 make test       # go test ./... (no cache)
-make lint       # gofumpt + go vet + golangci-lint
+make lint       # go vet + golangci-lint v2 (fmt + run)
 ```
 
 ## 💡 Examples

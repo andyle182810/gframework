@@ -2,7 +2,6 @@ package middleware_test
 
 import (
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,9 +12,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const messageKey = "message"
+
 func Example_errorHandlerBasic() {
 	e := echo.New()
-	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	e.Logger = slog.New(slog.DiscardHandler)
 
 	e.HTTPErrorHandler = middleware.ErrorHandler(e.HTTPErrorHandler)
 
@@ -32,7 +33,7 @@ func Example_errorHandlerBasic() {
 
 func Example_errorHandlerWithLogging() {
 	e := echo.New()
-	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	e.Logger = slog.New(slog.DiscardHandler)
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -54,7 +55,7 @@ func Example_errorHandlerWithLogging() {
 
 func Example_errorHandlerWithInternalErrors() {
 	e := echo.New()
-	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	e.Logger = slog.New(slog.DiscardHandler)
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
@@ -80,15 +81,15 @@ func Example_errorHandlerWithInternalErrors() {
 
 func Example_errorHandlerCustomResponse() {
 	e := echo.New()
-	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	e.Logger = slog.New(slog.DiscardHandler)
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
 		CustomErrorResponse: func(ctx *echo.Context, err error, code int) map[string]any {
 			return map[string]any{
 				"success": false,
 				"error": map[string]any{
-					"code":    code,
-					"message": err.Error(),
+					"code":     code,
+					messageKey: err.Error(),
 				},
 				"path":      ctx.Request().URL.Path,
 				"timestamp": "2024-01-01T00:00:00Z",
@@ -110,7 +111,7 @@ func Example_errorHandlerCustomResponse() {
 
 func Example_errorHandlerProduction() {
 	e := echo.New()
-	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	e.Logger = slog.New(slog.DiscardHandler)
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct

@@ -63,7 +63,7 @@ func TestRequestIDMiddleware(t *testing.T) {
 
 			ctx, rec, req := testutil.SetupEchoContext(t, &testutil.Options{
 				Method:        http.MethodPost,
-				Path:          "/test",
+				Path:          testPath,
 				Body:          nil,
 				Headers:       nil,
 				QueryParams:   nil,
@@ -177,7 +177,7 @@ func TestRequestIDWithConfigAutoGenerate(t *testing.T) { //nolint:funlen
 
 			ctx, rec, req := testutil.SetupEchoContext(t, &testutil.Options{
 				Method:        http.MethodPost,
-				Path:          "/test",
+				Path:          testPath,
 				Body:          nil,
 				Headers:       nil,
 				QueryParams:   nil,

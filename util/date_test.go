@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const dateStart = "2026-01-01"
+
 func day(s string) time.Time {
 	t, _ := time.Parse("2006-01-02", s)
 
@@ -27,42 +29,42 @@ func TestValidateDateRange(t *testing.T) {
 	}{
 		{
 			name:    "valid range",
-			from:    "2026-01-01",
+			from:    dateStart,
 			to:      "2026-03-01",
 			maxDays: 93,
 			wantErr: false,
 		},
 		{
 			name:    "same day",
-			from:    "2026-01-01",
-			to:      "2026-01-01",
+			from:    dateStart,
+			to:      dateStart,
 			maxDays: 93,
 			wantErr: false,
 		},
 		{
 			name:    "to before from",
 			from:    "2026-03-01",
-			to:      "2026-01-01",
+			to:      dateStart,
 			maxDays: 93,
 			wantErr: true,
 		},
 		{
 			name:    "exceeds max days",
-			from:    "2026-01-01",
+			from:    dateStart,
 			to:      "2026-04-05", // 94 days
 			maxDays: 93,
 			wantErr: true,
 		},
 		{
 			name:    "exactly max days",
-			from:    "2026-01-01",
+			from:    dateStart,
 			to:      "2026-04-04", // 93 days
 			maxDays: 93,
 			wantErr: false,
 		},
 		{
 			name:    "custom max days",
-			from:    "2026-01-01",
+			from:    dateStart,
 			to:      "2026-01-11", // 10 days
 			maxDays: 7,
 			wantErr: true,
@@ -86,12 +88,12 @@ func TestValidateDateRange(t *testing.T) {
 func TestDateRange_Validate(t *testing.T) {
 	t.Parallel()
 
-	dateRange := util.DateRange{From: day("2026-01-01"), To: day("2026-03-01"), MaxDays: 0}
+	dateRange := util.DateRange{From: day(dateStart), To: day("2026-03-01"), MaxDays: 0}
 	require.NoError(t, dateRange.Validate())
 
-	dateRange = util.DateRange{From: day("2026-03-01"), To: day("2026-01-01"), MaxDays: 0}
+	dateRange = util.DateRange{From: day("2026-03-01"), To: day(dateStart), MaxDays: 0}
 	require.Error(t, dateRange.Validate())
 
-	dateRange = util.DateRange{From: day("2026-01-01"), To: day("2026-01-10"), MaxDays: 7}
+	dateRange = util.DateRange{From: day(dateStart), To: day("2026-01-10"), MaxDays: 7}
 	require.Error(t, dateRange.Validate())
 }

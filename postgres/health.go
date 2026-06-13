@@ -74,7 +74,7 @@ func (p *Postgres) HealthCheck(ctx context.Context, opts ...HealthCheckOption) e
 	healthCtx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
 
-	if err := p.DBPool.Ping(healthCtx); err != nil {
+	if err := p.Ping(healthCtx); err != nil {
 		return fmt.Errorf("postgres health check ping failed: %w", err)
 	}
 

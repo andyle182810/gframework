@@ -23,6 +23,11 @@ var (
 	errAlwaysFail = errors.New("always fail")
 )
 
+const (
+	testTopic = "test-topic"
+	testGroup = "test-group"
+)
+
 func setupTestClient(t *testing.T) *valkey.Valkey {
 	t.Helper()
 
@@ -86,16 +91,16 @@ func TestNewSubscriber(t *testing.T) {
 		{
 			name:          "valid configuration",
 			client:        func() goredis.UniversalClient { return valkeyClient.Client },
-			consumerGroup: "test-group",
-			topic:         "test-topic",
+			consumerGroup: testGroup,
+			topic:         testTopic,
 			handler:       handler,
 			expectError:   nil,
 		},
 		{
 			name:          "nil client",
 			client:        func() goredis.UniversalClient { return nil },
-			consumerGroup: "test-group",
-			topic:         "test-topic",
+			consumerGroup: testGroup,
+			topic:         testTopic,
 			handler:       handler,
 			expectError:   redissub.ErrNilRedisClient,
 		},
@@ -103,14 +108,14 @@ func TestNewSubscriber(t *testing.T) {
 			name:          "empty consumer group",
 			client:        func() goredis.UniversalClient { return valkeyClient.Client },
 			consumerGroup: "",
-			topic:         "test-topic",
+			topic:         testTopic,
 			handler:       handler,
 			expectError:   redissub.ErrEmptyConsumerGroup,
 		},
 		{
 			name:          "empty topic",
 			client:        func() goredis.UniversalClient { return valkeyClient.Client },
-			consumerGroup: "test-group",
+			consumerGroup: testGroup,
 			topic:         "",
 			handler:       handler,
 			expectError:   redissub.ErrEmptyTopicName,
@@ -118,8 +123,8 @@ func TestNewSubscriber(t *testing.T) {
 		{
 			name:          "nil handler",
 			client:        func() goredis.UniversalClient { return valkeyClient.Client },
-			consumerGroup: "test-group",
-			topic:         "test-topic",
+			consumerGroup: testGroup,
+			topic:         testTopic,
 			handler:       nil,
 			expectError:   redissub.ErrNilMessageHandler,
 		},
@@ -176,13 +181,13 @@ func TestSubscriberTopic(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
-		"test-topic",
+		testGroup,
+		testTopic,
 		handler,
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, "test-topic", subscriber.Topic())
+	require.Equal(t, testTopic, subscriber.Topic())
 }
 
 func TestSubscriberConsumerGroup(t *testing.T) {
@@ -196,13 +201,13 @@ func TestSubscriberConsumerGroup(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
-		"test-topic",
+		testGroup,
+		testTopic,
 		handler,
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, "test-group", subscriber.ConsumerGroup())
+	require.Equal(t, testGroup, subscriber.ConsumerGroup())
 }
 
 func TestSubscriberIsHealthy(t *testing.T) {
@@ -216,7 +221,7 @@ func TestSubscriberIsHealthy(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		"test-topic-health",
 		handler,
 	)
@@ -237,7 +242,7 @@ func TestSubscriberStart(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		"test-topic-startstop",
 		handler,
 	)
@@ -278,7 +283,7 @@ func TestSubscriberStop(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		"test-topic-stop",
 		handler,
 	)
@@ -331,7 +336,7 @@ func TestSubscriberProcessMessage(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 	)
@@ -373,7 +378,7 @@ func TestSubscriberWithOptions(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		"test-topic-options",
 		handler,
 		redissub.WithBlockTime(5*time.Second),
@@ -406,7 +411,7 @@ func TestSubscriberWithRetry(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithRetry(3, 100*time.Millisecond, ""),
@@ -453,7 +458,7 @@ func TestSubscriberWithMetrics(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithMetrics(metrics),
@@ -501,7 +506,7 @@ func TestSubscriberWithDLQ(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithRetry(2, 50*time.Millisecond, dlqTopic),
@@ -574,7 +579,7 @@ func TestSubscriberStopWhenNotRunning(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		"test-topic-stop-not-running",
 		handler,
 	)
@@ -599,7 +604,7 @@ func TestSubscriberStartAlreadyRunning(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		"test-topic-already-running",
 		handler,
 	)
@@ -657,7 +662,7 @@ func TestSubscriberWithExecTimeout(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithExecTimeout(200*time.Millisecond),
@@ -714,7 +719,7 @@ func TestSubscriberWithExecTimeoutAndRetry(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithExecTimeout(100*time.Millisecond),
@@ -765,7 +770,7 @@ func TestSubscriberWithExecTimeoutSuccess(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithExecTimeout(1*time.Second),
@@ -816,7 +821,7 @@ func TestSubscriberWithExecTimeoutToDLQ(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithExecTimeout(100*time.Millisecond),
@@ -873,7 +878,7 @@ func TestSubscriberNoInfiniteRedeliveryAfterRetryExhaustion(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithRetry(maxRetries, 10*time.Millisecond, ""),
@@ -901,7 +906,7 @@ func TestSubscriberNoInfiniteRedeliveryAfterRetryExhaustion(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	finalAttempts := attemptCount.Load()
-	require.Equal(t, int32(expectedAttempts), finalAttempts, //nolint:gosec
+	require.Equal(t, int32(expectedAttempts), finalAttempts,
 		"message should only be processed %d times (initial + %d retries), got %d - indicates infinite redelivery bug",
 		expectedAttempts, maxRetries, finalAttempts)
 
@@ -931,7 +936,7 @@ func TestSubscriberNoInfiniteRedeliveryWithDLQ(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithRetry(maxRetries, 10*time.Millisecond, dlqTopic),
@@ -992,7 +997,7 @@ func TestSubscriberMetricsAfterRetryExhaustion(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithRetry(maxRetries, 10*time.Millisecond, dlqTopic),
@@ -1052,7 +1057,7 @@ func TestSubscriberDLQWriteFailureDoesNotLoseMessage(t *testing.T) {
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,
-		"test-group",
+		testGroup,
 		topic,
 		handler,
 		redissub.WithRetry(1, 10*time.Millisecond, dlqTopic),
@@ -1073,7 +1078,7 @@ func TestSubscriberDLQWriteFailureDoesNotLoseMessage(t *testing.T) {
 
 	// The message must remain pending (un-acked) in the consumer group so it can
 	// be redelivered later — before the fix it was acked and silently lost.
-	pending, err := valkeyClient.Client.XPending(ctx, topic, "test-group").Result()
+	pending, err := valkeyClient.Client.XPending(ctx, topic, testGroup).Result()
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, pending.Count, int64(1), "message must stay pending after a DLQ write failure")
 
