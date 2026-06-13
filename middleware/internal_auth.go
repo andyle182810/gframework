@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -22,6 +23,17 @@ type InternalAuthConfig struct {
 	Keyfunc        keyfunc.Keyfunc
 	Header         string
 	AllowedClients []string
+
+	// ValidMethods lists the accepted JWT signing algorithms. Empty means
+	// DefaultValidMethods(). Never include HS* methods when keys come from a JWKS.
+	ValidMethods []string
+
+	// Issuer, when non-empty, requires the token "iss" claim to match exactly.
+	Issuer string
+
+	// Leeway is the clock-skew tolerance for time-based claims.
+	// Zero means DefaultJWTLeeway.
+	Leeway time.Duration
 }
 
 func DefaultInternalAuthConfig() InternalAuthConfig {
@@ -30,6 +42,9 @@ func DefaultInternalAuthConfig() InternalAuthConfig {
 		Keyfunc:        nil,
 		Header:         HeaderXInternalAuthorization,
 		AllowedClients: nil,
+		ValidMethods:   DefaultValidMethods(),
+		Issuer:         "",
+		Leeway:         DefaultJWTLeeway,
 	}
 }
 
@@ -50,6 +65,16 @@ func InternalAuthWithConfig(config InternalAuthConfig) echo.MiddlewareFunc {
 		config.Header = HeaderXInternalAuthorization
 	}
 
+	if len(config.ValidMethods) == 0 {
+		config.ValidMethods = DefaultValidMethods()
+	}
+
+	if config.Leeway == 0 {
+		config.Leeway = DefaultJWTLeeway
+	}
+
+	parserOpts := buildParserOptions(config.ValidMethods, config.Issuer, nil, config.Leeway)
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(ctx *echo.Context) error {
 			if config.Skipper(ctx) {
@@ -63,7 +88,7 @@ func InternalAuthWithConfig(config InternalAuthConfig) echo.MiddlewareFunc {
 
 			claims := &ExtendedClaims{} //nolint:exhaustruct
 
-			token, err := jwt.ParseWithClaims(raw, claims, config.Keyfunc.Keyfunc)
+			token, err := jwt.ParseWithClaims(raw, claims, config.Keyfunc.Keyfunc, parserOpts...)
 			if err != nil || !token.Valid {
 				return ErrInternalTokenInvalid
 			}

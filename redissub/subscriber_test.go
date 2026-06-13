@@ -1025,6 +1025,57 @@ func TestSubscriberMetricsAfterRetryExhaustion(t *testing.T) {
 	require.Equal(t, int32(1), metrics.receivedCount.Load(), "should receive message exactly once")
 	require.Equal(t, int32(1), metrics.processedCount.Load(), "should record processed exactly once")
 	require.Equal(t, int32(1), metrics.dlqCount.Load(), "should send to DLQ exactly once")
-	require.Equal(t, int32(1), metrics.nackedCount.Load(), "should record nacked exactly once (for failed processing)")
+	require.Equal(t, int32(0), metrics.nackedCount.Load(),
+		"should not record nacked: the message was stored in the DLQ, not nacked")
 	require.Equal(t, int32(0), metrics.ackedCount.Load(), "should not record acked (message failed)")
+}
+
+func TestSubscriberDLQWriteFailureDoesNotLoseMessage(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	valkeyClient := setupTestClient(t)
+	publisher := setupTestPublisher(t, valkeyClient)
+
+	handler := func(_ context.Context, _ message.Payload) error {
+		return errAlwaysFail
+	}
+
+	topic := "test-topic-dlq-fail-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	dlqTopic := topic + "-dlq"
+
+	// Occupy the DLQ key with a plain string so XADD fails with WRONGTYPE,
+	// simulating a DLQ write failure.
+	require.NoError(t, valkeyClient.Client.Set(ctx, dlqTopic, "not-a-stream", 0).Err())
+
+	metrics := &mockMetrics{}
+
+	subscriber, err := redissub.NewSubscriber(
+		valkeyClient.Client,
+		"test-group",
+		topic,
+		handler,
+		redissub.WithRetry(1, 10*time.Millisecond, dlqTopic),
+		redissub.WithMetrics(metrics),
+	)
+	require.NoError(t, err)
+
+	publishTestMessage(t, publisher, topic, "must-not-be-lost")
+
+	startCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() { _ = subscriber.Start(startCtx) }()
+
+	require.Eventually(t, func() bool {
+		return metrics.nackedCount.Load() >= 1
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// The message must remain pending (un-acked) in the consumer group so it can
+	// be redelivered later — before the fix it was acked and silently lost.
+	pending, err := valkeyClient.Client.XPending(ctx, topic, "test-group").Result()
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, pending.Count, int64(1), "message must stay pending after a DLQ write failure")
+
+	require.Equal(t, int32(0), metrics.dlqCount.Load())
 }

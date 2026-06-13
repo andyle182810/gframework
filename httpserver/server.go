@@ -41,27 +41,38 @@ const (
 	megabyte         = 1 << 20
 	gigabyte         = 1 << 30
 	defaultBodyLimit = 10 * megabyte
+
+	DefaultReadHeaderTimeout = 10 * time.Second
+	DefaultReadTimeout       = 30 * time.Second
+	DefaultWriteTimeout      = 30 * time.Second
+	DefaultIdleTimeout       = 120 * time.Second
+	DefaultGracePeriod       = 15 * time.Second
 )
 
 type Config struct {
-	Host         string
-	Port         int
-	EnableCors   bool
-	AllowOrigins []string
-	BodyLimit    string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	GracePeriod  time.Duration
+	Host              string
+	Port              int
+	EnableCors        bool
+	AllowOrigins      []string
+	BodyLimit         string
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	GracePeriod       time.Duration
 }
 
 type Server struct {
-	address      string
-	gracePeriod  time.Duration
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-	Echo         *echo.Echo
-	Root         *echo.Group
-	httpServer   *http.Server
+	address           string
+	gracePeriod       time.Duration
+	readHeaderTimeout time.Duration
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
+	Echo              *echo.Echo
+	Root              *echo.Group
+	httpServer        *http.Server
+	listener          net.Listener
 }
 
 func New(cfg *Config) *Server {
@@ -73,6 +84,12 @@ func New(cfg *Config) *Server {
 	e.Pre(echomiddleware.BodyLimit(parseBodyLimit(cfg.BodyLimit)))
 
 	if cfg.EnableCors {
+		if len(cfg.AllowOrigins) == 0 {
+			log.Warn().
+				Str("source", "gframework").
+				Msg("CORS is enabled without AllowOrigins; all origins are allowed — set AllowOrigins in production")
+		}
+
 		e.Use(echomiddleware.CORS(cfg.AllowOrigins...))
 	}
 
@@ -80,13 +97,23 @@ func New(cfg *Config) *Server {
 	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 
 	return &Server{ //nolint:exhaustruct
-		gracePeriod:  cfg.GracePeriod,
-		address:      address,
-		Echo:         e,
-		Root:         root,
-		readTimeout:  cfg.ReadTimeout,
-		writeTimeout: cfg.WriteTimeout,
+		gracePeriod:       defaultDuration(cfg.GracePeriod, DefaultGracePeriod),
+		address:           address,
+		Echo:              e,
+		Root:              root,
+		readHeaderTimeout: defaultDuration(cfg.ReadHeaderTimeout, DefaultReadHeaderTimeout),
+		readTimeout:       defaultDuration(cfg.ReadTimeout, DefaultReadTimeout),
+		writeTimeout:      defaultDuration(cfg.WriteTimeout, DefaultWriteTimeout),
+		idleTimeout:       defaultDuration(cfg.IdleTimeout, DefaultIdleTimeout),
 	}
+}
+
+func defaultDuration(value, fallback time.Duration) time.Duration {
+	if value == 0 {
+		return fallback
+	}
+
+	return value
 }
 
 func parseBodyLimit(limit string) int64 {
@@ -119,24 +146,41 @@ func parseBodyLimit(limit string) int64 {
 
 func (s *Server) Start(_ context.Context) error {
 	s.httpServer = &http.Server{ //nolint:exhaustruct
-		Addr:         s.address,
-		Handler:      s.Echo,
-		ReadTimeout:  s.readTimeout,
-		WriteTimeout: s.writeTimeout,
+		Addr:              s.address,
+		Handler:           s.Echo,
+		ReadHeaderTimeout: s.readHeaderTimeout,
+		ReadTimeout:       s.readTimeout,
+		WriteTimeout:      s.writeTimeout,
+		IdleTimeout:       s.idleTimeout,
 	}
+
+	listener, err := net.Listen("tcp", s.address)
+	if err != nil {
+		return fmt.Errorf("failed to bind HTTP server to %s: %w", s.address, err)
+	}
+
+	s.listener = listener
 
 	log.Info().
 		Str("source", "gframework").
-		Str("address", s.address).
+		Str("address", listener.Addr().String()).
 		Msg("The HTTP server is being started")
 
 	go func() {
-		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Str("source", "gframework").Err(err).Msg("HTTP server failed to start")
+		if err := s.httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Str("source", "gframework").Err(err).Msg("HTTP server terminated unexpectedly")
 		}
 	}()
 
 	return nil
+}
+
+func (s *Server) Address() string {
+	if s.listener != nil {
+		return s.listener.Addr().String()
+	}
+
+	return s.address
 }
 
 func (s *Server) Stop() error {

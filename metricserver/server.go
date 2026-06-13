@@ -38,23 +38,33 @@ import (
 const (
 	metricsPath = "/metrics"
 	statusPath  = "/status"
+
+	defaultReadHeaderTimeout = 10 * time.Second
+	defaultReadTimeout       = 30 * time.Second
+	defaultWriteTimeout      = 30 * time.Second
+	defaultIdleTimeout       = 120 * time.Second
+	defaultGracePeriod       = 15 * time.Second
 )
 
 type Config struct {
-	Host         string
-	Port         int
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	GracePeriod  time.Duration
+	Host              string
+	Port              int
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	GracePeriod       time.Duration
 }
 
 type Server struct {
-	gracePeriod  time.Duration
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-	address      string
-	echo         *echo.Echo
-	httpServer   *http.Server
+	gracePeriod       time.Duration
+	readHeaderTimeout time.Duration
+	readTimeout       time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
+	address           string
+	echo              *echo.Echo
+	httpServer        *http.Server
 }
 
 func New(cfg *Config) *Server {
@@ -69,20 +79,39 @@ func New(cfg *Config) *Server {
 	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 
 	return &Server{ //nolint:exhaustruct
-		gracePeriod:  cfg.GracePeriod,
-		readTimeout:  cfg.ReadTimeout,
-		writeTimeout: cfg.WriteTimeout,
-		address:      address,
-		echo:         ech,
+		gracePeriod:       defaultDuration(cfg.GracePeriod, defaultGracePeriod),
+		readHeaderTimeout: defaultDuration(cfg.ReadHeaderTimeout, defaultReadHeaderTimeout),
+		readTimeout:       defaultDuration(cfg.ReadTimeout, defaultReadTimeout),
+		writeTimeout:      defaultDuration(cfg.WriteTimeout, defaultWriteTimeout),
+		idleTimeout:       defaultDuration(cfg.IdleTimeout, defaultIdleTimeout),
+		address:           address,
+		echo:              ech,
 	}
 }
 
+func defaultDuration(value, fallback time.Duration) time.Duration {
+	if value == 0 {
+		return fallback
+	}
+
+	return value
+}
+
+// Start binds the listener synchronously so bind failures are returned to the
+// caller, then serves requests in a background goroutine.
 func (s *Server) Start(_ context.Context) error {
 	s.httpServer = &http.Server{ //nolint:exhaustruct
-		Addr:         s.address,
-		Handler:      s.echo,
-		ReadTimeout:  s.readTimeout,
-		WriteTimeout: s.writeTimeout,
+		Addr:              s.address,
+		Handler:           s.echo,
+		ReadHeaderTimeout: s.readHeaderTimeout,
+		ReadTimeout:       s.readTimeout,
+		WriteTimeout:      s.writeTimeout,
+		IdleTimeout:       s.idleTimeout,
+	}
+
+	listener, err := net.Listen("tcp", s.address)
+	if err != nil {
+		return fmt.Errorf("failed to bind metrics server to %s: %w", s.address, err)
 	}
 
 	log.Info().
@@ -91,8 +120,8 @@ func (s *Server) Start(_ context.Context) error {
 		Msg("The metrics server is being started")
 
 	go func() {
-		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error().Str("source", "gframework").Err(err).Msg("Metrics server failed to start")
+		if err := s.httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Str("source", "gframework").Err(err).Msg("Metrics server terminated unexpectedly")
 		}
 	}()
 

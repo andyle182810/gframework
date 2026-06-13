@@ -1,3 +1,4 @@
+// Package util provides small shared helpers: date parsing and date-range validation.
 package util
 
 import (
@@ -14,6 +15,8 @@ var (
 	ErrDateRangeExceeded = errors.New("date range exceeded")
 )
 
+// ParseSundayDate parses value in "2006-01-02" format and verifies it falls on
+// a Sunday, returning ErrNotSunday otherwise.
 func ParseSundayDate(value string) (time.Time, error) {
 	parsed, err := time.Parse(dateLayout, value)
 	if err != nil {
@@ -27,20 +30,25 @@ func ParseSundayDate(value string) (time.Time, error) {
 	return parsed, nil
 }
 
+// ValidateSunday reports whether value is a valid "2006-01-02" date falling on a Sunday.
 func ValidateSunday(value string) error {
 	_, err := ParseSundayDate(value)
 
 	return err
 }
 
+// MaxDateRangeDays is the default maximum span accepted by DateRange.Validate.
 const MaxDateRangeDays = 93
 
+// DateRange is an inclusive [From, To] interval. MaxDays bounds the span;
+// zero means MaxDateRangeDays.
 type DateRange struct {
 	From    time.Time
 	To      time.Time
 	MaxDays int
 }
 
+// Validate checks that From precedes To and the span does not exceed MaxDays.
 func (dr DateRange) Validate() error {
 	maxDays := dr.MaxDays
 	if maxDays == 0 {
@@ -50,6 +58,7 @@ func (dr DateRange) Validate() error {
 	return ValidateDateRange(dr.From, dr.To, maxDays)
 }
 
+// ValidateDateRange checks that from precedes to and the span does not exceed maxDays.
 func ValidateDateRange(from, to time.Time, maxDays int) error {
 	if to.Before(from) {
 		return fmt.Errorf("from=%s is after to=%s: %w", from.Format("2006-01-02"), to.Format("2006-01-02"), ErrFromAfterTo)

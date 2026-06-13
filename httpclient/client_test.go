@@ -635,3 +635,82 @@ func TestClient_BaseURLReturnsConfiguredURL(t *testing.T) {
 
 	require.Equal(t, "https://api.example.com", client.BaseURL())
 }
+
+func TestDo_TokenProviderSendsOnlyAuthorizationHeader(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth, gotInternal string
+
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, req *http.Request) {
+		gotAuth = req.Header.Get(httpclient.HeaderAuthorization)
+		gotInternal = req.Header.Get(httpclient.HeaderXInternalAuthorization)
+
+		responseWriter.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := httpclient.New(
+		server.URL,
+		httpclient.WithTokenProvider(&mockTokenProvider{token: "secret-token", err: nil}),
+	)
+
+	require.NoError(t, client.Get(t.Context(), "/resource", nil))
+
+	require.Equal(t, "Bearer secret-token", gotAuth)
+	require.Empty(t, gotInternal, "X-Internal-Authorization must not be sent unless explicitly enabled")
+}
+
+func TestDo_WithInternalAuthHeaderSendsBothHeaders(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth, gotInternal string
+
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, req *http.Request) {
+		gotAuth = req.Header.Get(httpclient.HeaderAuthorization)
+		gotInternal = req.Header.Get(httpclient.HeaderXInternalAuthorization)
+
+		responseWriter.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := httpclient.New(
+		server.URL,
+		httpclient.WithTokenProvider(&mockTokenProvider{token: "secret-token", err: nil}),
+		httpclient.WithInternalAuthHeader(),
+	)
+
+	require.NoError(t, client.Get(t.Context(), "/resource", nil))
+
+	require.Equal(t, "Bearer secret-token", gotAuth)
+	require.Equal(t, "Bearer secret-token", gotInternal)
+}
+
+func TestDo_ErrorResponseBodyIsBounded(t *testing.T) {
+	t.Parallel()
+
+	const limit = 64
+
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, _ *http.Request) {
+		responseWriter.WriteHeader(http.StatusBadGateway)
+
+		junk := make([]byte, 4096)
+		for idx := range junk {
+			junk[idx] = 'x'
+		}
+
+		_, _ = responseWriter.Write(junk)
+	}))
+	defer server.Close()
+
+	client := httpclient.New(server.URL, httpclient.WithMaxResponseSize(limit))
+
+	err := client.Get(t.Context(), "/failing", nil)
+
+	require.Error(t, err)
+
+	var svcErr *httpclient.ServiceError
+
+	require.ErrorAs(t, err, &svcErr)
+	require.LessOrEqual(t, len(svcErr.Message), limit,
+		"error body included in ServiceError must be bounded by MaxResponseSize")
+}

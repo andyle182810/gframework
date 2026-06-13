@@ -8,15 +8,17 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const (
 	grantTypeUMATicket   = "urn:ietf:params:oauth:grant-type:uma-ticket"
 	responseModeDecision = "decision"
-
-	headerContentType = "Content-Type"
-	headerAuth        = "Authorization"
-	contentTypeForm   = "application/x-www-form-urlencoded"
+	headerContentType    = "Content-Type"
+	headerAuth           = "Authorization"
+	contentTypeForm      = "application/x-www-form-urlencoded"
+	defaultUMATimeout    = 10 * time.Second
+	maxErrorBodyBytes    = 2 << 10
 )
 
 var (
@@ -38,7 +40,7 @@ func NewUMAClient(
 	c := &UMAClient{
 		tokenEndpoint: tokenEndpoint,
 		audience:      audience,
-		httpClient:    http.DefaultClient,
+		httpClient:    &http.Client{Timeout: defaultUMATimeout}, //nolint:exhaustruct
 	}
 
 	for _, opt := range opts {
@@ -91,7 +93,7 @@ func (c *UMAClient) Check(ctx context.Context, userToken, resource, scope string
 }
 
 func unexpectedStatus(resp *http.Response) error {
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
 	if err != nil {
 		return fmt.Errorf("%w: status=%d body_read_error=%w",
 			ErrUMAResponseInvalid, resp.StatusCode, err)

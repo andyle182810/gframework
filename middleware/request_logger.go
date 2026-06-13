@@ -2,11 +2,23 @@ package middleware
 
 import (
 	"maps"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
+
+// sensitiveQueryParams are query parameter names whose values are redacted in
+// request logs so credentials passed via query string never reach log storage.
+//
+//nolint:gochecknoglobals
+var sensitiveQueryParams = []string{
+	"token", "access_token", "id_token", "refresh_token",
+	"code", "secret", "password", "api_key", "apikey", "key",
+	"signature", "authorization",
+}
 
 type LogFieldExtractor func(*echo.Context) map[string]any
 
@@ -44,17 +56,54 @@ func RequestLogger(log zerolog.Logger, extraLogFieldExtractor ...LogFieldExtract
 
 func extractLogFields(ctx *echo.Context, start time.Time, res *echo.Response) map[string]any {
 	req := ctx.Request()
+	loggedURL := redactQueryParams(req.URL)
 
 	return map[string]any{
 		"remote_ip":   ctx.RealIP(),
 		"latency":     time.Since(start).String(),
 		"host":        req.Host,
-		"request":     req.Method + " " + req.URL.String(),
-		"request_uri": req.RequestURI,
+		"request":     req.Method + " " + loggedURL,
+		"request_uri": loggedURL,
 		"status":      res.Status,
 		"size":        res.Size,
 		"user_agent":  req.UserAgent(),
 	}
+}
+
+func redactQueryParams(requestURL *url.URL) string {
+	if requestURL.RawQuery == "" {
+		return requestURL.String()
+	}
+
+	query := requestURL.Query()
+	redacted := false
+
+	for name := range query {
+		if slicesContainsFold(sensitiveQueryParams, name) {
+			query.Set(name, "REDACTED")
+
+			redacted = true
+		}
+	}
+
+	if !redacted {
+		return requestURL.String()
+	}
+
+	clone := *requestURL
+	clone.RawQuery = query.Encode()
+
+	return clone.String()
+}
+
+func slicesContainsFold(haystack []string, needle string) bool {
+	for _, candidate := range haystack {
+		if strings.EqualFold(candidate, needle) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func addExtraLogFields(fields map[string]any, ctx *echo.Context, extractors []LogFieldExtractor) {

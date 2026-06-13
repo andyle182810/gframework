@@ -21,6 +21,11 @@
 //
 // All methods (Get, Post, Put, Patch, Delete) accept a context, path, optional request body, and response pointer.
 // Request IDs are automatically propagated from the context if set via middleware.ContextKeyRequestID.
+//
+// When a token provider is configured, the token is sent only in the Authorization header.
+// For service-to-service calls protected by middleware.InternalAuth, add the
+// WithInternalAuthHeader option to also send X-Internal-Authorization — never enable it on
+// clients that talk to external APIs.
 package httpclient
 
 import (
@@ -48,13 +53,14 @@ type TokenProvider interface {
 var _ Doer = (*http.Client)(nil)
 
 type Client struct {
-	baseURL         string
-	httpClient      Doer
-	requestIDKey    any
-	defaultHeaders  map[string]string
-	authConfig      *AuthConfig
-	tokenProvider   TokenProvider
-	maxResponseSize int64 // 0 means no limit
+	baseURL                string
+	httpClient             Doer
+	requestIDKey           any
+	defaultHeaders         map[string]string
+	authConfig             *AuthConfig
+	tokenProvider          TokenProvider
+	maxResponseSize        int64 // 0 means no limit
+	sendInternalAuthHeader bool
 }
 
 func New(baseURL string, opts ...Option) *Client {
@@ -67,9 +73,10 @@ func New(baseURL string, opts ...Option) *Client {
 		defaultHeaders: map[string]string{
 			HeaderContentType: ContentTypeJSON,
 		},
-		authConfig:      nil,
-		tokenProvider:   nil,
-		maxResponseSize: 0,
+		authConfig:             nil,
+		tokenProvider:          nil,
+		maxResponseSize:        0,
+		sendInternalAuthHeader: false,
 	}
 
 	for _, opt := range opts {
@@ -163,7 +170,10 @@ func (c *Client) do(
 		}
 
 		cfg.headers[HeaderAuthorization] = "Bearer " + token
-		cfg.headers[HeaderXInternalAuthorization] = "Bearer " + token
+
+		if c.sendInternalAuthHeader {
+			cfg.headers[HeaderXInternalAuthorization] = "Bearer " + token
+		}
 	}
 
 	req, err := c.buildRequest(reqCtx, method, path, body, cfg)
@@ -284,8 +294,19 @@ func (c *Client) handleResponse(resp *http.Response, response any, requestID str
 	return nil
 }
 
+// defaultErrorBodyLimit bounds how much of an error response body is read when
+// no MaxResponseSize is configured, so a misbehaving upstream cannot exhaust memory.
+const defaultErrorBodyLimit = 1 * megabyte
+
+const megabyte = 1 << 20
+
 func (c *Client) handleErrorResponse(resp *http.Response, requestID string) error {
-	bodyBytes, err := io.ReadAll(resp.Body)
+	limit := c.maxResponseSize
+	if limit <= 0 {
+		limit = defaultErrorBodyLimit
+	}
+
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, limit))
 	if err != nil {
 		return NewServiceError(resp.StatusCode, "", "", requestID)
 	}

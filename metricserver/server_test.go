@@ -15,11 +15,13 @@ func startServer(t *testing.T) *metricserver.Server {
 	t.Helper()
 
 	opts := &metricserver.Config{
-		Host:         "127.0.0.1",
-		Port:         9090,
-		ReadTimeout:  2 * time.Second,
-		WriteTimeout: 2 * time.Second,
-		GracePeriod:  2 * time.Second,
+		Host:              "127.0.0.1",
+		Port:              9090,
+		ReadHeaderTimeout: 2 * time.Second,
+		ReadTimeout:       2 * time.Second,
+		WriteTimeout:      2 * time.Second,
+		IdleTimeout:       2 * time.Second,
+		GracePeriod:       2 * time.Second,
 	}
 
 	server := metricserver.New(opts)

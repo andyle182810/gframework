@@ -15,6 +15,9 @@
 //	)
 //	r.Run() // Blocks until SIGINT/SIGTERM; calls os.Exit(1) on error
 //
+// Use RunContext instead of Run to supply your own context and receive an
+// error instead of exiting the process (e.g. for custom signal handling).
+//
 // Each service must implement the Service interface (Start, Stop, Name).
 // Startup failures in any tier abort the application immediately.
 package runner
@@ -32,7 +35,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const defaultShutdownTimeout = 30 * time.Second
+const (
+	defaultShutdownTimeout    = 30 * time.Second
+	defaultStartupGracePeriod = 5 * time.Second
+)
 
 var (
 	ErrServicePanic   = errors.New("runner: service panicked")
@@ -50,6 +56,7 @@ type Runner struct {
 	coreServices           []Service
 	infrastructureServices []Service
 	shutdownTimeout        time.Duration
+	startupGracePeriod     time.Duration
 }
 
 type Option func(*Runner)
@@ -59,6 +66,7 @@ func New(opts ...Option) *Runner {
 		coreServices:           make([]Service, 0),
 		infrastructureServices: make([]Service, 0),
 		shutdownTimeout:        defaultShutdownTimeout,
+		startupGracePeriod:     defaultStartupGracePeriod,
 	}
 
 	for _, opt := range opts {
@@ -96,25 +104,52 @@ func WithShutdownTimeout(d time.Duration) Option {
 	}
 }
 
+func WithStartupGracePeriod(d time.Duration) Option {
+	return func(r *Runner) {
+		r.startupGracePeriod = d
+	}
+}
+
 func (r *Runner) Run() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if err := r.RunContext(ctx); err != nil {
+		os.Exit(1)
+	}
+
+	log.Info().Str("source", "gframework").Msg("Graceful shutdown completed")
+}
+
+// RunContext starts all registered services and blocks until ctx is cancelled
+// or any service fails. Either event triggers a graceful shutdown (core
+// services first, then infrastructure). It returns nil on a clean
+// cancellation-triggered shutdown and the service failure otherwise.
+//
+// Most applications should use Run, which wires SIGINT/SIGTERM handling and
+// exits the process on failure. RunContext is for callers that manage their
+// own signals or exit codes, and for tests.
+func (r *Runner) RunContext(ctx context.Context) error {
+	infraErrCh := make(chan error, len(r.infrastructureServices))
+	coreErrCh := make(chan error, len(r.coreServices))
+
 	log.Info().Str("source", "gframework").Msg("Starting infrastructure services")
 
-	if err := r.startServices(ctx, r.infrastructureServices); err != nil {
+	if err := r.startServices(ctx, r.infrastructureServices, infraErrCh); err != nil {
 		log.Error().Str("source", "gframework").Err(err).Msg("Infrastructure services failed to start")
 		r.shutdownWithTimeout(r.infrastructureServices)
-		os.Exit(1)
+
+		return err
 	}
 
 	log.Info().Str("source", "gframework").Msg("Starting core services")
 
-	if err := r.startServices(ctx, r.coreServices); err != nil {
+	if err := r.startServices(ctx, r.coreServices, coreErrCh); err != nil {
 		log.Error().Str("source", "gframework").Err(err).Msg("Core services failed to start")
 		r.shutdownWithTimeout(r.coreServices)
 		r.shutdownWithTimeout(r.infrastructureServices)
-		os.Exit(1)
+
+		return err
 	}
 
 	log.Info().
@@ -124,21 +159,27 @@ func (r *Runner) Run() {
 		Int("infra_services", len(r.infrastructureServices)).
 		Msg("All services started, waiting for shutdown signal")
 
-	<-ctx.Done()
-	log.Warn().Str("source", "gframework").Msg("Shutdown signal received")
+	var runErr error
+
+	select {
+	case <-ctx.Done():
+		log.Warn().Str("source", "gframework").Msg("Shutdown signal received")
+	case runErr = <-infraErrCh:
+		log.Error().Str("source", "gframework").Err(runErr).Msg("Infrastructure service failed, shutting down")
+	case runErr = <-coreErrCh:
+		log.Error().Str("source", "gframework").Err(runErr).Msg("Core service failed, shutting down")
+	}
 
 	r.shutdownWithTimeout(r.coreServices)
 	r.shutdownWithTimeout(r.infrastructureServices)
 
-	log.Info().Str("source", "gframework").Msg("Graceful shutdown completed")
+	return runErr
 }
 
-func (r *Runner) startServices(ctx context.Context, services []Service) error {
+func (r *Runner) startServices(ctx context.Context, services []Service, errCh chan error) error {
 	if len(services) == 0 {
 		return nil
 	}
-
-	errCh := make(chan error, len(services))
 
 	for _, svc := range services {
 		go func(service Service) {
@@ -156,14 +197,12 @@ func (r *Runner) startServices(ctx context.Context, services []Service) error {
 		}(svc)
 	}
 
-	// Check for immediate startup failures.
-	// Note: This only catches services that fail synchronously.
 	select {
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
-	default:
+	case <-time.After(r.startupGracePeriod):
 		return nil
 	}
 }

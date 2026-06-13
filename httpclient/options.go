@@ -79,6 +79,12 @@ func WithTokenProvider(provider TokenProvider) Option {
 	}
 }
 
+func WithInternalAuthHeader() Option {
+	return func(c *Client) {
+		c.sendInternalAuthHeader = true
+	}
+}
+
 func WithMaxResponseSize(size int64) Option {
 	return func(c *Client) {
 		c.maxResponseSize = size

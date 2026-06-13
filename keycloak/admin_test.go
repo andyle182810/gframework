@@ -353,8 +353,9 @@ func TestClient_Token_SafetyBufferTriggersRefresh(t *testing.T) {
 	t.Parallel()
 
 	stub := newStub()
-	// Very short-lived token; the safety buffer consumes the entire lifetime,
-	// so every call should trigger a refresh.
+	// Very short-lived token; the safety buffer exceeds the lifetime, so the
+	// token is cached for half its lifetime (500ms) instead of refetching on
+	// every call.
 	stub.expiresIn = 1
 
 	server := stub.newServer(t)
@@ -372,8 +373,16 @@ func TestClient_Token_SafetyBufferTriggersRefresh(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, int32(3), stub.tokenCalls.Load(),
-		"safety buffer > expires_in should force refresh on every call")
+	assert.Equal(t, int32(1), stub.tokenCalls.Load(),
+		"safety buffer > expires_in caches for half the token lifetime instead of refetching every call")
+
+	// After the half-lifetime window passes, the next call refreshes.
+	time.Sleep(600 * time.Millisecond)
+
+	_, err := client.GetUser(ctx, "user-abc-123")
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), stub.tokenCalls.Load(),
+		"token must be refreshed once the half-lifetime cache window has passed")
 }
 
 func TestClient_AddRole_ReturnsErrRoleNotFound(t *testing.T) {

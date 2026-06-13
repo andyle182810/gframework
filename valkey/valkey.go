@@ -208,6 +208,13 @@ func buildValkeyOptions(cfg *Config) (*redis.Options, error) {
 
 //nolint:gosec,exhaustruct
 func buildTLSConfig(cfg *Config) (*tls.Config, error) {
+	if cfg.TLSSkipVerify {
+		log.Warn().
+			Str("source", "gframework").
+			Msg("Valkey TLS certificate verification is DISABLED (TLSSkipVerify=true); " +
+				"connections are vulnerable to MITM — never use this in production")
+	}
+
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: cfg.TLSSkipVerify,
 		MinVersion:         tls.VersionTLS12,

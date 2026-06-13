@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        # ubuntu-latest provides Docker, required by the testcontainers-based
+        # integration tests (postgres, valkey).
+        run: go test -count=1 ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          # The repo's .golangci.yaml uses the v1 config format.
+          version: v1.64
+
+  vulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install and run govulncheck
+        # testutil is excluded: its testcontainers dependency pulls in
+        # github.com/docker/docker, which has known advisories without a fixed
+        # release. testutil is only ever used from tests. Re-include it once a
+        # fixed docker/docker version ships.
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck $(go list ./... | grep -v '/testutil')
+
+  examples:
+    name: Build examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build every example module
+        run: |
+          for dir in examples/*/; do
+            echo "::group::$dir"
+            (cd "$dir" && go build ./...)
+            echo "::endgroup::"
+          done

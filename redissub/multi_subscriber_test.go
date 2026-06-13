@@ -220,7 +220,7 @@ func TestMultiSubscriberStart(t *testing.T) {
 	require.NoError(t, err)
 
 	started := make(chan struct{})
-	stopped := make(chan error)
+	stopped := make(chan error, 1)
 
 	go func() {
 		close(started)
@@ -232,10 +232,11 @@ func TestMultiSubscriberStart(t *testing.T) {
 
 	require.True(t, multiSub.IsHealthy(), "multi subscriber should be healthy after start")
 
-	err = <-stopped
+	// Stop triggers the graceful-shutdown path, which makes Start return nil.
+	err = multiSub.Stop()
 	require.NoError(t, err)
 
-	err = multiSub.Stop()
+	err = <-stopped
 	require.NoError(t, err)
 
 	require.False(t, multiSub.IsHealthy(), "multi subscriber should not be healthy after stop")
@@ -516,6 +517,9 @@ func TestMultiSubscriberStartAlreadyRunning(t *testing.T) {
 		redissub.ErrMultiSubscriberAlreadyRunning,
 		"second Start call should return ErrMultiSubscriberAlreadyRunning",
 	)
+
+	// Stop the first Start so the goroutine can deliver its result.
+	require.NoError(t, multiSub.Stop())
 
 	<-stopped
 }

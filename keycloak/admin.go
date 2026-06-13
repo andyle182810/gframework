@@ -36,6 +36,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
@@ -45,8 +46,9 @@ import (
 const defaultTokenSafetyBuffer = 60 * time.Second
 
 var (
-	ErrRoleNotFound = errors.New("keycloak: realm role not found")
-	ErrInvalidInput = errors.New("keycloak: invalid input")
+	ErrRoleNotFound   = errors.New("keycloak: realm role not found")
+	ErrInvalidInput   = errors.New("keycloak: invalid input")
+	ErrPasswordNotSet = errors.New("keycloak: user created but password could not be set")
 )
 
 type AdminClient struct {
@@ -131,7 +133,7 @@ func (c *AdminClient) CreateUser(ctx context.Context, params CreateUserParams) (
 
 	if params.Password != "" {
 		if err := c.gocloak.SetPassword(ctx, token, id, c.realm, params.Password, false); err != nil {
-			return id, err
+			return id, fmt.Errorf("%w: user %s created but password not set: %w", ErrPasswordNotSet, id, err)
 		}
 	}
 
@@ -276,6 +278,11 @@ func (c *AdminClient) applyRole(
 
 	role, err := c.gocloak.GetRealmRole(ctx, token, c.realm, name)
 	if err != nil {
+		var apiErr *gocloak.APIError
+		if errors.As(err, &apiErr) && apiErr.Code == http.StatusNotFound {
+			return fmt.Errorf("%w: %s", ErrRoleNotFound, name)
+		}
+
 		return err
 	}
 

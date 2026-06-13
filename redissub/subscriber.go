@@ -439,28 +439,58 @@ func (s *Subscriber) waitForRetry(ctx context.Context) error {
 	}
 }
 
+// handleFailedMessage routes a message whose retries are exhausted. With a DLQ
+// configured, the message is acknowledged only after it has been safely stored
+// in the DLQ; if the DLQ write fails, the message is nacked so the consumer
+// group redelivers it instead of silently losing it. Without a DLQ the message
+// is acknowledged and dropped by design to prevent an infinite redelivery loop —
+// configure a DLQ when message loss is unacceptable.
 func (s *Subscriber) handleFailedMessage(ctx context.Context, msg *message.Message, processingErr error) {
-	if s.config.Retry != nil && s.config.Retry.DLQTopic != "" {
+	dlqConfigured := s.config.Retry != nil && s.config.Retry.DLQTopic != ""
+
+	if dlqConfigured {
 		if dlqErr := s.sendToDLQ(ctx, msg, processingErr); dlqErr != nil {
 			log.Error().
 				Str("source", "gframework").
 				Err(dlqErr).
 				Str("message_id", msg.UUID).
-				Msg("Failed to send message to DLQ")
-		} else if s.config.Metrics != nil {
+				Msg("Failed to send message to DLQ, leaving message unacknowledged for redelivery")
+
+			if !msg.Nack() {
+				log.Warn().
+					Str("source", "gframework").
+					Str("message_id", msg.UUID).
+					Msg("Failed message was already acknowledged, cannot nack")
+			}
+
+			s.notifyNacked()
+
+			return
+		}
+
+		if s.config.Metrics != nil {
 			s.config.Metrics.MessageSentToDLQ(s.Topic())
 		}
+
+		s.ackFailedMessage(msg)
+
+		return
 	}
 
-	// Acknowledge the message to prevent infinite redelivery loop.
-	// The message has either been sent to DLQ or logged as failed after exhausting retries.
+	s.ackFailedMessage(msg)
+	s.notifyNacked()
+}
+
+func (s *Subscriber) ackFailedMessage(msg *message.Message) {
 	if !msg.Ack() {
 		log.Warn().
 			Str("source", "gframework").
 			Str("message_id", msg.UUID).
 			Msg("Failed message was already acknowledged")
 	}
+}
 
+func (s *Subscriber) notifyNacked() {
 	if s.config.Metrics != nil {
 		s.config.Metrics.MessageNacked(s.Topic())
 	}

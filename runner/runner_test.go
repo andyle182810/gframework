@@ -22,6 +22,7 @@ type mockService struct {
 	startDelay   time.Duration
 	stopDelay    time.Duration
 	panicOnStart bool
+	block        bool
 	started      atomic.Bool
 	stopped      atomic.Bool
 }
@@ -34,6 +35,7 @@ func newMockService(name string) *mockService {
 		startDelay:   0,
 		stopDelay:    0,
 		panicOnStart: false,
+		block:        false,
 		started:      atomic.Bool{},
 		stopped:      atomic.Bool{},
 	}
@@ -57,6 +59,12 @@ func (m *mockService) Start(ctx context.Context) error {
 	}
 
 	m.started.Store(true)
+
+	if m.block {
+		<-ctx.Done()
+
+		return ctx.Err()
+	}
 
 	return nil
 }
@@ -348,6 +356,120 @@ func TestMockService_SuccessfulStartAndStop(t *testing.T) {
 	if !svc.wasStopped() {
 		t.Error("service should be marked as stopped")
 	}
+}
+
+func TestRunContext_CleanShutdownOnContextCancel(t *testing.T) {
+	t.Parallel()
+
+	svc := newMockService("core")
+	svc.block = true
+
+	r := runner.New(runner.WithCoreService(svc))
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	done := make(chan error, 1)
+
+	go func() { done <- r.RunContext(ctx) }()
+
+	time.Sleep(6 * time.Second) // default startup grace period is 5s, so this ensures the service has started
+	cancel()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(6 * time.Second):
+		t.Fatal("runner did not shut down after context cancellation")
+	}
+
+	require.True(t, svc.wasStopped())
+}
+
+func TestRunContext_SynchronousStartupFailureAborts(t *testing.T) {
+	t.Parallel()
+
+	infra := newMockService("db")
+	infra.startErr = errStart
+
+	r := runner.New(runner.WithInfrastructureService(infra))
+
+	err := r.RunContext(t.Context())
+
+	require.ErrorIs(t, err, runner.ErrServiceFailed)
+	require.ErrorIs(t, err, errStart)
+}
+
+func TestRunContext_AsyncServiceFailureTriggersShutdown(t *testing.T) {
+	t.Parallel()
+
+	// The failing service errors well after the startup grace period, which a
+	// runner that stops watching after startup would never notice.
+	failing := newMockService("http")
+	failing.startErr = errStart
+	failing.startDelay = time.Second
+
+	healthy := newMockService("db")
+	healthy.block = true
+
+	r := runner.New(
+		runner.WithInfrastructureService(healthy),
+		runner.WithCoreService(failing),
+	)
+
+	done := make(chan error, 1)
+
+	go func() { done <- r.RunContext(t.Context()) }()
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, runner.ErrServiceFailed)
+		require.ErrorIs(t, err, errStart)
+	case <-time.After(10 * time.Second):
+		t.Fatal("runner did not detect the asynchronous service failure")
+	}
+
+	require.True(t, healthy.wasStopped())
+	require.True(t, failing.wasStopped())
+}
+
+func TestRunContext_ServicePanicIsCaught(t *testing.T) {
+	t.Parallel()
+
+	svc := newMockService("panicky")
+	svc.panicOnStart = true
+
+	r := runner.New(runner.WithCoreService(svc))
+
+	err := r.RunContext(t.Context())
+
+	require.ErrorIs(t, err, runner.ErrServicePanic)
+}
+
+func TestRunContext_NoServicesShutsDownOnCancel(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	require.NoError(t, runner.New().RunContext(ctx))
+}
+
+func TestWithStartupGracePeriod_CatchesSlowFailure(t *testing.T) {
+	t.Parallel()
+
+	// A service failing inside an extended grace period is caught during startup.
+	failing := newMockService("slow-fail")
+	failing.startErr = errStart
+	failing.startDelay = 600 * time.Millisecond
+
+	r := runner.New(
+		runner.WithCoreService(failing),
+		runner.WithStartupGracePeriod(2*time.Second),
+	)
+
+	err := r.RunContext(t.Context())
+
+	require.ErrorIs(t, err, runner.ErrServiceFailed)
 }
 
 func TestMockService_ConcurrentStopIsSafe(t *testing.T) {

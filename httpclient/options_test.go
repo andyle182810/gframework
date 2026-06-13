@@ -62,8 +62,8 @@ func TestWithAuth_ForwardsExpiryBufferToTokenProvider(t *testing.T) {
 	require.NoError(t, client.Get(t.Context(), "/test", nil))
 	require.NoError(t, client.Get(t.Context(), "/test", nil))
 
-	require.Equal(t, int32(2), tokenCalls.Load(),
-		"ExpiryBuffer larger than token lifetime should force a refresh on every call")
+	require.Equal(t, int32(1), tokenCalls.Load(),
+		"ExpiryBuffer larger than token lifetime falls back to caching for half the lifetime instead of refetching on every call")
 }
 
 func TestWithAuth_DefaultBufferCachesToken(t *testing.T) {

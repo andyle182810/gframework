@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -18,6 +19,22 @@ var (
 	ErrJWKSFetchFailed = echo.NewHTTPError(http.StatusInternalServerError, "Failed to fetch JWKS")
 	ErrInvalidToken    = echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 )
+
+// DefaultJWTLeeway is the clock-skew tolerance applied to time-based claims (exp, nbf, iat).
+const DefaultJWTLeeway = 30 * time.Second
+
+// DefaultValidMethods returns the JWT signing algorithms accepted by default.
+// Only asymmetric algorithms are included: accepting HS* alongside a JWKS keyfunc
+// would open the door to algorithm-confusion attacks where a public key is used
+// as an HMAC secret.
+func DefaultValidMethods() []string {
+	return []string{
+		"RS256", "RS384", "RS512",
+		"ES256", "ES384", "ES512",
+		"PS256", "PS384", "PS512",
+		"EdDSA",
+	}
+}
 
 type RoleAccess struct {
 	Roles []string `json:"roles"`
@@ -86,6 +103,25 @@ type JWTConfig struct {
 	NewClaimsFunc func(*echo.Context) jwt.Claims
 	ContextKey    string
 	TokenLookup   string
+
+	// ValidMethods lists the accepted JWT signing algorithms. Empty means
+	// DefaultValidMethods(). Never include HS* methods when keys come from a JWKS.
+	ValidMethods []string
+
+	// Issuer, when non-empty, requires the token "iss" claim to match exactly.
+	// Set this to the realm issuer URL (e.g. https://auth.example.com/realms/my-realm)
+	// so tokens minted by other issuers are rejected.
+	Issuer string
+
+	// Audiences, when non-empty, requires the token "aud" claim to contain at
+	// least one of the listed values. Set this to reject tokens issued for
+	// other services in the same realm.
+	Audiences []string
+
+	// Leeway is the clock-skew tolerance for time-based claims.
+	// Zero means DefaultJWTLeeway; set a negative-free small value (e.g. time.Nanosecond)
+	// to effectively disable leeway.
+	Leeway time.Duration
 }
 
 func DefaultJWTConfig() JWTConfig {
@@ -96,6 +132,10 @@ func DefaultJWTConfig() JWTConfig {
 		NewClaimsFunc: defaultNewClaimsFunc,
 		ContextKey:    "user",
 		TokenLookup:   "",
+		ValidMethods:  DefaultValidMethods(),
+		Issuer:        "",
+		Audiences:     nil,
+		Leeway:        DefaultJWTLeeway,
 	}
 }
 
@@ -123,16 +163,23 @@ func JWTWithConfig(config JWTConfig) echo.MiddlewareFunc {
 		config.ContextKey = "user"
 	}
 
-	jwtConfig := buildJWTConfig(config)
+	if len(config.ValidMethods) == 0 {
+		config.ValidMethods = DefaultValidMethods()
+	}
+
+	if config.Leeway == 0 {
+		config.Leeway = DefaultJWTLeeway
+	}
+
+	jwtMiddleware := echojwt.WithConfig(buildJWTConfig(config))
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		handler := jwtMiddleware(next)
+
 		return func(ctx *echo.Context) error {
 			if config.Skipper(ctx) {
 				return next(ctx)
 			}
-
-			jwtMiddleware := echojwt.WithConfig(jwtConfig)
-			handler := jwtMiddleware(next)
 
 			return handler(ctx)
 		}
@@ -141,28 +188,64 @@ func JWTWithConfig(config JWTConfig) echo.MiddlewareFunc {
 
 func buildJWTConfig(config JWTConfig) echojwt.Config {
 	return echojwt.Config{
-		Skipper:          nil,
-		BeforeFunc:       nil,
-		ContextKey:       config.ContextKey,
-		SigningKey:       nil,
-		SigningKeys:      nil,
-		SigningMethod:    "",
-		TokenLookup:      config.TokenLookup,
-		TokenLookupFuncs: nil,
-		ParseTokenFunc:   nil,
-		KeyFunc: func(token *jwt.Token) (any, error) {
-			return config.Keyfunc.Keyfunc(token)
-		},
+		Skipper:                nil,
+		BeforeFunc:             nil,
+		ContextKey:             config.ContextKey,
+		SigningKey:             nil,
+		SigningKeys:            nil,
+		SigningMethod:          "",
+		TokenLookup:            config.TokenLookup,
+		TokenLookupFuncs:       nil,
+		ParseTokenFunc:         createParseTokenFunc(config),
+		KeyFunc:                nil,
 		NewClaimsFunc:          config.NewClaimsFunc,
-		SuccessHandler:         createSuccessHandler(config.Logger),
+		SuccessHandler:         createSuccessHandler(config.Logger, config.ContextKey),
 		ErrorHandler:           createErrorHandler(config.Logger),
 		ContinueOnIgnoredError: false,
 	}
 }
 
-func createSuccessHandler(logger *zerolog.Logger) func(*echo.Context) error {
+// createParseTokenFunc builds the token parser used in place of echo-jwt's default.
+// echo-jwt skips its own algorithm check when a custom key function is supplied,
+// so algorithm pinning, issuer, audience, and leeway validation happen here.
+func createParseTokenFunc(config JWTConfig) func(*echo.Context, string) (any, error) {
+	parserOpts := buildParserOptions(config.ValidMethods, config.Issuer, config.Audiences, config.Leeway)
+
+	return func(ctx *echo.Context, auth string) (any, error) {
+		token, err := jwt.ParseWithClaims(auth, config.NewClaimsFunc(ctx), config.Keyfunc.Keyfunc, parserOpts...)
+		if err != nil {
+			return nil, err
+		}
+
+		if !token.Valid {
+			return nil, jwt.ErrTokenUnverifiable
+		}
+
+		return token, nil
+	}
+}
+
+func buildParserOptions(validMethods []string, issuer string, audiences []string, leeway time.Duration) []jwt.ParserOption {
+	opts := []jwt.ParserOption{
+		jwt.WithValidMethods(validMethods),
+		jwt.WithExpirationRequired(),
+		jwt.WithLeeway(leeway),
+	}
+
+	if issuer != "" {
+		opts = append(opts, jwt.WithIssuer(issuer))
+	}
+
+	if len(audiences) > 0 {
+		opts = append(opts, jwt.WithAudience(audiences...))
+	}
+
+	return opts
+}
+
+func createSuccessHandler(logger *zerolog.Logger, contextKey string) func(*echo.Context) error {
 	return func(echoCtx *echo.Context) error {
-		token, ok := echoCtx.Get("user").(*jwt.Token)
+		token, ok := echoCtx.Get(contextKey).(*jwt.Token)
 		if !ok {
 			jwtLogError(logger, "JWT token retrieval from context failed", nil)
 

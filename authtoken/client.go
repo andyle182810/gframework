@@ -92,8 +92,16 @@ func (c *Client) getToken(ctx context.Context) (string, error) {
 
 	expiresIn := time.Duration(jwt.ExpiresIn) * time.Second
 
+	// When the token lifetime does not exceed the expiry buffer, subtracting the
+	// buffer would produce an already-expired cache entry and every request would
+	// hit Keycloak. Cache for half the lifetime instead.
+	cacheFor := expiresIn - c.expiryBuffer
+	if cacheFor <= 0 {
+		cacheFor = expiresIn / 2 //nolint:mnd
+	}
+
 	c.accessToken = jwt.AccessToken
-	c.expiresAt = time.Now().Add(expiresIn - c.expiryBuffer)
+	c.expiresAt = time.Now().Add(cacheFor)
 
 	return c.accessToken, nil
 }

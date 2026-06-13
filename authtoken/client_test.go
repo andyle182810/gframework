@@ -164,6 +164,10 @@ func TestClient_RefreshesExpiredToken(t *testing.T) {
 	_, err := client.GetToken(t.Context())
 	require.NoError(t, err)
 
+	// With a 1s lifetime and a buffer exceeding it, the token is cached for half
+	// its lifetime (500ms). Wait past that so the next call must refresh.
+	time.Sleep(600 * time.Millisecond)
+
 	_, err = client.GetToken(t.Context())
 	require.NoError(t, err)
 
@@ -306,6 +310,9 @@ func TestClient_ReturnsUpdatedTokenAfterExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	stub.token = firstToken + "-refreshed"
+
+	// Wait past the half-lifetime cache window (500ms for a 1s token).
+	time.Sleep(600 * time.Millisecond)
 
 	secondToken, err := client.GetToken(t.Context())
 	require.NoError(t, err)

@@ -226,6 +226,10 @@ func TestJWTWithConfig_Skipper(t *testing.T) {
 		NewClaimsFunc: nil,
 		ContextKey:    "",
 		TokenLookup:   "",
+		ValidMethods:  nil,
+		Issuer:        "",
+		Audiences:     nil,
+		Leeway:        0,
 	}
 
 	mw := middleware.JWTWithConfig(config)
@@ -271,6 +275,10 @@ func TestJWTWithConfig_CustomLogger(t *testing.T) {
 		NewClaimsFunc: nil,
 		ContextKey:    "",
 		TokenLookup:   "",
+		ValidMethods:  nil,
+		Issuer:        "",
+		Audiences:     nil,
+		Leeway:        0,
 	}
 
 	mw := middleware.JWTWithConfig(config)
@@ -314,6 +322,10 @@ func TestJWTWithConfig_CustomContextKey(t *testing.T) {
 		NewClaimsFunc: nil,
 		ContextKey:    "jwt-token",
 		TokenLookup:   "",
+		ValidMethods:  nil,
+		Issuer:        "",
+		Audiences:     nil,
+		Leeway:        0,
 	}
 
 	mw := middleware.JWTWithConfig(config)
@@ -340,6 +352,11 @@ func TestDefaultJWTConfig(t *testing.T) {
 	require.NotNil(t, config.NewClaimsFunc)
 	require.Equal(t, "user", config.ContextKey)
 	require.Empty(t, config.TokenLookup)
+	require.Equal(t, middleware.DefaultValidMethods(), config.ValidMethods)
+	require.Empty(t, config.Issuer)
+	require.Nil(t, config.Audiences)
+	require.Equal(t, middleware.DefaultJWTLeeway, config.Leeway)
+	require.NotContains(t, config.ValidMethods, "HS256")
 
 	claims := config.NewClaimsFunc(nil)
 	_, ok := claims.(*middleware.ExtendedClaims)
@@ -390,6 +407,10 @@ func TestJWTWithConfig_NilDefaults(t *testing.T) {
 		NewClaimsFunc: nil,
 		ContextKey:    "",
 		TokenLookup:   "",
+		ValidMethods:  nil,
+		Issuer:        "",
+		Audiences:     nil,
+		Leeway:        0,
 	}
 
 	mw := middleware.JWTWithConfig(config)
@@ -424,6 +445,10 @@ func TestJWTWithConfig_DefaultSkipper(t *testing.T) {
 		NewClaimsFunc: nil,
 		ContextKey:    "",
 		TokenLookup:   "",
+		ValidMethods:  nil,
+		Issuer:        "",
+		Audiences:     nil,
+		Leeway:        0,
 	}
 
 	mw := middleware.JWTWithConfig(config)
@@ -435,4 +460,195 @@ func TestJWTWithConfig_DefaultSkipper(t *testing.T) {
 
 	require.ErrorAs(t, err, &httpErr)
 	require.Equal(t, http.StatusUnauthorized, httpErr.Code)
+}
+
+func securityTestConfig(mock *mockKeyfunc, issuer string, audiences []string) middleware.JWTConfig {
+	return middleware.JWTConfig{
+		Skipper:       nil,
+		Logger:        nil,
+		Keyfunc:       mock,
+		NewClaimsFunc: nil,
+		ContextKey:    "",
+		TokenLookup:   "",
+		ValidMethods:  nil,
+		Issuer:        issuer,
+		Audiences:     audiences,
+		Leeway:        0,
+	}
+}
+
+func requireUnauthorized(t *testing.T, err error) {
+	t.Helper()
+
+	var httpErr *echo.HTTPError
+
+	require.ErrorAs(t, err, &httpErr)
+	require.Equal(t, http.StatusUnauthorized, httpErr.Code)
+}
+
+func authContext(t *testing.T, token string) *echo.Context {
+	t.Helper()
+
+	ctx, _, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
+		Method:        http.MethodGet,
+		Path:          "/test",
+		Body:          nil,
+		Headers:       nil,
+		QueryParams:   nil,
+		PathParams:    nil,
+		ContentType:   "",
+		SkipRequestID: true,
+	}, "Bearer "+token)
+
+	return ctx
+}
+
+func TestJWT_RejectsHS256Token(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockKeyfunc(t)
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
+		//nolint:exhaustruct
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
+
+	hsToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := hsToken.SignedString([]byte("attacker-controlled-secret"))
+	require.NoError(t, err)
+
+	ctx := authContext(t, tokenString)
+
+	mw := middleware.JWT(mock)
+	err = mw(echoSuccessHandler)(ctx)
+
+	requireUnauthorized(t, err)
+}
+
+func TestJWT_RejectsTokenWithoutExpiry(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockKeyfunc(t)
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
+		//nolint:exhaustruct
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt: jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := createTestToken(t, mock.key, claims)
+
+	ctx := authContext(t, token)
+
+	mw := middleware.JWT(mock)
+	err := mw(echoSuccessHandler)(ctx)
+
+	requireUnauthorized(t, err)
+}
+
+func TestJWTWithConfig_IssuerValidation(t *testing.T) {
+	t.Parallel()
+
+	const trustedIssuer = "https://auth.example.com/realms/my-realm"
+
+	tests := []struct {
+		name     string
+		tokenIss string
+		wantOK   bool
+	}{
+		{name: "matching issuer accepted", tokenIss: trustedIssuer, wantOK: true},
+		{name: "foreign issuer rejected", tokenIss: "https://auth.example.com/realms/other", wantOK: false},
+		{name: "missing issuer rejected", tokenIss: "", wantOK: false},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock := newMockKeyfunc(t)
+			claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
+				//nolint:exhaustruct
+				RegisteredClaims: jwt.RegisteredClaims{
+					Issuer:    testCase.tokenIss,
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+				},
+			}
+			token := createTestToken(t, mock.key, claims)
+
+			ctx := authContext(t, token)
+
+			mw := middleware.JWTWithConfig(securityTestConfig(mock, trustedIssuer, nil))
+			err := mw(echoSuccessHandler)(ctx)
+
+			if testCase.wantOK {
+				require.NoError(t, err)
+			} else {
+				requireUnauthorized(t, err)
+			}
+		})
+	}
+}
+
+func TestJWTWithConfig_AudienceValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		tokenAud jwt.ClaimStrings
+		wantOK   bool
+	}{
+		{name: "matching audience accepted", tokenAud: jwt.ClaimStrings{"my-service"}, wantOK: true},
+		{name: "one of several audiences accepted", tokenAud: jwt.ClaimStrings{"other", "my-service"}, wantOK: true},
+		{name: "foreign audience rejected", tokenAud: jwt.ClaimStrings{"other-service"}, wantOK: false},
+		{name: "missing audience rejected", tokenAud: nil, wantOK: false},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock := newMockKeyfunc(t)
+			claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
+				//nolint:exhaustruct
+				RegisteredClaims: jwt.RegisteredClaims{
+					Audience:  testCase.tokenAud,
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+				},
+			}
+			token := createTestToken(t, mock.key, claims)
+
+			ctx := authContext(t, token)
+
+			mw := middleware.JWTWithConfig(securityTestConfig(mock, "", []string{"my-service"}))
+			err := mw(echoSuccessHandler)(ctx)
+
+			if testCase.wantOK {
+				require.NoError(t, err)
+			} else {
+				requireUnauthorized(t, err)
+			}
+		})
+	}
+}
+
+func TestJWTWithConfig_LeewayAllowsClockSkew(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockKeyfunc(t)
+	// Token expired 10 seconds ago: rejected without leeway, accepted with the
+	// default 30-second leeway.
+	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
+		//nolint:exhaustruct
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-10 * time.Second)),
+		},
+	}
+	token := createTestToken(t, mock.key, claims)
+
+	ctx := authContext(t, token)
+
+	mw := middleware.JWT(mock)
+	err := mw(echoSuccessHandler)(ctx)
+
+	require.NoError(t, err)
 }

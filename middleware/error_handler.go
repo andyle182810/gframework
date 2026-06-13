@@ -9,8 +9,12 @@ import (
 )
 
 type ErrorHandlerConfig struct {
-	Logger                *zerolog.Logger
-	LogErrors             bool
+	Logger    *zerolog.Logger
+	LogErrors bool
+	// IncludeInternalErrors adds the wrapped internal error string to HTTP
+	// responses under the "internal" key. It exposes implementation details
+	// (driver errors, hostnames, queries) to clients — only enable it in
+	// development environments, never in production.
 	IncludeInternalErrors bool
 	CustomErrorResponse   func(*echo.Context, error, int) map[string]any
 }
