@@ -101,6 +101,7 @@ func TestBulkInsert_Success(t *testing.T) {
 	assert.Equal(t, int64(5), count)
 
 	var actualCount int64
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM test_users").Scan(&actualCount)
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), actualCount)
@@ -220,6 +221,7 @@ func TestBulkInsert_LargeDataset(t *testing.T) {
 	columns := []string{columnName, "value"}
 
 	rows := make([][]any, 1000)
+
 	for i := range 1000 {
 		rows[i] = []any{fmt.Sprintf("name_%d", i), i}
 	}
@@ -229,6 +231,7 @@ func TestBulkInsert_LargeDataset(t *testing.T) {
 	assert.Equal(t, int64(1000), count)
 
 	var actualCount int64
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM test_large").Scan(&actualCount)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1000), actualCount)
@@ -269,6 +272,7 @@ func TestBulkInsertStructs_Success(t *testing.T) {
 	assert.Equal(t, int64(3), count)
 
 	var actualCount int64
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM test_struct_users").Scan(&actualCount)
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), actualCount)
@@ -427,6 +431,7 @@ func TestBulkInsertStructs_LargeDataset(t *testing.T) {
 	require.NoError(t, err)
 
 	users := make([]testUser, 5000)
+
 	for i := range 5000 {
 		users[i] = testUser{
 			ID:    i + 1,
@@ -447,6 +452,7 @@ func TestBulkInsertStructs_LargeDataset(t *testing.T) {
 	assert.Equal(t, int64(5000), count)
 
 	var actualCount int64
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM test_large_structs").Scan(&actualCount)
 	require.NoError(t, err)
 	assert.Equal(t, int64(5000), actualCount)

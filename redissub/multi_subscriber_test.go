@@ -224,6 +224,7 @@ func TestMultiSubscriberStart(t *testing.T) {
 
 	go func() {
 		close(started)
+
 		stopped <- multiSub.Start(t.Context())
 	}()
 
@@ -259,6 +260,7 @@ func TestMultiSubscriberStartWithNoSubscribers(t *testing.T) {
 
 	go func() {
 		close(started)
+
 		stopped <- multiSub.Start(startCtx)
 	}()
 
@@ -403,6 +405,7 @@ func TestMultiSubscriberConcurrentProcessing(t *testing.T) {
 	var totalProcessed atomic.Int32
 
 	topics := make([]string, 3)
+
 	for i := range 3 {
 		topics[i] = "test-topic-concurrent-" + strconv.Itoa(i) + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}

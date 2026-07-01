@@ -55,6 +55,7 @@ type RetryableFunc func(ctx context.Context) error
 
 func WithRetry(ctx context.Context, config RetryConfig, fn RetryableFunc) error {
 	var lastErr error
+
 	delay := config.InitialDelay
 
 	for attempt := 0; attempt <= config.MaxRetries; attempt++ {

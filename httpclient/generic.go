@@ -9,6 +9,7 @@ import (
 
 func GetJSON[T any](ctx context.Context, c *Client, path string, opts ...RequestOption) (T, error) {
 	var result T
+
 	err := c.Get(ctx, path, &result, opts...)
 
 	return result, err
@@ -16,6 +17,7 @@ func GetJSON[T any](ctx context.Context, c *Client, path string, opts ...Request
 
 func PostJSON[T any](ctx context.Context, c *Client, path string, body any, opts ...RequestOption) (T, error) {
 	var result T
+
 	err := c.Post(ctx, path, body, &result, opts...)
 
 	return result, err
@@ -23,6 +25,7 @@ func PostJSON[T any](ctx context.Context, c *Client, path string, body any, opts
 
 func PutJSON[T any](ctx context.Context, c *Client, path string, body any, opts ...RequestOption) (T, error) {
 	var result T
+
 	err := c.Put(ctx, path, body, &result, opts...)
 
 	return result, err
@@ -30,6 +33,7 @@ func PutJSON[T any](ctx context.Context, c *Client, path string, body any, opts 
 
 func PatchJSON[T any](ctx context.Context, c *Client, path string, body any, opts ...RequestOption) (T, error) {
 	var result T
+
 	err := c.Patch(ctx, path, body, &result, opts...)
 
 	return result, err
@@ -37,6 +41,7 @@ func PatchJSON[T any](ctx context.Context, c *Client, path string, body any, opt
 
 func DeleteJSON[T any](ctx context.Context, c *Client, path string, opts ...RequestOption) (T, error) {
 	var result T
+
 	err := c.Delete(ctx, path, &result, opts...)
 
 	return result, err
@@ -44,6 +49,7 @@ func DeleteJSON[T any](ctx context.Context, c *Client, path string, opts ...Requ
 
 func DoJSON[T any](ctx context.Context, c *Client, method, path string, body any, opts ...RequestOption) (T, error) {
 	var result T
+
 	err := c.Do(ctx, method, path, body, &result, opts...)
 
 	return result, err
@@ -62,6 +68,7 @@ func (c *Client) doHead(ctx context.Context, method, path string, opts ...Reques
 
 	if cfg.timeout > 0 {
 		var cancel context.CancelFunc
+
 		ctx, cancel = context.WithTimeout(ctx, cfg.timeout)
 		defer cancel()
 	}
@@ -97,6 +104,7 @@ func (c *Client) doHead(ctx context.Context, method, path string, opts ...Reques
 	}
 
 	headers := make(map[string]string)
+
 	for k := range resp.Header {
 		headers[k] = resp.Header.Get(k)
 	}

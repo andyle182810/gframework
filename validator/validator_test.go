@@ -86,6 +86,7 @@ func TestValidate_RequiredFieldMissing(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -110,6 +111,7 @@ func TestValidate_InvalidEmail(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -134,6 +136,7 @@ func TestValidate_AgeOutOfRange(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -194,6 +197,7 @@ func TestValidate_MinMaxValidation(t *testing.T) {
 			require.Error(t, err)
 
 			var validationErrors validator.ValidationErrors
+
 			ok := errors.As(err, &validationErrors)
 			require.True(t, ok)
 
@@ -225,6 +229,7 @@ func TestValidate_URLValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -255,6 +260,7 @@ func TestValidate_UUIDValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -285,6 +291,7 @@ func TestValidate_AlphanumValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -315,6 +322,7 @@ func TestValidate_NumericValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -345,6 +353,7 @@ func TestValidate_LengthValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -375,6 +384,7 @@ func TestValidate_GreaterThanValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -405,6 +415,7 @@ func TestValidate_LessThanValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -435,6 +446,7 @@ func TestValidate_OneOfValidation(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -517,6 +529,7 @@ func TestValidate_RegexpValidation_Failure(t *testing.T) {
 			require.Error(t, err)
 
 			var validationErrors validator.ValidationErrors
+
 			ok := errors.As(err, &validationErrors)
 			require.True(t, ok)
 
@@ -543,6 +556,7 @@ func TestValidate_RegexpValidation_InvalidPattern(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -567,6 +581,7 @@ func TestValidate_MultipleErrors(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
@@ -598,10 +613,12 @@ func TestValidate_JSONFieldNames(t *testing.T) {
 	require.Error(t, err)
 
 	var validationErrors validator.ValidationErrors
+
 	ok := errors.As(err, &validationErrors)
 	require.True(t, ok)
 
 	fields := make(map[string]bool)
+
 	for _, vErr := range validationErrors {
 		fields[vErr.Field] = true
 	}
@@ -817,6 +834,7 @@ func TestValidate_DecimalGteFailure(t *testing.T) {
 			require.Error(t, err)
 
 			var validationErrors validator.ValidationErrors
+
 			ok := errors.As(err, &validationErrors)
 			require.True(t, ok)
 

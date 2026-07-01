@@ -42,7 +42,7 @@ func setupTestService(t *testing.T) (*service.Service, *repo.Repository, *valkey
 
 	valkey, err := valkey.New(&valkey.Config{ //nolint:exhaustruct
 		Host:     valkeyContainer.Host,
-		Port:     valkeyContainer.Port.Int(),
+		Port:     int(valkeyContainer.Port.Num()),
 		Password: "",
 		DB:       0,
 	})

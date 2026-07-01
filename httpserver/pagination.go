@@ -22,6 +22,7 @@ func NormalizePage(page, pageSize int) (normalizedPage, normalizedSize, offset i
 
 func NewPagination(page, pageSize, totalCount int) *Pagination {
 	totalPages := 0
+
 	if pageSize > 0 {
 		totalPages = (totalCount + pageSize - 1) / pageSize
 	}

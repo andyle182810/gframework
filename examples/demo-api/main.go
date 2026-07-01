@@ -116,14 +116,16 @@ type application struct {
 
 func (app *application) newHTTPServer() *httpserver.Server {
 	httpCfg := &httpserver.Config{
-		Host:         app.cfg.HTTPServerHost,
-		Port:         app.cfg.HTTPServerPort,
-		EnableCors:   app.cfg.HTTPEnableCORS,
-		AllowOrigins: app.cfg.HTTPAllowOrigins,
-		BodyLimit:    app.cfg.HTTPBodyLimit,
-		ReadTimeout:  app.cfg.HTTPServerReadTimeout,
-		WriteTimeout: app.cfg.HTTPServerWriteTimeout,
-		GracePeriod:  app.cfg.GracefulShutdownPeriod,
+		Host:             app.cfg.HTTPServerHost,
+		Port:             app.cfg.HTTPServerPort,
+		EnableCors:       app.cfg.HTTPEnableCORS,
+		AllowOrigins:     app.cfg.HTTPAllowOrigins,
+		BodyLimit:        app.cfg.HTTPBodyLimit,
+		ReadTimeout:      app.cfg.HTTPServerReadTimeout,
+		WriteTimeout:     app.cfg.HTTPServerWriteTimeout,
+		GracePeriod:      app.cfg.GracefulShutdownPeriod,
+		DisableTransform: app.cfg.HTTPDisableTransform,
+		LogRequestBody:   app.cfg.HTTPLogRequestBody,
 	}
 
 	svr := httpserver.New(httpCfg)

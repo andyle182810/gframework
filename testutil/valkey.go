@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/network"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -17,7 +17,7 @@ const (
 type ValkeyTestContainer struct {
 	Container testcontainers.Container
 	Host      string
-	Port      nat.Port
+	Port      network.Port
 }
 
 func (c *ValkeyTestContainer) Address() string {

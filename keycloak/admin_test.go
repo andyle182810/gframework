@@ -47,7 +47,7 @@ func newStub() *keycloakStub {
 }
 
 // newServer returns an httptest.Server wired to the stub's handler. Path
-// matching mirrors Keycloak's URL layout exactly so gocloak/v13 sees valid
+// matching mirrors Keycloak's URL layout exactly so gocloak/v14 sees valid
 // endpoints.
 func (s *keycloakStub) newServer(t *testing.T) *httptest.Server {
 	t.Helper()

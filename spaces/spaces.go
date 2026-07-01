@@ -240,6 +240,7 @@ func (c *Client) Head(ctx context.Context, logicalKey string) (*HeadResult, erro
 	}
 
 	res := &HeadResult{} //nolint:exhaustruct
+
 	if out.ContentLength != nil {
 		res.ContentLength = *out.ContentLength
 	}

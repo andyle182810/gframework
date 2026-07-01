@@ -134,6 +134,7 @@ func TestGetPoolStats_UpdatesAfterQueries(t *testing.T) {
 	pg := setupTestPostgres(t)
 
 	var result int
+
 	err := pg.DBPool.QueryRow(ctx, "SELECT 1").Scan(&result)
 	require.NoError(t, err)
 

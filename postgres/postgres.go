@@ -84,12 +84,34 @@ func New(cfg *Config) (*Postgres, error) {
 		Config:   nil,
 	}
 
-	pgConfig.MaxConns = cfg.MaxConnection
-	pgConfig.MinConns = cfg.MinConnection
-	pgConfig.MaxConnIdleTime = cfg.MaxConnectionIdleTime
-	pgConfig.MaxConnLifetime = cfg.MaxConnectionLifetime
-	pgConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
-	pgConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
+	// Only override pgx's parsed defaults when a value is explicitly provided.
+	// A zero value must not clobber the defaults from ParseConfig: since pgx
+	// v5.10 a MaxConnLifetime of 0 marks connections as expired immediately,
+	// which would make every acquire fail and render the pool unusable.
+	if cfg.MaxConnection > 0 {
+		pgConfig.MaxConns = cfg.MaxConnection
+	}
+
+	if cfg.MinConnection > 0 {
+		pgConfig.MinConns = cfg.MinConnection
+	}
+
+	if cfg.MaxConnectionIdleTime > 0 {
+		pgConfig.MaxConnIdleTime = cfg.MaxConnectionIdleTime
+	}
+
+	if cfg.MaxConnectionLifetime > 0 {
+		pgConfig.MaxConnLifetime = cfg.MaxConnectionLifetime
+	}
+
+	if cfg.HealthCheckPeriod > 0 {
+		pgConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
+	}
+
+	if cfg.ConnectTimeout > 0 {
+		pgConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
+	}
+
 	pgConfig.ConnConfig.Tracer = tracer
 
 	if cfg.StatementTimeout > 0 {

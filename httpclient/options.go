@@ -59,6 +59,7 @@ func WithAuth(cfg AuthConfig) Option {
 		c.authConfig = &cfg
 
 		var opts []authtoken.Option
+
 		if cfg.ExpiryBuffer > 0 {
 			opts = append(opts, authtoken.WithTokenExpiryBuffer(cfg.ExpiryBuffer))
 		}

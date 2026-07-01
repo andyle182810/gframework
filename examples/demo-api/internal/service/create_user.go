@@ -11,8 +11,8 @@ import (
 )
 
 type CreateUserRequest struct {
-	Name  string `json:"name"  validate:"required,min=2,max=100"`
-	Email string `json:"email" validate:"required,email"`
+	Name  string `json:"name"  mod:"trim"        validate:"required,min=2,max=100" scrub:"name"`
+	Email string `json:"email" mod:"trim,lcase" validate:"required,email"        scrub:"emails"`
 }
 
 type CreateUserResponse struct {
@@ -45,11 +45,6 @@ func (e *CreateUserExecutor) Execute(
 	req *CreateUserRequest,
 ) (*httpserver.HandlerResponse[CreateUserResponse], *echo.HTTPError) {
 	ctx := c.Request().Context()
-
-	e.log.Info().
-		Str("name", req.Name).
-		Str("email", req.Email).
-		Msg("Creating new user")
 
 	user, err := e.repo.User.CreateUser(ctx, req.Name, req.Email)
 	if err != nil {

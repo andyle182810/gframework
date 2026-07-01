@@ -101,6 +101,7 @@ func New(redisClient goredis.UniversalClient, opts Options) (*RedisPublisher, er
 func (p *RedisPublisher) PublishToTopic(ctx context.Context, topic string, messageContents ...string) error {
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
+
 		ctx, cancel = context.WithTimeout(ctx, p.timeout)
 		defer cancel()
 	}

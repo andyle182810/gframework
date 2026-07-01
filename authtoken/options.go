@@ -3,7 +3,7 @@ package authtoken
 import (
 	"time"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 )
 
 type Option func(*Client)

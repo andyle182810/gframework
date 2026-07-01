@@ -3,7 +3,7 @@ package keycloak_test
 import (
 	"testing"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 	"github.com/andyle182810/gframework/keycloak"
 	"github.com/stretchr/testify/assert"
 )

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 )
 
 var ErrNoAccessToken = errors.New("authtoken: no access token in response")
@@ -62,12 +62,14 @@ func New(baseURL, realm, clientID, clientSecret string, opts ...Option) *Client 
 
 func (c *Client) GetToken(ctx context.Context) (string, error) {
 	c.mu.RLock()
+
 	if c.accessToken != "" && time.Now().Before(c.expiresAt) {
 		token := c.accessToken
 		c.mu.RUnlock()
 
 		return token, nil
 	}
+
 	c.mu.RUnlock()
 
 	return c.getToken(ctx)

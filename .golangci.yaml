@@ -39,7 +39,7 @@ linters:
     - godot
     - godox
     - goheader
-    - gomodguard # deprecated in v2.12.0 (use gomodguard_v2); still works, no-op without settings
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - gosmopolitan
@@ -96,7 +96,7 @@ linters:
     - varnamelen
     - wastedassign
     - whitespace
-    - wsl # deprecated in v2.2.0 (use wsl_v5); still works. Migrate deliberately — wsl_v5 changes whitespace rules
+    - wsl_v5
     - zerologlint
   disable:
     - depguard
@@ -129,6 +129,10 @@ linters:
         - v
         - w
         - r
+    wsl_v5:
+      allow-first-in-block: false
+      allow-whole-block: false
+      branch-max-lines: 2
   exclusions:
     generated: lax
     presets:

@@ -159,6 +159,7 @@ func (c *Client) do(
 
 	if cfg.timeout > 0 {
 		var cancel context.CancelFunc
+
 		reqCtx, cancel = context.WithTimeout(ctx, cfg.timeout)
 		defer cancel()
 	}
@@ -274,6 +275,7 @@ func (c *Client) handleResponse(resp *http.Response, response any, requestID str
 	}
 
 	body := io.Reader(resp.Body)
+
 	if c.maxResponseSize > 0 {
 		body = io.LimitReader(resp.Body, c.maxResponseSize+1)
 	}
@@ -335,6 +337,7 @@ func (c *Client) buildURL(path string, query map[string]string) string {
 	}
 
 	params := url.Values{}
+
 	for k, v := range query {
 		params.Add(k, v)
 	}

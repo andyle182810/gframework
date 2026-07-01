@@ -68,6 +68,7 @@ func TestNew_AppliesMaxResponseSizeOption(t *testing.T) {
 	client := httpclient.New(server.URL, httpclient.WithMaxResponseSize(100))
 
 	var response map[string]string
+
 	err := client.Get(t.Context(), "/test", &response)
 
 	require.ErrorIs(t, err, httpclient.ErrResponseTooLarge)
@@ -150,6 +151,7 @@ func TestClient_Get(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]string
+
 	err := client.Get(t.Context(), "/test", &response)
 
 	require.NoError(t, err)
@@ -163,6 +165,7 @@ func TestClient_Post(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 
 		var body map[string]string
+
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		assert.Equal(t, "test", body[nameField])
 
@@ -174,6 +177,7 @@ func TestClient_Post(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]int
+
 	err := client.Post(t.Context(), "/test", map[string]string{nameField: "test"}, &response)
 
 	require.NoError(t, err)
@@ -193,6 +197,7 @@ func TestClient_Put(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]string
+
 	err := client.Put(t.Context(), "/test/1", map[string]string{nameField: "updated"}, &response)
 
 	require.NoError(t, err)
@@ -212,6 +217,7 @@ func TestClient_Patch(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]string
+
 	err := client.Patch(t.Context(), "/test/1", map[string]string{"field": "value"}, &response)
 
 	require.NoError(t, err)
@@ -231,6 +237,7 @@ func TestClient_Delete(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]bool
+
 	err := client.Delete(t.Context(), "/test/1", &response)
 
 	require.NoError(t, err)
@@ -249,6 +256,7 @@ func TestClient_Do(t *testing.T) {
 	client := httpclient.New(server.URL)
 
 	var response map[string]string
+
 	err := client.Do(t.Context(), "CUSTOM", "/test", nil, &response)
 
 	require.NoError(t, err)

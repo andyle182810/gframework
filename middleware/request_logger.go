@@ -10,14 +10,20 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// sensitiveQueryParams are query parameter names whose values are redacted in
-// request logs so credentials passed via query string never reach log storage.
-//
 //nolint:gochecknoglobals
 var sensitiveQueryParams = []string{
-	"token", "access_token", "id_token", "refresh_token",
-	"code", "secret", "password", "api_key", "apikey", "key",
-	"signature", "authorization",
+	"token",
+	"access_token",
+	"id_token",
+	"refresh_token",
+	"code",
+	"secret",
+	"password",
+	"api_key",
+	"apikey",
+	"key",
+	"signature",
+	"authorization",
 }
 
 type LogFieldExtractor func(*echo.Context) map[string]any

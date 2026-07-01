@@ -33,6 +33,7 @@ func internalAuthContext(t *testing.T, header string) *echo.Context {
 	t.Helper()
 
 	headers := map[string]string{}
+
 	if header != "" {
 		headers[middleware.HeaderXInternalAuthorization] = header
 	}

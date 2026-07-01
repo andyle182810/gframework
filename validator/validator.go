@@ -59,6 +59,7 @@ func DefaultRestValidator() *Validator {
 
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		const maxSplits = 2
+
 		name := strings.SplitN(fld.Tag.Get("json"), ",", maxSplits)[0]
 
 		if name == "-" {

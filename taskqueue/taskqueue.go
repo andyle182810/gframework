@@ -341,7 +341,6 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 	defer cancel()
 
 	err := q.executor.Execute(execCtx, task.id, task.payload)
-
 	if err != nil {
 		if errors.Is(execCtx.Err(), context.DeadlineExceeded) {
 			log.Error().

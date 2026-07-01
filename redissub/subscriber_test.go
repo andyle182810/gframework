@@ -861,6 +861,7 @@ func TestSubscriberNoInfiniteRedeliveryAfterRetryExhaustion(t *testing.T) {
 	publisher := setupTestPublisher(t, valkeyClient)
 
 	const maxRetries = 2
+
 	expectedAttempts := maxRetries + 1
 
 	var attemptCount atomic.Int32
@@ -918,6 +919,7 @@ func TestSubscriberNoInfiniteRedeliveryWithDLQ(t *testing.T) {
 	publisher := setupTestPublisher(t, valkeyClient)
 
 	const maxRetries = 2
+
 	expectedAttempts := maxRetries + 1
 
 	var attemptCount atomic.Int32

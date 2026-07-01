@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 	"github.com/andyle182810/gframework/authtoken"
 	"github.com/stretchr/testify/require"
 )
