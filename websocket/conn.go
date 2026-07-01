@@ -8,48 +8,84 @@ import (
 	gws "github.com/gorilla/websocket"
 )
 
-type Conn struct {
-	ID     string
-	UserID string
+type sendMsg struct {
+	msgType int
+	data    []byte
+}
 
-	ws     *gws.Conn
-	send   chan Message
-	rooms  map[string]struct{}
-	roomMu sync.RWMutex
+type Conn struct {
+	ID   string
+	Meta map[string]any
+
+	ws           *gws.Conn
+	send         chan sendMsg
+	once         sync.Once
+	done         chan struct{}
+	pingDeadline time.Duration
 }
 
 func newConn(
 	id string,
-	userID string,
-	ws *gws.Conn,
+	wsConn *gws.Conn,
+	pingDeadline time.Duration,
 ) *Conn {
-	return &Conn{
-		ID:     id,
-		UserID: userID,
-		ws:     ws,
-		send:   make(chan Message, defaultSendBufferSize),
-		rooms:  make(map[string]struct{}),
+	return &Conn{ //nolint:exhaustruct
+		ID:           id,
+		Meta:         make(map[string]any),
+		ws:           wsConn,
+		send:         make(chan sendMsg, defaultSendBufferSize),
+		done:         make(chan struct{}),
+		pingDeadline: pingDeadline,
 	}
 }
 
-func (c *Conn) addRoom(room string) {
-	c.roomMu.Lock()
-	defer c.roomMu.Unlock()
-	c.rooms[room] = struct{}{}
+func (c *Conn) ReadMessage() (int, Payload, error) {
+	msgType, raw, err := c.ws.ReadMessage()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	_ = c.ws.SetReadDeadline(time.Now().Add(c.pingDeadline))
+
+	return msgType, Payload(raw), nil
 }
 
-func (c *Conn) removeRoom(room string) {
-	c.roomMu.Lock()
-	defer c.roomMu.Unlock()
-	delete(c.rooms, room)
+func (c *Conn) WriteMessage(messageType int, data []byte) error {
+	msg := sendMsg{msgType: messageType, data: data}
+
+	select {
+	case c.send <- msg:
+		return nil
+	default:
+		return ErrSendBufferFull
+	}
+}
+
+func (c *Conn) Write(data []byte) error {
+	return c.WriteMessage(gws.TextMessage, data)
+}
+
+func (c *Conn) WriteJSON(v any) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	return c.Write(data)
+}
+
+func (c *Conn) Close() error {
+	c.once.Do(func() { close(c.send) })
+	<-c.done
+
+	return c.ws.Close()
 }
 
 func (c *Conn) writeLoop(writeTimeout, pingInterval, pingTimeout time.Duration) {
+	defer close(c.done)
+
 	ticker := time.NewTicker(pingInterval)
-	defer func() {
-		ticker.Stop()
-		c.ws.Close()
-	}()
+	defer ticker.Stop()
 
 	c.ws.SetPongHandler(func(_ string) error {
 		return c.ws.SetReadDeadline(time.Now().Add(pingInterval + pingTimeout))
@@ -59,28 +95,26 @@ func (c *Conn) writeLoop(writeTimeout, pingInterval, pingTimeout time.Duration) 
 		select {
 		case msg, ok := <-c.send:
 			if !ok {
-				c.ws.WriteMessage(gws.CloseMessage, []byte{})
+				_ = c.ws.WriteMessage(gws.CloseMessage, []byte{})
+
 				return
 			}
-			if err := c.writeJSON(msg, writeTimeout); err != nil {
+
+			if err := c.ws.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+				return
+			}
+
+			if err := c.ws.WriteMessage(msg.msgType, msg.data); err != nil {
 				return
 			}
 		case <-ticker.C:
-			c.ws.SetWriteDeadline(time.Now().Add(writeTimeout))
+			if err := c.ws.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+				return
+			}
+
 			if err := c.ws.WriteMessage(gws.PingMessage, nil); err != nil {
 				return
 			}
 		}
-
 	}
-}
-
-func (c *Conn) writeJSON(msg Message, timeout time.Duration) error {
-	c.ws.SetWriteDeadline(time.Now().Add(timeout))
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-
-	return c.ws.WriteMessage(gws.TextMessage, data)
 }
