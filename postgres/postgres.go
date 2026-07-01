@@ -84,10 +84,29 @@ func New(cfg *Config) (*Postgres, error) {
 		Config:   nil,
 	}
 
-	// Only override pgx's parsed defaults when a value is explicitly provided.
-	// A zero value must not clobber the defaults from ParseConfig: since pgx
-	// v5.10 a MaxConnLifetime of 0 marks connections as expired immediately,
-	// which would make every acquire fail and render the pool unusable.
+	pgConfig.ConnConfig.Tracer = tracer
+
+	applyPoolTuning(pgConfig, cfg)
+
+	applySessionTimeouts(pgConfig, cfg)
+
+	pgConfig.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
+		pgxdecimal.Register(conn.TypeMap())
+
+		return nil
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), pgConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Postgres{
+		DBPool: pool,
+	}, nil
+}
+
+func applyPoolTuning(pgConfig *pgxpool.Config, cfg *Config) {
 	if cfg.MaxConnection > 0 {
 		pgConfig.MaxConns = cfg.MaxConnection
 	}
@@ -111,9 +130,9 @@ func New(cfg *Config) (*Postgres, error) {
 	if cfg.ConnectTimeout > 0 {
 		pgConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
 	}
+}
 
-	pgConfig.ConnConfig.Tracer = tracer
-
+func applySessionTimeouts(pgConfig *pgxpool.Config, cfg *Config) {
 	if cfg.StatementTimeout > 0 {
 		pgConfig.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(cfg.StatementTimeout.Milliseconds(), 10)
 	}
@@ -123,24 +142,9 @@ func New(cfg *Config) (*Postgres, error) {
 	}
 
 	if cfg.IdleInTransactionTimeout > 0 {
-		//nolint:lll
-		pgConfig.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = strconv.FormatInt(cfg.IdleInTransactionTimeout.Milliseconds(), 10)
+		idleTimeout := strconv.FormatInt(cfg.IdleInTransactionTimeout.Milliseconds(), 10)
+		pgConfig.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = idleTimeout
 	}
-
-	pgConfig.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
-		pgxdecimal.Register(conn.TypeMap())
-
-		return nil
-	}
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), pgConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Postgres{
-		DBPool: pool,
-	}, nil
 }
 
 func (p *Postgres) Start(ctx context.Context) error {

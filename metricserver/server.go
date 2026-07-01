@@ -77,7 +77,7 @@ func New(cfg *Config) *Server {
 
 	metricsHandler := promhttp.InstrumentMetricHandler(
 		prometheus.DefaultRegisterer,
-		promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{DisableCompression: true}),
+		promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{DisableCompression: true}), //nolint:exhaustruct
 	)
 	ech.GET(metricsPath, echo.WrapHandler(metricsHandler))
 
