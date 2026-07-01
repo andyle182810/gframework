@@ -196,6 +196,7 @@ func (m *MultiSubscriber) Stop() error {
 	}
 
 	shutdownStart := time.Now()
+
 	select {
 	case <-m.stoppedSignal:
 		log.Info().

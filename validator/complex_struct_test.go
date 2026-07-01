@@ -436,6 +436,7 @@ func TestComplexStruct_MultipleErrorsAggregated(t *testing.T) {
 	require.GreaterOrEqual(t, len(validationErrors), 5)
 
 	fields := map[string]bool{}
+
 	for _, ve := range validationErrors {
 		fields[ve.Field] = true
 	}

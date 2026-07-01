@@ -198,6 +198,7 @@ func TestRedisPublisher_ImplementsPublisherInterface(t *testing.T) {
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	var _ redispub.Publisher = publisher
@@ -215,6 +216,7 @@ func TestRedisPublisher_PublishToTopicWithNoMessages(t *testing.T) {
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic")
@@ -235,6 +237,7 @@ func TestRedisPublisher_PublishToTopicWithSingleMessage(t *testing.T) {
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic", "message-1")
@@ -255,6 +258,7 @@ func TestRedisPublisher_PublishToTopicWithMultipleMessages(t *testing.T) {
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic", "message-1", "message-2", "message-3")
@@ -275,6 +279,7 @@ func TestRedisPublisher_PublishToTopicRespectsExistingContextDeadline(t *testing
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -298,6 +303,7 @@ func TestRedisPublisher_PublishToTopicWithAlreadyCancelledContext(t *testing.T) 
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	ctxCancelled, cancel := context.WithCancel(ctx)
@@ -321,6 +327,7 @@ func TestRedisPublisher_PublishToTopicAppliesDefaultTimeoutWhenNoDeadline(t *tes
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	err = publisher.PublishToTopic(ctx, "test-topic", "message-1")
@@ -341,6 +348,7 @@ func TestRedisPublisher_PublishToMultipleTopics(t *testing.T) {
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	topics := []string{"topic-1", "topic-2", "topic-3"}
@@ -364,6 +372,7 @@ func TestRedisPublisher_PublishWithMaxStreamEntries(t *testing.T) {
 		Logger:           nil,
 	})
 	require.NoError(t, err)
+
 	defer publisher.Close()
 
 	for i := range 20 {

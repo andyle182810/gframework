@@ -25,8 +25,9 @@ func Example_errorHandlerBasic() {
 	})
 
 	go func() {
-		_ = e.Start(":9090")
+		_ = e.Start(":9095")
 	}()
+
 	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
@@ -49,6 +50,7 @@ func Example_errorHandlerWithLogging() {
 	go func() {
 		_ = e.Start(":9091")
 	}()
+
 	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
@@ -75,6 +77,7 @@ func Example_errorHandlerWithInternalErrors() {
 	go func() {
 		_ = e.Start(":9092")
 	}()
+
 	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
@@ -105,6 +108,7 @@ func Example_errorHandlerCustomResponse() {
 	go func() {
 		_ = e.Start(":9093")
 	}()
+
 	time.Sleep(100 * time.Millisecond)
 	// Output:
 }
@@ -131,6 +135,7 @@ func Example_errorHandlerProduction() {
 	go func() {
 		_ = e.Start(":9094")
 	}()
+
 	time.Sleep(100 * time.Millisecond)
 	// Output:
 }

@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/andyle182810/gframework/middleware"
+	"github.com/andyle182810/gframework/transformer"
 	"github.com/andyle182810/gframework/validator"
 	"github.com/labstack/echo/v5"
 	echomiddleware "github.com/labstack/echo/v5/middleware"
@@ -60,6 +61,9 @@ type Config struct {
 	WriteTimeout      time.Duration
 	IdleTimeout       time.Duration
 	GracePeriod       time.Duration
+	Transformer       *transformer.Transformer
+	DisableTransform  bool
+	LogRequestBody    bool
 }
 
 type Server struct {
@@ -80,8 +84,23 @@ func New(cfg *Config) *Server {
 	e.Validator = validator.DefaultRestValidator()
 	e.HTTPErrorHandler = middleware.ErrorHandler(echo.DefaultHTTPErrorHandler(false))
 
-	e.Pre(middleware.RequestLogger(log.Logger, SafeLogFieldsExtractor))
+	tfm := cfg.Transformer
+	if tfm == nil {
+		tfm = transformer.DefaultRestTransformer()
+	}
+
+	logExtractors := []middleware.LogFieldExtractor{safeLogFieldsExtractor}
+
+	if cfg.LogRequestBody {
+		logExtractors = append(logExtractors, scrubbedBodyLogFieldExtractor(tfm))
+	}
+
+	e.Pre(middleware.RequestLogger(log.Logger, logExtractors...))
 	e.Pre(echomiddleware.BodyLimit(parseBodyLimit(cfg.BodyLimit)))
+
+	if !cfg.DisableTransform {
+		e.Use(injectTransformer(tfm))
+	}
 
 	if cfg.EnableCors {
 		if len(cfg.AllowOrigins) == 0 {
@@ -214,7 +233,7 @@ func (s *Server) Name() string {
 	return "http"
 }
 
-func SafeLogFieldsExtractor(ctx *echo.Context) map[string]any {
+func safeLogFieldsExtractor(ctx *echo.Context) map[string]any {
 	fields := make(map[string]any)
 
 	if req := ctx.Get(middleware.ContextKeyBody); req != nil {

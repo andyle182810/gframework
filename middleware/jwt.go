@@ -288,6 +288,7 @@ func jwtLogDebug(logger *zerolog.Logger, msg string) {
 func jwtLogError(logger *zerolog.Logger, msg string, err error) {
 	if logger != nil {
 		event := logger.Error()
+
 		if err != nil {
 			event = event.Err(err)
 		}

@@ -40,6 +40,7 @@ func SetupEchoContext(
 
 	if len(opts.QueryParams) > 0 {
 		query := url.Values{}
+
 		for key, value := range opts.QueryParams {
 			query.Add(key, value)
 		}

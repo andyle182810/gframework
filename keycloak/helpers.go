@@ -1,7 +1,7 @@
 package keycloak
 
 import (
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 )
 
 func RoleNames(roles []*gocloak.Role) []string {

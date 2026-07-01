@@ -11,7 +11,7 @@ import (
 	"time"
 
 	gfrpostgres "github.com/andyle182810/gframework/postgres"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/network"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	defaultPostgresUser              = "testuser"
-	defaultPostgresPassword          = "testpass"
-	defaultPostgresDatabase          = "testdb"
-	defaultPostgresImage             = "postgres:18-alpine3.22"
-	defaultPostgresPort     nat.Port = "5432"
+	defaultPostgresUser     = "testuser"
+	defaultPostgresPassword = "testpass"
+	defaultPostgresDatabase = "testdb"
+	defaultPostgresImage    = "postgres:18-alpine3.22"
+	defaultPostgresPort     = "5432"
 )
 
 const (
@@ -37,7 +37,7 @@ type PostgresTestContainer struct {
 	Password  string
 	Host      string
 	Database  string
-	Port      nat.Port
+	Port      network.Port
 }
 
 func (c *PostgresTestContainer) ConnectionString() string {
@@ -130,12 +130,14 @@ func CleanupDatabase(t *testing.T, ctx context.Context, pg *gfrpostgres.Postgres
 
 	rows, err := pg.Query(ctx, query)
 	require.NoError(t, err)
+
 	defer rows.Close()
 
 	var tables []string
 
 	for rows.Next() {
 		var tableName string
+
 		err := rows.Scan(&tableName)
 		require.NoError(t, err)
 

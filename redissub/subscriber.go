@@ -370,6 +370,7 @@ func (s *Subscriber) handleMessage(ctx context.Context, msg *message.Message) er
 
 func (s *Subscriber) processWithRetry(ctx context.Context, msg *message.Message) error {
 	maxAttempts := 1
+
 	if s.config.Retry != nil && s.config.Retry.MaxRetries > 0 {
 		maxAttempts = s.config.Retry.MaxRetries + 1
 	}

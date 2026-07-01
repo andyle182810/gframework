@@ -483,6 +483,7 @@ func TestMockService_ConcurrentStopIsSafe(t *testing.T) {
 	for range 3 {
 		go func() {
 			_ = svc.Stop()
+
 			done <- struct{}{}
 		}()
 	}

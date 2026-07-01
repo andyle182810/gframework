@@ -91,6 +91,7 @@ func TestRequestIDMiddleware(t *testing.T) {
 				}
 			} else {
 				var httpErr *echo.HTTPError
+
 				ok := errors.As(err, &httpErr)
 				require.True(t, ok)
 				require.Equal(t, test.expectedStatus, httpErr.Code)
@@ -212,6 +213,7 @@ func TestRequestIDWithConfigAutoGenerate(t *testing.T) { //nolint:funlen
 				}
 			} else {
 				var httpErr *echo.HTTPError
+
 				ok := errors.As(err, &httpErr)
 				require.True(t, ok)
 				require.Equal(t, test.expectedStatus, httpErr.Code)

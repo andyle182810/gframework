@@ -42,6 +42,7 @@ func TestPostJSON_SendsBodyAndReturnsTypedResponse(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 
 		var input testUser
+
 		_ = json.NewDecoder(r.Body).Decode(&input)
 
 		w.Header().Set("Content-Type", "application/json")

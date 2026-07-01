@@ -367,6 +367,7 @@ func TestWithRetryTx_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM retry_tx_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
@@ -433,6 +434,7 @@ func TestWithRetryTxDefault_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var value string
+
 	err = pg.QueryRow(ctx, "SELECT value FROM retry_tx_default_test WHERE id = 1").Scan(&value)
 	require.NoError(t, err)
 	require.Equal(t, "default_test", value)

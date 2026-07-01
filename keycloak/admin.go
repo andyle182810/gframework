@@ -1,6 +1,6 @@
 // Package keycloak provides a Keycloak integration with two complementary clients:
 //
-//   - AdminClient: a service-account-backed wrapper around gocloak/v13 for user
+//   - AdminClient: a service-account-backed wrapper around gocloak/v14 for user
 //     and realm-role lifecycle management. Service-account token caching and
 //     refresh are delegated to the authtoken package with a configurable safety
 //     buffer (default 60 s). Safe for concurrent use.
@@ -39,7 +39,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 	"github.com/andyle182810/gframework/authtoken"
 )
 
@@ -319,7 +319,7 @@ func (c *AdminClient) SendActionsEmail(ctx context.Context, id string, actions [
 
 	params := gocloak.ExecuteActionsEmail{ //nolint:exhaustruct
 		UserID:  &id,
-		Actions: &actions,
+		Actions: actions,
 	}
 
 	if err := c.gocloak.ExecuteActionsEmail(ctx, token, c.realm, params); err != nil {

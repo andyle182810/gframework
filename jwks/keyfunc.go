@@ -85,8 +85,9 @@ func New(ctx context.Context, urls []string, opts ...Option) (*KeyFunc, error) {
 					Msg("JWKS key refresh failed")
 			}
 		},
-		RateLimitWaitMax:  cfg.rateLimitWaitMax,
-		ValidationSkipAll: cfg.validationSkipAll,
+		RateLimitWaitMax:          cfg.rateLimitWaitMax,
+		ValidationSkipAll:         cfg.validationSkipAll,
+		NoErrorReturnFirstHTTPReq: nil,
 	}
 
 	keyFunc, err := keyfunc.NewDefaultOverrideCtx(ctx, urls, override)

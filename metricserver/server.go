@@ -30,8 +30,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v5"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 )
 
@@ -74,7 +75,11 @@ func New(cfg *Config) *Server {
 		return ctx.JSON(http.StatusOK, map[string]any{"status": "ok"})
 	})
 
-	ech.GET(metricsPath, echoprometheus.NewHandler())
+	metricsHandler := promhttp.InstrumentMetricHandler(
+		prometheus.DefaultRegisterer,
+		promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{DisableCompression: true}), //nolint:exhaustruct
+	)
+	ech.GET(metricsPath, echo.WrapHandler(metricsHandler))
 
 	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 

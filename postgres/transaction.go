@@ -46,6 +46,7 @@ func (p *Postgres) WithTransactionOptions(
 	defer func() {
 		if p := recover(); p != nil {
 			_ = tx.Rollback(ctx)
+
 			panic(p)
 		}
 	}()

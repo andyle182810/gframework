@@ -20,6 +20,8 @@ type Config struct {
 	HTTPServerWriteTimeout time.Duration `env:"HTTP_SERVER_WRITE_TIMEOUT" envDefault:"30s"`
 	HTTPSkipRequestID      bool          `env:"HTTP_SKIP_REQUEST_ID"      envDefault:"false"`
 	HTTPAllowOrigins       []string      `env:"HTTP_ALLOW_ORIGINS"        envDefault:"*"`
+	HTTPDisableTransform   bool          `env:"HTTP_DISABLE_TRANSFORM"    envDefault:"false"`
+	HTTPLogRequestBody     bool          `env:"HTTP_LOG_REQUEST_BODY"     envDefault:"true"`
 
 	// Metric Server
 	MetricServerHost         string        `env:"METRIC_SERVER_HOST"          envDefault:"0.0.0.0"`

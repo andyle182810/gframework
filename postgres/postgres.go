@@ -84,26 +84,11 @@ func New(cfg *Config) (*Postgres, error) {
 		Config:   nil,
 	}
 
-	pgConfig.MaxConns = cfg.MaxConnection
-	pgConfig.MinConns = cfg.MinConnection
-	pgConfig.MaxConnIdleTime = cfg.MaxConnectionIdleTime
-	pgConfig.MaxConnLifetime = cfg.MaxConnectionLifetime
-	pgConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
-	pgConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
 	pgConfig.ConnConfig.Tracer = tracer
 
-	if cfg.StatementTimeout > 0 {
-		pgConfig.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(cfg.StatementTimeout.Milliseconds(), 10)
-	}
+	applyPoolTuning(pgConfig, cfg)
 
-	if cfg.LockTimeout > 0 {
-		pgConfig.ConnConfig.RuntimeParams["lock_timeout"] = strconv.FormatInt(cfg.LockTimeout.Milliseconds(), 10)
-	}
-
-	if cfg.IdleInTransactionTimeout > 0 {
-		//nolint:lll
-		pgConfig.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = strconv.FormatInt(cfg.IdleInTransactionTimeout.Milliseconds(), 10)
-	}
+	applySessionTimeouts(pgConfig, cfg)
 
 	pgConfig.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		pgxdecimal.Register(conn.TypeMap())
@@ -119,6 +104,47 @@ func New(cfg *Config) (*Postgres, error) {
 	return &Postgres{
 		DBPool: pool,
 	}, nil
+}
+
+func applyPoolTuning(pgConfig *pgxpool.Config, cfg *Config) {
+	if cfg.MaxConnection > 0 {
+		pgConfig.MaxConns = cfg.MaxConnection
+	}
+
+	if cfg.MinConnection > 0 {
+		pgConfig.MinConns = cfg.MinConnection
+	}
+
+	if cfg.MaxConnectionIdleTime > 0 {
+		pgConfig.MaxConnIdleTime = cfg.MaxConnectionIdleTime
+	}
+
+	if cfg.MaxConnectionLifetime > 0 {
+		pgConfig.MaxConnLifetime = cfg.MaxConnectionLifetime
+	}
+
+	if cfg.HealthCheckPeriod > 0 {
+		pgConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
+	}
+
+	if cfg.ConnectTimeout > 0 {
+		pgConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
+	}
+}
+
+func applySessionTimeouts(pgConfig *pgxpool.Config, cfg *Config) {
+	if cfg.StatementTimeout > 0 {
+		pgConfig.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(cfg.StatementTimeout.Milliseconds(), 10)
+	}
+
+	if cfg.LockTimeout > 0 {
+		pgConfig.ConnConfig.RuntimeParams["lock_timeout"] = strconv.FormatInt(cfg.LockTimeout.Milliseconds(), 10)
+	}
+
+	if cfg.IdleInTransactionTimeout > 0 {
+		idleTimeout := strconv.FormatInt(cfg.IdleInTransactionTimeout.Milliseconds(), 10)
+		pgConfig.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = idleTimeout
+	}
 }
 
 func (p *Postgres) Start(ctx context.Context) error {

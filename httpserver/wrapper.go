@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/andyle182810/gframework/middleware"
+	"github.com/andyle182810/gframework/transformer"
 	"github.com/andyle182810/gframework/validator"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
@@ -32,6 +33,7 @@ func Wrapper[TREQ any](wrapped func(*echo.Context, *TREQ) (any, *echo.HTTPError)
 		}
 
 		status := http.StatusOK
+
 		if response, errx := echo.UnwrapResponse(c.Response()); errx == nil && response != nil && response.Status != 0 {
 			status = response.Status
 		}
@@ -63,16 +65,25 @@ func bindAndValidate[TREQ any](c *echo.Context) (*TREQ, *echo.HTTPError) {
 		return nil, httpErr
 	}
 
+	if t := transformerFromContext(c); t != nil && transformer.IsTransformable(&req) {
+		if err := t.Transform(c.Request().Context(), &req); err != nil {
+			httpErr := BadRequestError(err, "Failed to transform request")
+			_ = httpErr.Wrap(err)
+
+			return nil, httpErr
+		}
+	}
+
 	if err := c.Validate(&req); err != nil {
-		message := "Validation failed"
+		message := "Failed to validate request"
 
 		var validationErrs validator.ValidationErrors
-
 		if errors.As(err, &validationErrs) {
 			message = validationErrs.Error()
 		}
 
 		httpErr := BadRequestError(err, message)
+		_ = httpErr.Wrap(err)
 
 		return nil, httpErr
 	}

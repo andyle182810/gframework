@@ -124,6 +124,7 @@ func TestErrorHandler_WithLogging(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+
 	logger := zerolog.New(&buf)
 
 	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
@@ -213,6 +214,7 @@ func TestErrorHandler_NonHTTPError_WithLogging(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+
 	logger := zerolog.New(&buf)
 
 	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct

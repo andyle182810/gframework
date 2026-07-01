@@ -14,28 +14,29 @@ go get github.com/andyle182810/gframework
 
 ## 🧩 Packages
 
-| Package                                           | Description                                                                                                          |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [`httpserver`](httpserver/)                       | Echo v5 REST server with request logging, body limits, validation, error handling, CORS, and secure timeout defaults |
-| [`runner`](runner/)                               | Application lifecycle manager: tiered startup (infrastructure → core), graceful shutdown, failure detection          |
-| [`middleware`](middleware/)                       | JWT validation (JWKS), internal service-to-service auth, request ID, request logging, role checks, error handler     |
-| [`jwks`](jwks/)                                   | JWKS key function with background refresh and rate-limited unknown-KID lookups                                       |
-| [`authtoken`](authtoken/)                         | Keycloak service-account token cache with automatic refresh                                                          |
-| [`keycloak`](keycloak/)                           | Keycloak admin client (users, realm roles) and UMA 2.0 permission checks                                             |
-| [`httpclient`](httpclient/)                       | Type-safe JSON REST client with bearer-token injection, request-ID propagation, response size limits                 |
-| [`postgres`](postgres/)                           | pgx/v5 connection pool with tracing, session timeouts, migrations, transactions, retry, batching                     |
-| [`valkey`](valkey/)                               | Valkey/Redis client wrapper with TLS, pooling, and health checks                                                     |
-| [`redispub`](redispub/) / [`redissub`](redissub/) | Redis Streams pub/sub (Watermill) with retries, execution timeouts, and dead-letter queues                           |
-| [`taskqueue`](taskqueue/)                         | Redis-backed task queue with delayed execution and stale-task recovery                                               |
-| [`distlock`](distlock/)                           | Redis distributed locks (fail-hard and fail-silent modes)                                                            |
-| [`workerpool`](workerpool/)                       | Tick-driven worker pool for periodic background jobs                                                                 |
-| [`cache`](cache/)                                 | Generic cache helpers and collision-safe key builders                                                                |
-| [`spaces`](spaces/)                               | DigitalOcean Spaces / S3-compatible storage with presigned URLs and key validation                                   |
-| [`metricserver`](metricserver/)                   | Standalone Prometheus `/metrics` + `/status` server                                                                  |
-| [`validator`](validator/)                         | Request validation via go-playground/validator with custom tags (`regexp`, …)                                        |
-| [`logutil`](logutil/)                             | zerolog level helpers                                                                                                |
-| [`testutil`](testutil/)                           | Testcontainers helpers (PostgreSQL, Valkey) and Echo test contexts                                                   |
-| [`util`](util/)                                   | Date parsing and date-range validation helpers                                                                       |
+| Package                                           | Description                                                                                                           |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [`httpserver`](httpserver/)                       | Echo v5 REST server with request logging, body limits, transformation, validation, error handling, CORS, and timeouts |
+| [`runner`](runner/)                               | Application lifecycle manager: tiered startup (infrastructure → core), graceful shutdown, failure detection           |
+| [`middleware`](middleware/)                       | JWT validation (JWKS), internal service-to-service auth, request ID, request logging, role checks, error handler      |
+| [`jwks`](jwks/)                                   | JWKS key function with background refresh and rate-limited unknown-KID lookups                                        |
+| [`authtoken`](authtoken/)                         | Keycloak service-account token cache with automatic refresh                                                           |
+| [`keycloak`](keycloak/)                           | Keycloak admin client (users, realm roles) and UMA 2.0 permission checks                                              |
+| [`httpclient`](httpclient/)                       | Type-safe JSON REST client with bearer-token injection, request-ID propagation, response size limits                  |
+| [`postgres`](postgres/)                           | pgx/v5 connection pool with tracing, session timeouts, migrations, transactions, retry, batching                      |
+| [`valkey`](valkey/)                               | Valkey/Redis client wrapper with TLS, pooling, and health checks                                                      |
+| [`redispub`](redispub/) / [`redissub`](redissub/) | Redis Streams pub/sub (Watermill) with retries, execution timeouts, and dead-letter queues                            |
+| [`taskqueue`](taskqueue/)                         | Redis-backed task queue with delayed execution and stale-task recovery                                                |
+| [`distlock`](distlock/)                           | Redis distributed locks (fail-hard and fail-silent modes)                                                             |
+| [`workerpool`](workerpool/)                       | Tick-driven worker pool for periodic background jobs                                                                  |
+| [`cache`](cache/)                                 | Generic cache helpers and collision-safe key builders                                                                 |
+| [`spaces`](spaces/)                               | DigitalOcean Spaces / S3-compatible storage with presigned URLs and key validation                                    |
+| [`metricserver`](metricserver/)                   | Standalone Prometheus `/metrics` + `/status` server                                                                   |
+| [`validator`](validator/)                         | Request validation via go-playground/validator with custom tags (`regexp`, …)                                         |
+| [`transformer`](transformer/)                     | Struct-field transformation via go-playground/mold (`mod:` conform before validation, `scrub:` PII redaction)         |
+| [`logutil`](logutil/)                             | zerolog level helpers                                                                                                 |
+| [`testutil`](testutil/)                           | Testcontainers helpers (PostgreSQL, Valkey) and Echo test contexts                                                    |
+| [`util`](util/)                                   | Date parsing and date-range validation helpers                                                                        |
 
 ## 🚀 Quick Start
 

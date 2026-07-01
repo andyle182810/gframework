@@ -76,6 +76,7 @@ func TestWithTransaction_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
@@ -108,6 +109,7 @@ func TestWithTransaction_Rollback(t *testing.T) {
 	require.ErrorIs(t, err, errIntentional)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_rollback_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
@@ -153,6 +155,7 @@ func TestWithTransaction_MultipleOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_multi_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 5, count)
@@ -186,6 +189,7 @@ func TestWithTransaction_PartialRollback(t *testing.T) {
 	require.ErrorIs(t, err, postgres.ErrTxRolledBack)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_partial_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
@@ -260,6 +264,7 @@ func TestWithSerializableTransaction_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_serializable_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
@@ -286,6 +291,7 @@ func TestWithRepeatableReadTransaction_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_repeatable_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
@@ -318,6 +324,7 @@ func TestWithTransactionOptions_CustomOptions(t *testing.T) {
 	require.NoError(t, err)
 
 	var value string
+
 	err = pg.QueryRow(ctx, "SELECT value FROM tx_custom_opts_test WHERE id = 1").Scan(&value)
 	require.NoError(t, err)
 	require.Equal(t, "custom_value", value)
@@ -352,11 +359,13 @@ func TestWithTransaction_NestedQueries(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
+
 	err = pg.QueryRow(ctx, "SELECT COUNT(*) FROM tx_nested_test").Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, 2, count)
 
 	var childValue string
+
 	err = pg.QueryRow(ctx, "SELECT value FROM tx_nested_test WHERE parent_id IS NOT NULL").Scan(&childValue)
 	require.NoError(t, err)
 	require.Equal(t, "child", childValue)
