@@ -39,7 +39,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	gws "github.com/gorilla/websocket"
 )
 
@@ -57,6 +56,7 @@ var (
 	ErrSendBufferFull = errors.New("websocket: send buffer full")
 	ErrPayloadEmpty   = errors.New("websocket: payload is empty")
 	ErrConfigNil      = errors.New("websocket: configuration must not be nil")
+	ErrConnClosed     = errors.New("websocket: connection is closed")
 )
 
 type Config struct {
@@ -140,7 +140,7 @@ func (ws *WebSocket) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, err
 		return nil, setErr
 	}
 
-	conn := newConn(uuid.NewString(), wsConn, pingDeadline)
+	conn := newConn(wsConn, pingDeadline)
 
 	go conn.writeLoop(ws.cfg.WriteTimeout, ws.cfg.PingInterval, ws.cfg.PingTimeout)
 

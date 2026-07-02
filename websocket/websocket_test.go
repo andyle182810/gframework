@@ -134,8 +134,7 @@ func TestWS_Upgrade(t *testing.T) {
 
 	serverConn := <-connCh
 
-	assert.NotEmpty(t, serverConn.ID)
-	assert.NotNil(t, serverConn.Meta)
+	assert.NotNil(t, serverConn)
 }
 
 func TestWS_Upgrade_BadRequest(t *testing.T) {
@@ -272,7 +271,7 @@ func TestConn_Close(t *testing.T) {
 	assert.NoError(t, serverConn.Close())
 }
 
-func TestConn_Meta(t *testing.T) {
+func TestConn_WriteMessage_AfterClose(t *testing.T) {
 	t.Parallel()
 
 	ws := newTestWS(t)
@@ -281,8 +280,29 @@ func TestConn_Meta(t *testing.T) {
 
 	serverConn := <-connCh
 
-	require.NotNil(t, serverConn.Meta)
+	require.NoError(t, serverConn.Close())
 
-	serverConn.Meta["user_id"] = "abc123"
-	assert.Equal(t, "abc123", serverConn.Meta["user_id"])
+	err := serverConn.WriteMessage(gws.TextMessage, []byte("hi"))
+	assert.ErrorIs(t, err, websocket.ErrConnClosed)
+}
+
+func TestConn_Close_DoesNotHang(t *testing.T) {
+	t.Parallel()
+
+	ws := newTestWS(t)
+	server, connCh := startUpgradeServer(t, ws)
+	_ = dialClient(t, server)
+
+	serverConn := <-connCh
+
+	closeDone := make(chan error, 1)
+
+	go func() { closeDone <- serverConn.Close() }()
+
+	select {
+	case err := <-closeDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Close() did not return within 1s")
+	}
 }

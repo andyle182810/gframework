@@ -14,26 +14,21 @@ type sendMsg struct {
 }
 
 type Conn struct {
-	ID   string
-	Meta map[string]any
-
 	ws           *gws.Conn
 	send         chan sendMsg
-	once         sync.Once
+	closed       chan struct{}
+	closeOnce    sync.Once
+	wg           sync.WaitGroup
 	done         chan struct{}
+	closeErr     error
 	pingDeadline time.Duration
 }
 
-func newConn(
-	id string,
-	wsConn *gws.Conn,
-	pingDeadline time.Duration,
-) *Conn {
+func newConn(wsConn *gws.Conn, pingDeadline time.Duration) *Conn {
 	return &Conn{ //nolint:exhaustruct
-		ID:           id,
-		Meta:         make(map[string]any),
 		ws:           wsConn,
 		send:         make(chan sendMsg, defaultSendBufferSize),
+		closed:       make(chan struct{}),
 		done:         make(chan struct{}),
 		pingDeadline: pingDeadline,
 	}
@@ -51,6 +46,15 @@ func (c *Conn) ReadMessage() (int, Payload, error) {
 }
 
 func (c *Conn) WriteMessage(messageType int, data []byte) error {
+	c.wg.Add(1)
+	defer c.wg.Done()
+
+	select {
+	case <-c.closed:
+		return ErrConnClosed
+	default:
+	}
+
 	msg := sendMsg{msgType: messageType, data: data}
 
 	select {
@@ -75,10 +79,14 @@ func (c *Conn) WriteJSON(v any) error {
 }
 
 func (c *Conn) Close() error {
-	c.once.Do(func() { close(c.send) })
+	c.closeOnce.Do(func() {
+		close(c.closed)
+		c.wg.Wait()
+	})
+
 	<-c.done
 
-	return c.ws.Close()
+	return c.closeErr
 }
 
 func (c *Conn) writeLoop(writeTimeout, pingInterval, pingTimeout time.Duration) {
@@ -93,26 +101,34 @@ func (c *Conn) writeLoop(writeTimeout, pingInterval, pingTimeout time.Duration) 
 
 	for {
 		select {
-		case msg, ok := <-c.send:
-			if !ok {
-				_ = c.ws.WriteMessage(gws.CloseMessage, []byte{})
+		case <-c.closed:
+			_ = c.ws.SetWriteDeadline(time.Now().Add(writeTimeout))
+			_ = c.ws.WriteMessage(gws.CloseMessage, []byte{})
+			c.closeErr = c.ws.Close()
 
-				return
-			}
-
+			return
+		case msg := <-c.send:
 			if err := c.ws.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+				c.closeErr = c.ws.Close()
+
 				return
 			}
 
 			if err := c.ws.WriteMessage(msg.msgType, msg.data); err != nil {
+				c.closeErr = c.ws.Close()
+
 				return
 			}
 		case <-ticker.C:
 			if err := c.ws.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+				c.closeErr = c.ws.Close()
+
 				return
 			}
 
 			if err := c.ws.WriteMessage(gws.PingMessage, nil); err != nil {
+				c.closeErr = c.ws.Close()
+
 				return
 			}
 		}
