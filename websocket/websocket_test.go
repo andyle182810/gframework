@@ -389,6 +389,44 @@ func TestWS_Upgrade_CrossOriginDeniedByDefault(t *testing.T) {
 	assert.ErrorIs(t, err, gws.ErrBadHandshake)
 }
 
+func TestWS_Dial_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	ws := newTestWS(t)
+	server, connCh := startUpgradeServer(t, ws)
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	clientConn, err := newTestWS(t).Dial(testutil.Context(t), wsURL)
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = clientConn.Close() })
+
+	serverConn := <-connCh
+
+	require.NoError(t, clientConn.Write([]byte("ping")))
+
+	msgType, payload, err := serverConn.ReadMessage()
+	require.NoError(t, err)
+	assert.Equal(t, gws.TextMessage, msgType)
+	assert.Equal(t, "ping", string(payload))
+
+	require.NoError(t, serverConn.Write([]byte("pong")))
+
+	msgType, payload, err = clientConn.ReadMessage()
+	require.NoError(t, err)
+	assert.Equal(t, gws.TextMessage, msgType)
+	assert.Equal(t, "pong", string(payload))
+}
+
+func TestWS_Dial_Refused(t *testing.T) {
+	t.Parallel()
+
+	conn, err := newTestWS(t).Dial(testutil.Context(t), "ws://127.0.0.1:1/ws")
+	assert.Nil(t, conn)
+	assert.Error(t, err)
+}
+
 func TestConn_ConcurrentWriteAndClose(t *testing.T) {
 	t.Parallel()
 

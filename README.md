@@ -23,6 +23,7 @@ go get github.com/andyle182810/gframework
 | [`authtoken`](authtoken/)                         | Keycloak service-account token cache with automatic refresh                                                           |
 | [`keycloak`](keycloak/)                           | Keycloak admin client (users, realm roles) and UMA 2.0 permission checks                                              |
 | [`httpclient`](httpclient/)                       | Type-safe JSON REST client with bearer-token injection, request-ID propagation, response size limits                  |
+| [`websocket`](websocket/)                         | WebSocket upgrade and client dialing with concurrency-safe writes, ping/pong keepalive, origin allowlisting           |
 | [`postgres`](postgres/)                           | pgx/v5 connection pool with tracing, session timeouts, migrations, transactions, retry, batching                      |
 | [`valkey`](valkey/)                               | Valkey/Redis client wrapper with TLS, pooling, and health checks                                                      |
 | [`redispub`](redispub/) / [`redissub`](redissub/) | Redis Streams pub/sub (Watermill) with retries, execution timeouts, and dead-letter queues                            |
@@ -129,12 +130,13 @@ make lint       # go vet + golangci-lint v2 (fmt + run)
 
 ## 💡 Examples
 
-| Example                                                 | Shows                                                                                  |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [examples/minimal-api](examples/minimal-api/)           | Smallest possible service: httpserver + runner + graceful shutdown                     |
-| [examples/jwt-auth](examples/jwt-auth/)                 | JWKS + JWT middleware with issuer/audience pinning, realm roles, internal service auth |
-| [examples/messaging-worker](examples/messaging-worker/) | Redis Streams pub/sub with retries + DLQ, periodic worker pool, distributed locks      |
-| [examples/demo-api](examples/demo-api/)                 | Full showcase: PostgreSQL, migrations, Swagger, Docker Compose                         |
+| Example                                                 | Shows                                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [examples/minimal-api](examples/minimal-api/)           | Smallest possible service: httpserver + runner + graceful shutdown                          |
+| [examples/jwt-auth](examples/jwt-auth/)                 | JWKS + JWT middleware with issuer/audience pinning, realm roles, internal service auth      |
+| [examples/messaging-worker](examples/messaging-worker/) | Redis Streams pub/sub with retries + DLQ, periodic worker pool, distributed locks           |
+| [examples/websocket-echo](examples/websocket-echo/)     | WebSocket echo server + interactive client: Upgrade, Dial, JSON messages, concurrent writes |
+| [examples/demo-api](examples/demo-api/)                 | Full showcase: PostgreSQL, migrations, Swagger, Docker Compose                              |
 
 ## 🛠️ Error handling conventions
 

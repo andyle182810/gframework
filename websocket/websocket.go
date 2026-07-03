@@ -4,8 +4,9 @@
 // concepts (rooms, hubs, auth) on top of the raw Conn.
 //
 // WebSocket.Upgrade performs the HTTP-to-WebSocket handshake and returns a
-// Conn. Conn.ReadMessage blocks for the next inbound frame and must be used
-// from a single goroutine. Write, WriteMessage, and WriteJSON are safe for
+// Conn; WebSocket.Dial establishes an outbound client connection managed the
+// same way. Conn.ReadMessage blocks for the next inbound frame and must be
+// used from a single goroutine. Write, WriteMessage, and WriteJSON are safe for
 // concurrent use: a mutex serializes them onto the underlying connection and
 // each call blocks until its frame is written or WriteTimeout elapses. A
 // background goroutine pings the peer every PingInterval; a peer that stops
@@ -37,6 +38,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -148,6 +150,29 @@ func (ws *WebSocket) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, err
 		return nil, err
 	}
 
+	return ws.adopt(wsConn)
+}
+
+func (ws *WebSocket) Dial(ctx context.Context, url string) (*Conn, error) {
+	dialer := gws.Dialer{ //nolint:exhaustruct
+		ReadBufferSize:   ws.cfg.ReadBufferSize,
+		WriteBufferSize:  ws.cfg.WriteBufferSize,
+		HandshakeTimeout: ws.cfg.WriteTimeout,
+	}
+
+	wsConn, resp, err := dialer.DialContext(ctx, url, nil)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ws.adopt(wsConn)
+}
+
+func (ws *WebSocket) adopt(wsConn *gws.Conn) (*Conn, error) {
 	wsConn.SetReadLimit(ws.cfg.ReadLimit)
 
 	pingDeadline := ws.cfg.PingInterval + ws.cfg.PingTimeout
