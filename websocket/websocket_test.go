@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -304,5 +305,168 @@ func TestConn_Close_DoesNotHang(t *testing.T) {
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		t.Fatal("Close() did not return within 1s")
+	}
+}
+
+func TestNew_NegativeConfig(t *testing.T) {
+	t.Parallel()
+
+	ws, err := websocket.New(&websocket.Config{PingInterval: -time.Second}) //nolint:exhaustruct
+	assert.Nil(t, ws)
+	assert.ErrorIs(t, err, websocket.ErrConfigInvalid)
+}
+
+func TestConfig_WithDefaults_DoesNotMutateReceiver(t *testing.T) {
+	t.Parallel()
+
+	original := &websocket.Config{} //nolint:exhaustruct
+	_ = original.WithDefaults()
+
+	assert.Zero(t, original.PingInterval)
+}
+
+func dialWithOrigin(t *testing.T, server *httptest.Server, origin string) error {
+	t.Helper()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	header := http.Header{"Origin": []string{origin}}
+
+	client, resp, err := gws.DefaultDialer.DialContext(testutil.Context(t), wsURL, header)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+
+	if client != nil {
+		t.Cleanup(func() { _ = client.Close() })
+	}
+
+	return err
+}
+
+func TestWS_Upgrade_OriginAllowed(t *testing.T) {
+	t.Parallel()
+
+	ws, err := websocket.New(&websocket.Config{AllowedOrigins: []string{"https://ok.example"}}) //nolint:exhaustruct
+	require.NoError(t, err)
+
+	server, connCh := startUpgradeServer(t, ws)
+
+	require.NoError(t, dialWithOrigin(t, server, "https://ok.example"))
+	assert.NotNil(t, <-connCh)
+}
+
+func TestWS_Upgrade_OriginDenied(t *testing.T) {
+	t.Parallel()
+
+	ws, err := websocket.New(&websocket.Config{AllowedOrigins: []string{"https://ok.example"}}) //nolint:exhaustruct
+	require.NoError(t, err)
+
+	server, _ := startUpgradeServer(t, ws)
+
+	err = dialWithOrigin(t, server, "https://evil.example")
+	assert.ErrorIs(t, err, gws.ErrBadHandshake)
+}
+
+func TestWS_Upgrade_OriginWildcard(t *testing.T) {
+	t.Parallel()
+
+	ws, err := websocket.New(&websocket.Config{AllowedOrigins: []string{"*"}}) //nolint:exhaustruct
+	require.NoError(t, err)
+
+	server, connCh := startUpgradeServer(t, ws)
+
+	require.NoError(t, dialWithOrigin(t, server, "https://anything.example"))
+	assert.NotNil(t, <-connCh)
+}
+
+func TestWS_Upgrade_CrossOriginDeniedByDefault(t *testing.T) {
+	t.Parallel()
+
+	ws := newTestWS(t)
+	server, _ := startUpgradeServer(t, ws)
+
+	err := dialWithOrigin(t, server, "https://evil.example")
+	assert.ErrorIs(t, err, gws.ErrBadHandshake)
+}
+
+func TestConn_ConcurrentWriteAndClose(t *testing.T) {
+	t.Parallel()
+
+	ws := newTestWS(t)
+	server, connCh := startUpgradeServer(t, ws)
+	client := dialClient(t, server)
+
+	serverConn := <-connCh
+
+	// Drain the client side so server writes never back up.
+	go func() {
+		for {
+			if _, _, err := client.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
+	var wg sync.WaitGroup
+
+	for range 10 {
+		wg.Go(func() {
+			for range 100 {
+				if err := serverConn.Write([]byte("payload")); err != nil {
+					assert.ErrorIs(t, err, websocket.ErrConnClosed)
+				}
+			}
+		})
+	}
+
+	require.NoError(t, serverConn.Close())
+	wg.Wait()
+
+	err := serverConn.WriteMessage(gws.TextMessage, []byte("late"))
+	assert.ErrorIs(t, err, websocket.ErrConnClosed)
+}
+
+func TestConn_PingKeepsConnectionAlive(t *testing.T) {
+	t.Parallel()
+
+	wsServer, err := websocket.New(&websocket.Config{ //nolint:exhaustruct
+		PingInterval: 50 * time.Millisecond,
+		PingTimeout:  250 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	server, connCh := startUpgradeServer(t, wsServer)
+	client := dialClient(t, server)
+
+	serverConn := <-connCh
+
+	// Reading makes the client process pings, which gorilla answers with
+	// pongs by default; those pongs keep the server read deadline fresh.
+	go func() {
+		for {
+			if _, _, readErr := client.ReadMessage(); readErr != nil {
+				return
+			}
+		}
+	}()
+
+	serverRead := make(chan error, 1)
+
+	go func() {
+		_, _, readErr := serverConn.ReadMessage()
+		serverRead <- readErr
+	}()
+
+	// Sit idle for several read-deadline windows (deadline is 300ms); only
+	// the ping/pong exchange can keep the connection alive this long.
+	time.Sleep(900 * time.Millisecond)
+
+	require.NoError(t, client.WriteMessage(gws.TextMessage, []byte("still alive")))
+
+	select {
+	case readErr := <-serverRead:
+		require.NoError(t, readErr)
+	case <-time.After(time.Second):
+		t.Fatal("server ReadMessage did not return")
 	}
 }

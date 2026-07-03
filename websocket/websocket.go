@@ -3,11 +3,14 @@
 // their own read loop, decide what messages mean, and own any application
 // concepts (rooms, hubs, auth) on top of the raw Conn.
 //
-// WS.Upgrade performs the HTTP-to-WebSocket handshake and returns a Conn.
-// Conn.ReadMessage blocks for the next inbound frame; Write, WriteMessage,
-// and WriteJSON queue outbound frames onto an internal channel drained by a
-// single writer goroutine, so they are safe to call concurrently. A
-// background ping/pong keeps idle connections alive and detects dead peers.
+// WebSocket.Upgrade performs the HTTP-to-WebSocket handshake and returns a
+// Conn. Conn.ReadMessage blocks for the next inbound frame and must be used
+// from a single goroutine. Write, WriteMessage, and WriteJSON are safe for
+// concurrent use: a mutex serializes them onto the underlying connection and
+// each call blocks until its frame is written or WriteTimeout elapses. A
+// background goroutine pings the peer every PingInterval; a peer that stops
+// answering trips the read deadline, which surfaces as an error from
+// ReadMessage.
 //
 // Basic usage:
 //
@@ -49,14 +52,13 @@ const (
 	defaultPingTimeout     = 10 * time.Second
 	defaultWriteTimeout    = 10 * time.Second
 	defaultReadLimit       = 512 * 1024 // 512 KB
-	defaultSendBufferSize  = 256
 )
 
 var (
-	ErrSendBufferFull = errors.New("websocket: send buffer full")
-	ErrPayloadEmpty   = errors.New("websocket: payload is empty")
-	ErrConfigNil      = errors.New("websocket: configuration must not be nil")
-	ErrConnClosed     = errors.New("websocket: connection is closed")
+	ErrPayloadEmpty  = errors.New("websocket: payload is empty")
+	ErrConfigNil     = errors.New("websocket: configuration must not be nil")
+	ErrConfigInvalid = errors.New("websocket: configuration values must not be negative")
+	ErrConnClosed    = errors.New("websocket: connection is closed")
 )
 
 type Config struct {
@@ -70,35 +72,46 @@ type Config struct {
 }
 
 func (cfg *Config) WithDefaults() *Config {
-	if cfg.ReadBufferSize == 0 {
-		cfg.ReadBufferSize = defaultReadBufferSize
+	out := *cfg
+
+	if out.ReadBufferSize == 0 {
+		out.ReadBufferSize = defaultReadBufferSize
 	}
 
-	if cfg.WriteBufferSize == 0 {
-		cfg.WriteBufferSize = defaultWriteBufferSize
+	if out.WriteBufferSize == 0 {
+		out.WriteBufferSize = defaultWriteBufferSize
 	}
 
-	if cfg.PingInterval == 0 {
-		cfg.PingInterval = defaultPingInterval
+	if out.PingInterval == 0 {
+		out.PingInterval = defaultPingInterval
 	}
 
-	if cfg.PingTimeout == 0 {
-		cfg.PingTimeout = defaultPingTimeout
+	if out.PingTimeout == 0 {
+		out.PingTimeout = defaultPingTimeout
 	}
 
-	if cfg.WriteTimeout == 0 {
-		cfg.WriteTimeout = defaultWriteTimeout
+	if out.WriteTimeout == 0 {
+		out.WriteTimeout = defaultWriteTimeout
 	}
 
-	if cfg.ReadLimit == 0 {
-		cfg.ReadLimit = defaultReadLimit
+	if out.ReadLimit == 0 {
+		out.ReadLimit = defaultReadLimit
 	}
 
-	return cfg
+	return &out
+}
+
+func (cfg *Config) validate() error {
+	if cfg.ReadBufferSize < 0 || cfg.WriteBufferSize < 0 || cfg.ReadLimit < 0 ||
+		cfg.PingInterval < 0 || cfg.PingTimeout < 0 || cfg.WriteTimeout < 0 {
+		return ErrConfigInvalid
+	}
+
+	return nil
 }
 
 type WebSocket struct {
-	cfg      Config
+	cfg      *Config
 	upgrader gws.Upgrader
 }
 
@@ -107,10 +120,14 @@ func New(cfg *Config) (*WebSocket, error) {
 		return nil, ErrConfigNil
 	}
 
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+
 	cfg = cfg.WithDefaults()
 
 	return &WebSocket{
-		cfg:      *cfg,
+		cfg:      cfg,
 		upgrader: buildUpgrader(cfg),
 	}, nil
 }
@@ -140,32 +157,45 @@ func (ws *WebSocket) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, err
 		return nil, setErr
 	}
 
-	conn := newConn(wsConn, pingDeadline)
+	conn := newConn(wsConn, ws.cfg.WriteTimeout, pingDeadline)
 
-	go conn.writeLoop(ws.cfg.WriteTimeout, ws.cfg.PingInterval, ws.cfg.PingTimeout)
+	go conn.pingLoop(ws.cfg.PingInterval)
 
 	return conn, nil
 }
 
 func buildUpgrader(cfg *Config) gws.Upgrader {
-	checkOrigin := func(_ *http.Request) bool { return true }
-
-	if len(cfg.AllowedOrigins) > 0 {
-		allowed := make(map[string]struct{}, len(cfg.AllowedOrigins))
-		for _, origin := range cfg.AllowedOrigins {
-			allowed[origin] = struct{}{}
-		}
-
-		checkOrigin = func(r *http.Request) bool {
-			_, ok := allowed[r.Header.Get("Origin")]
-
-			return ok
-		}
-	}
-
 	return gws.Upgrader{ //nolint:exhaustruct
 		ReadBufferSize:  cfg.ReadBufferSize,
 		WriteBufferSize: cfg.WriteBufferSize,
-		CheckOrigin:     checkOrigin,
+		CheckOrigin:     buildCheckOrigin(cfg.AllowedOrigins),
+	}
+}
+
+func buildCheckOrigin(origins []string) func(*http.Request) bool {
+	if len(origins) == 0 {
+		return nil
+	}
+
+	allowAll := false
+	allowed := make(map[string]struct{}, len(origins))
+
+	for _, origin := range origins {
+		if origin == "*" {
+			allowAll = true
+		}
+
+		allowed[origin] = struct{}{}
+	}
+
+	return func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" || allowAll {
+			return true
+		}
+
+		_, ok := allowed[origin]
+
+		return ok
 	}
 }

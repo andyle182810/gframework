@@ -2,36 +2,38 @@ package websocket
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
 	gws "github.com/gorilla/websocket"
 )
 
-type sendMsg struct {
-	msgType int
-	data    []byte
-}
-
 type Conn struct {
 	ws           *gws.Conn
-	send         chan sendMsg
-	closed       chan struct{}
-	closeOnce    sync.Once
-	wg           sync.WaitGroup
-	done         chan struct{}
-	closeErr     error
+	writeTimeout time.Duration
 	pingDeadline time.Duration
+	writeMu      sync.Mutex
+	closeOnce    sync.Once
+	closed       chan struct{}
+	closeErr     error
 }
 
-func newConn(wsConn *gws.Conn, pingDeadline time.Duration) *Conn {
-	return &Conn{ //nolint:exhaustruct
+func newConn(wsConn *gws.Conn, writeTimeout, pingDeadline time.Duration) *Conn {
+	conn := &Conn{ //nolint:exhaustruct
 		ws:           wsConn,
-		send:         make(chan sendMsg, defaultSendBufferSize),
-		closed:       make(chan struct{}),
-		done:         make(chan struct{}),
+		writeTimeout: writeTimeout,
 		pingDeadline: pingDeadline,
+		closed:       make(chan struct{}),
 	}
+
+	// Installed before the caller can read and before the ping loop starts,
+	// so the handler is never mutated concurrently.
+	wsConn.SetPongHandler(func(_ string) error {
+		return wsConn.SetReadDeadline(time.Now().Add(pingDeadline))
+	})
+
+	return conn
 }
 
 func (c *Conn) ReadMessage() (int, Payload, error) {
@@ -46,23 +48,12 @@ func (c *Conn) ReadMessage() (int, Payload, error) {
 }
 
 func (c *Conn) WriteMessage(messageType int, data []byte) error {
-	c.wg.Add(1)
-	defer c.wg.Done()
-
-	select {
-	case <-c.closed:
-		return ErrConnClosed
-	default:
+	err := c.writeFrame(messageType, data)
+	if err != nil && !errors.Is(err, ErrConnClosed) {
+		_ = c.Close()
 	}
 
-	msg := sendMsg{msgType: messageType, data: data}
-
-	select {
-	case c.send <- msg:
-		return nil
-	default:
-		return ErrSendBufferFull
-	}
+	return err
 }
 
 func (c *Conn) Write(data []byte) error {
@@ -78,56 +69,50 @@ func (c *Conn) WriteJSON(v any) error {
 	return c.Write(data)
 }
 
+// Close sends a close frame, closes the underlying connection, and stops the
+// ping loop. It is safe to call from any goroutine and more than once;
+// every call returns the result of the first.
 func (c *Conn) Close() error {
 	c.closeOnce.Do(func() {
 		close(c.closed)
-		c.wg.Wait()
-	})
 
-	<-c.done
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+
+		_ = c.ws.SetWriteDeadline(time.Now().Add(c.writeTimeout))
+		_ = c.ws.WriteMessage(gws.CloseMessage, gws.FormatCloseMessage(gws.CloseNormalClosure, ""))
+		c.closeErr = c.ws.Close()
+	})
 
 	return c.closeErr
 }
 
-func (c *Conn) writeLoop(writeTimeout, pingInterval, pingTimeout time.Duration) {
-	defer close(c.done)
+func (c *Conn) writeFrame(messageType int, data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
 
-	ticker := time.NewTicker(pingInterval)
+	select {
+	case <-c.closed:
+		return ErrConnClosed
+	default:
+	}
+
+	_ = c.ws.SetWriteDeadline(time.Now().Add(c.writeTimeout))
+
+	return c.ws.WriteMessage(messageType, data)
+}
+
+func (c *Conn) pingLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-
-	c.ws.SetPongHandler(func(_ string) error {
-		return c.ws.SetReadDeadline(time.Now().Add(pingInterval + pingTimeout))
-	})
 
 	for {
 		select {
 		case <-c.closed:
-			_ = c.ws.SetWriteDeadline(time.Now().Add(writeTimeout))
-			_ = c.ws.WriteMessage(gws.CloseMessage, []byte{})
-			c.closeErr = c.ws.Close()
-
 			return
-		case msg := <-c.send:
-			if err := c.ws.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
-				c.closeErr = c.ws.Close()
-
-				return
-			}
-
-			if err := c.ws.WriteMessage(msg.msgType, msg.data); err != nil {
-				c.closeErr = c.ws.Close()
-
-				return
-			}
 		case <-ticker.C:
-			if err := c.ws.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
-				c.closeErr = c.ws.Close()
-
-				return
-			}
-
-			if err := c.ws.WriteMessage(gws.PingMessage, nil); err != nil {
-				c.closeErr = c.ws.Close()
+			if err := c.writeFrame(gws.PingMessage, nil); err != nil {
+				_ = c.Close()
 
 				return
 			}
