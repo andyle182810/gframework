@@ -1,4 +1,4 @@
-.PHONY: help test test-coverage test-clean pre-lint fmt lint lint-fix pre-benchmark benchmark deps
+.PHONY: help test test-coverage test-clean pre-lint fmt lint lint-fix pre-benchmark benchmark deps pre-vuln vuln
 
 .DEFAULT_GOAL := help
 
@@ -51,3 +51,13 @@ benchmark: pre-benchmark ## Run benchmarks
 deps: ## Install and tidy dependencies
 	go mod download
 	go mod tidy
+
+## Vulnerability scanning commands
+pre-vuln: ## Install govulncheck
+	go install golang.org/x/vuln/cmd/govulncheck@latest
+
+vuln: pre-vuln ## Run govulncheck in all service folders
+	@for dir in $$(find . -name "go.mod" -exec dirname {} \;); do \
+		echo "==> Scanning $$dir"; \
+		(cd $$dir && govulncheck ./...); \
+	done
