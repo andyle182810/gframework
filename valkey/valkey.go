@@ -35,6 +35,7 @@ import (
 	"strconv"
 	"time"
 
+	frameworkmetrics "github.com/andyle182810/gframework/metrics"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
@@ -86,6 +87,7 @@ type Config struct {
 	TLSCertFile     string
 	TLSKeyFile      string
 	TLSCAFile       string
+	DisableMetrics  bool
 }
 
 type Valkey struct {
@@ -173,6 +175,11 @@ func New(cfg *Config) (*Valkey, error) {
 	}
 
 	client := redis.NewClient(opt)
+
+	if !cfg.DisableMetrics && frameworkmetrics.Enabled() {
+		client.AddHook(newMetricsHook())
+		registerPoolMetrics(client)
+	}
 
 	return &Valkey{Client: client}, nil
 }
@@ -270,6 +277,8 @@ func (v *Valkey) Stop() error {
 	if err := v.Close(); err != nil {
 		return fmt.Errorf("failed to close Valkey client: %w", err)
 	}
+
+	unregisterPoolMetrics(v.Client)
 
 	log.Info().
 		Str("source", "gframework").

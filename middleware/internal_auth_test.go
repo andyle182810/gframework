@@ -20,13 +20,14 @@ const (
 func internalToken(t *testing.T, key *mockKeyfunc, azp string) string {
 	t.Helper()
 
-	return createTestToken(t, key.key, &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: azp,
-		RegisteredClaims: jwt.RegisteredClaims{ //nolint:exhaustruct
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	})
+	return createTestToken(
+		t,
+		key.key,
+		testExtendedClaims(
+			azp,
+			testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), jwt.NewNumericDate(time.Now())),
+		),
+	)
 }
 
 func internalAuthContext(t *testing.T, header string) *echo.Context {

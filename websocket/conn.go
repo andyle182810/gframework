@@ -10,21 +10,31 @@ import (
 )
 
 type Conn struct {
-	ws           *gws.Conn
-	writeTimeout time.Duration
-	pingDeadline time.Duration
-	writeMu      sync.Mutex
-	closeOnce    sync.Once
-	closed       chan struct{}
-	closeErr     error
+	ws             *gws.Conn
+	writeTimeout   time.Duration
+	pingDeadline   time.Duration
+	direction      string
+	metricsEnabled bool
+	writeMu        sync.Mutex
+	closeOnce      sync.Once
+	closed         chan struct{}
+	closeErr       error
 }
 
-func newConn(wsConn *gws.Conn, writeTimeout, pingDeadline time.Duration) *Conn {
+func newConn(
+	wsConn *gws.Conn,
+	writeTimeout time.Duration,
+	pingDeadline time.Duration,
+	direction string,
+	metricsEnabled bool,
+) *Conn {
 	conn := &Conn{ //nolint:exhaustruct
-		ws:           wsConn,
-		writeTimeout: writeTimeout,
-		pingDeadline: pingDeadline,
-		closed:       make(chan struct{}),
+		ws:             wsConn,
+		writeTimeout:   writeTimeout,
+		pingDeadline:   pingDeadline,
+		direction:      direction,
+		metricsEnabled: metricsEnabled,
+		closed:         make(chan struct{}),
 	}
 
 	// Installed before the caller can read and before the ping loop starts,
@@ -39,16 +49,21 @@ func newConn(wsConn *gws.Conn, writeTimeout, pingDeadline time.Duration) *Conn {
 func (c *Conn) ReadMessage() (int, Payload, error) {
 	msgType, raw, err := c.ws.ReadMessage()
 	if err != nil {
+		c.recordMessage("read", msgType, len(raw), err)
+
 		return 0, nil, err
 	}
 
 	_ = c.ws.SetReadDeadline(time.Now().Add(c.pingDeadline))
+	c.recordMessage("read", msgType, len(raw), nil)
 
 	return msgType, Payload(raw), nil
 }
 
 func (c *Conn) WriteMessage(messageType int, data []byte) error {
 	err := c.writeFrame(messageType, data)
+	c.recordMessage("write", messageType, len(data), err)
+
 	if err != nil && !errors.Is(err, ErrConnClosed) {
 		_ = c.Close()
 	}
@@ -82,9 +97,20 @@ func (c *Conn) Close() error {
 		_ = c.ws.SetWriteDeadline(time.Now().Add(c.writeTimeout))
 		_ = c.ws.WriteMessage(gws.CloseMessage, gws.FormatCloseMessage(gws.CloseNormalClosure, ""))
 		c.closeErr = c.ws.Close()
+
+		if c.metricsEnabled {
+			decActiveConnection(c.direction)
+			recordClose(c.direction, c.closeErr)
+		}
 	})
 
 	return c.closeErr
+}
+
+func (c *Conn) recordMessage(ioDirection string, messageType int, bytes int, err error) {
+	if c.metricsEnabled {
+		recordMessage(c.direction, ioDirection, messageType, bytes, err)
+	}
 }
 
 func (c *Conn) writeFrame(messageType int, data []byte) error {

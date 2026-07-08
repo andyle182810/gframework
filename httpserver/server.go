@@ -63,6 +63,7 @@ type Config struct {
 	GracePeriod       time.Duration
 	Transformer       *transformer.Transformer
 	DisableTransform  bool
+	DisableMetrics    bool
 	LogRequestBody    bool
 }
 
@@ -97,6 +98,10 @@ func New(cfg *Config) *Server {
 
 	e.Pre(middleware.RequestLogger(log.Logger, logExtractors...))
 	e.Pre(echomiddleware.BodyLimit(parseBodyLimit(cfg.BodyLimit)))
+
+	if !cfg.DisableMetrics {
+		e.Use(middleware.HTTPMetrics())
+	}
 
 	if !cfg.DisableTransform {
 		e.Use(injectTransformer(tfm))

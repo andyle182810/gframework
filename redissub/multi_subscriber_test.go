@@ -1,4 +1,3 @@
-//nolint:exhaustruct,paralleltest,tparallel
 package redissub_test
 
 import (
@@ -25,8 +24,26 @@ func setupMultiTestClient(t *testing.T) *valkey.Valkey {
 	require.NoError(t, err)
 
 	valkeyClient, err := valkey.New(&valkey.Config{
-		Host: container.Host,
-		Port: port,
+		Host:            container.Host,
+		Port:            port,
+		Password:        "",
+		DB:              0,
+		DialTimeout:     0,
+		MaxIdleConns:    0,
+		MinIdleConns:    0,
+		PingTimeout:     0,
+		PoolSize:        0,
+		ReadTimeout:     0,
+		WriteTimeout:    0,
+		MaxRetries:      0,
+		MinRetryBackoff: 0,
+		MaxRetryBackoff: 0,
+		TLSEnabled:      false,
+		TLSSkipVerify:   false,
+		TLSCertFile:     "",
+		TLSKeyFile:      "",
+		TLSCAFile:       "",
+		DisableMetrics:  false,
 	})
 	require.NoError(t, err)
 
@@ -40,7 +57,12 @@ func setupMultiTestClient(t *testing.T) *valkey.Valkey {
 func setupMultiTestPublisher(t *testing.T, client *valkey.Valkey) *redispub.RedisPublisher {
 	t.Helper()
 
-	publisher, err := redispub.New(client.Client, redispub.Options{})
+	publisher, err := redispub.New(client.Client, redispub.Options{
+		MaxStreamEntries: 0,
+		Timeout:          0,
+		Logger:           nil,
+		DisableMetrics:   false,
+	})
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -116,6 +138,8 @@ func TestMultiSubscriberSubscribe(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			multiSub := redissub.NewMultiSubscriber(
 				"test-multi-sub",
 				valkeyClient.Client,

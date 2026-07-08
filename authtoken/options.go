@@ -23,3 +23,9 @@ func WithGoCloakClient(client *gocloak.GoCloak) Option {
 		}
 	}
 }
+
+func WithoutMetrics() Option {
+	return func(c *Client) {
+		c.metricsEnabled = false
+	}
+}

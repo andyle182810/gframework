@@ -56,11 +56,13 @@ type Options struct {
 	MaxStreamEntries int64
 	Timeout          time.Duration
 	Logger           watermill.LoggerAdapter
+	DisableMetrics   bool
 }
 
 type RedisPublisher struct {
-	publisher *redisstream.Publisher
-	timeout   time.Duration
+	publisher      *redisstream.Publisher
+	timeout        time.Duration
+	metricsEnabled bool
 }
 
 var _ Publisher = (*RedisPublisher)(nil)
@@ -93,12 +95,15 @@ func New(redisClient goredis.UniversalClient, opts Options) (*RedisPublisher, er
 	}
 
 	return &RedisPublisher{
-		publisher: publisher,
-		timeout:   timeout,
+		publisher:      publisher,
+		timeout:        timeout,
+		metricsEnabled: !opts.DisableMetrics,
 	}, nil
 }
 
 func (p *RedisPublisher) PublishToTopic(ctx context.Context, topic string, messageContents ...string) error {
+	startedAt := time.Now()
+
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
 
@@ -115,12 +120,22 @@ func (p *RedisPublisher) PublishToTopic(ctx context.Context, topic string, messa
 	}
 
 	if err := p.publisher.Publish(topic, messages...); err != nil {
+		p.recordPublishMetrics(topic, len(messages), time.Since(startedAt), err)
+
 		return fmt.Errorf("%w to topic %s: %w", ErrPublishFailed, topic, err)
 	}
+
+	p.recordPublishMetrics(topic, len(messages), time.Since(startedAt), nil)
 
 	return nil
 }
 
 func (p *RedisPublisher) Close() error {
 	return p.publisher.Close()
+}
+
+func (p *RedisPublisher) recordPublishMetrics(topic string, messageCount int, duration time.Duration, err error) {
+	if p.metricsEnabled {
+		recordPublishMetrics(topic, messageCount, duration, err)
+	}
 }

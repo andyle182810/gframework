@@ -48,14 +48,22 @@ func (l *Locker) WithLock(ctx context.Context, key string, ttl time.Duration, ha
 	lock, err := l.client.Obtain(ctx, key, ttl, nil)
 	if err != nil {
 		if errors.Is(err, redislock.ErrNotObtained) {
+			recordLockAttempt(key, "not_obtained")
+
 			return ErrLockNotObtained
 		}
+
+		recordLockAttempt(key, "error")
 
 		return err
 	}
 
+	recordLockAttempt(key, "obtained")
+
 	defer func() {
 		if releaseErr := lock.Release(ctx); releaseErr != nil {
+			recordLockReleaseError(key)
+
 			log.Warn().
 				Str("source", "gframework").
 				Err(releaseErr).
@@ -64,7 +72,18 @@ func (l *Locker) WithLock(ctx context.Context, key string, ttl time.Duration, ha
 		}
 	}()
 
-	return handler()
+	startedAt := time.Now()
+
+	err = handler()
+	if err != nil {
+		recordLockHandler(key, "error", time.Since(startedAt))
+
+		return err
+	}
+
+	recordLockHandler(key, "success", time.Since(startedAt))
+
+	return nil
 }
 
 func (l *Locker) TryWithLock(ctx context.Context, key string, ttl time.Duration, handler func() error) error {

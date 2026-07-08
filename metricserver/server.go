@@ -66,6 +66,7 @@ type Server struct {
 	address           string
 	echo              *echo.Echo
 	httpServer        *http.Server
+	listener          net.Listener
 }
 
 func New(cfg *Config) *Server {
@@ -121,9 +122,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to bind metrics server to %s: %w", s.address, err)
 	}
 
+	s.listener = listener
+
 	log.Info().
 		Str("source", "gframework").
-		Str("address", s.address).
+		Str("address", listener.Addr().String()).
 		Msg("The metrics server is being started")
 
 	go func() {
@@ -133,6 +136,14 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func (s *Server) Address() string {
+	if s.listener != nil {
+		return s.listener.Addr().String()
+	}
+
+	return s.address
 }
 
 func (s *Server) Stop() error {

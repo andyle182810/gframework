@@ -1,58 +1,48 @@
-//nolint:exhaustruct
 package postgres_test
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/andyle182810/gframework/postgres"
-	"github.com/andyle182810/gframework/testutil"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/stretchr/testify/require"
 )
 
 // sqlStateDeadlock is the Postgres SQLSTATE code for deadlock_detected.
 const sqlStateDeadlock = "40P01"
 
-func setupRetryTestPostgres(t *testing.T) (*postgres.Postgres, context.Context) {
-	t.Helper()
+var (
+	errRegularRetry     = errors.New("regular error")
+	errSomeRegularRetry = errors.New("some regular error")
+)
 
-	ctx := t.Context()
-
-	container := testutil.SetupPostgresContainer(t)
-
-	dbURL := fmt.Sprintf(
-		"postgres://%s:%s@%s/%s?sslmode=disable",
-		container.User,
-		container.Password,
-		net.JoinHostPort(container.Host, container.Port.Port()),
-		container.Database,
-	)
-
-	opts := &postgres.Config{
-		URL:                   dbURL,
-		MaxConnection:         5,
-		MinConnection:         1,
-		MaxConnectionIdleTime: 60 * time.Second,
-		HealthCheckPeriod:     10 * time.Second,
-		LogLevel:              tracelog.LogLevelTrace,
+func pgError(code string) *pgconn.PgError {
+	return &pgconn.PgError{
+		Severity:            "",
+		SeverityUnlocalized: "",
+		Code:                code,
+		Message:             "",
+		Detail:              "",
+		Hint:                "",
+		Position:            0,
+		InternalPosition:    0,
+		InternalQuery:       "",
+		Where:               "",
+		SchemaName:          "",
+		TableName:           "",
+		ColumnName:          "",
+		DataTypeName:        "",
+		ConstraintName:      "",
+		File:                "",
+		Line:                0,
+		Routine:             "",
 	}
-
-	pg, err := postgres.New(opts)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		pg.Close()
-	})
-
-	return pg, ctx
 }
 
 func TestDefaultRetryConfig(t *testing.T) {
@@ -111,7 +101,7 @@ func TestIsRetryableError_WithPgError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			pgErr := &pgconn.PgError{Code: tt.errorCode}
+			pgErr := pgError(tt.errorCode)
 			result := postgres.IsRetryableError(pgErr, tt.retryableCodes)
 			require.Equal(t, tt.expected, result)
 		})
@@ -121,7 +111,7 @@ func TestIsRetryableError_WithPgError(t *testing.T) {
 func TestIsRetryableError_WithNonPgError(t *testing.T) {
 	t.Parallel()
 
-	regularErr := errors.New("regular error") //nolint:err113
+	regularErr := errRegularRetry
 	result := postgres.IsRetryableError(regularErr, []string{"40001", sqlStateDeadlock})
 	require.False(t, result)
 }
@@ -129,7 +119,7 @@ func TestIsRetryableError_WithNonPgError(t *testing.T) {
 func TestIsRetryableError_WithWrappedPgError(t *testing.T) {
 	t.Parallel()
 
-	pgErr := &pgconn.PgError{Code: "40001"}
+	pgErr := pgError("40001")
 	wrappedErr := fmt.Errorf("wrapped: %w", pgErr)
 
 	result := postgres.IsRetryableError(wrappedErr, []string{"40001", sqlStateDeadlock})
@@ -177,7 +167,7 @@ func TestWithRetry_SuccessAfterRetries(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		count := atomic.AddInt32(&attempts, 1)
 		if count < 3 {
-			return &pgconn.PgError{Code: "40001"}
+			return pgError("40001")
 		}
 
 		return nil
@@ -204,7 +194,7 @@ func TestWithRetry_MaxRetriesExceeded(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		atomic.AddInt32(&attempts, 1)
 
-		return &pgconn.PgError{Code: "40001"}
+		return pgError("40001")
 	})
 
 	require.Error(t, err)
@@ -229,7 +219,7 @@ func TestWithRetry_NonRetryableError(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		atomic.AddInt32(&attempts, 1)
 
-		return &pgconn.PgError{Code: "23505"} // unique_violation - not retryable
+		return pgError("23505") // unique_violation - not retryable
 	})
 
 	require.Error(t, err)
@@ -259,7 +249,7 @@ func TestWithRetry_ContextCancelled(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		atomic.AddInt32(&attempts, 1)
 
-		return &pgconn.PgError{Code: "40001"}
+		return pgError("40001")
 	})
 
 	require.Error(t, err)
@@ -284,7 +274,7 @@ func TestWithRetry_ExponentialBackoff(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		timestamps = append(timestamps, time.Now())
 		if len(timestamps) <= 3 {
-			return &pgconn.PgError{Code: "40001"}
+			return pgError("40001")
 		}
 
 		return nil
@@ -320,7 +310,7 @@ func TestWithRetry_MaxDelayRespected(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		timestamps = append(timestamps, time.Now())
 		if len(timestamps) <= 4 {
-			return &pgconn.PgError{Code: "40001"}
+			return pgError("40001")
 		}
 
 		return nil
@@ -341,7 +331,7 @@ func TestWithRetry_MaxDelayRespected(t *testing.T) {
 func TestWithRetryTx_Success(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupRetryTestPostgres(t)
+	pg, ctx := setupTransactionTestPostgres(t)
 
 	_, err := pg.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS retry_tx_test (
@@ -376,7 +366,7 @@ func TestWithRetryTx_Success(t *testing.T) {
 func TestWithRetryTx_RollbackOnNonRetryableError(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupRetryTestPostgres(t)
+	pg, ctx := setupTransactionTestPostgres(t)
 
 	_, err := pg.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS retry_tx_rollback_test (
@@ -416,7 +406,7 @@ func TestWithRetryTx_RollbackOnNonRetryableError(t *testing.T) {
 func TestWithRetryTxDefault_Success(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupRetryTestPostgres(t)
+	pg, ctx := setupTransactionTestPostgres(t)
 
 	_, err := pg.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS retry_tx_default_test (
@@ -443,7 +433,7 @@ func TestWithRetryTxDefault_Success(t *testing.T) {
 func TestWithRetryTxDefault_UsesDefaultConfig(t *testing.T) {
 	t.Parallel()
 
-	pg, ctx := setupRetryTestPostgres(t)
+	pg, ctx := setupTransactionTestPostgres(t)
 
 	_, err := pg.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS retry_default_config_test (
@@ -485,7 +475,7 @@ func TestWithRetry_RegularErrorNotRetryable(t *testing.T) {
 
 	var attempts int32
 
-	regularErr := errors.New("some regular error") //nolint:err113
+	regularErr := errSomeRegularRetry
 
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		atomic.AddInt32(&attempts, 1)
@@ -516,7 +506,7 @@ func TestWithRetry_ZeroMaxRetries(t *testing.T) {
 	err := postgres.WithRetry(ctx, config, func(_ context.Context) error {
 		count := atomic.AddInt32(&attempts, 1)
 		if count == 1 {
-			return &pgconn.PgError{Code: "40001"}
+			return pgError("40001")
 		}
 
 		return nil
