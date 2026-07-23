@@ -20,6 +20,7 @@ const (
 	testRealm     = "my-realm"
 	testUserName  = "alice"
 	testUserEmail = "alice@example.com"
+	testPassword  = "s3cret"
 )
 
 // keycloakStub is a minimal fake of the subset of Keycloak endpoints used by
@@ -37,6 +38,11 @@ type keycloakStub struct {
 	roleNotFound    bool
 	expiresIn       int
 	createdUserID   string
+
+	// mu guards createdUser, which records the body of the last create-user
+	// request so tests can assert on what was actually sent to Keycloak.
+	mu          sync.Mutex
+	createdUser map[string]any
 }
 
 func newStub() *keycloakStub {
@@ -87,6 +93,17 @@ func (s *keycloakStub) handleUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.createUserCalls.Add(1)
+
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
+		return
+	}
+
+	s.mu.Lock()
+	s.createdUser = body
+	s.mu.Unlock()
 
 	location := "/admin/realms/" + testRealm + "/users/" + s.createdUserID
 	w.Header().Set("Location", location)
@@ -164,13 +181,76 @@ func TestClient_CreateUser_Happy(t *testing.T) {
 		Email:     testUserEmail,
 		FirstName: "Alice",
 		LastName:  "Liddell",
-		Password:  "s3cret",
+		Password:  testPassword,
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "user-abc-123", id)
 	assert.Equal(t, int32(1), stub.createUserCalls.Load())
 	assert.Equal(t, int32(1), stub.setPasswordCalls.Load())
+}
+
+func (s *keycloakStub) lastCreatedUser() map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.createdUser
+}
+
+func TestClient_CreateUser_RequiredActions(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   []string
+		want []any
+	}{
+		{
+			name: "forwarded to keycloak",
+			in:   []string{"UPDATE_PASSWORD"},
+			want: []any{"UPDATE_PASSWORD"},
+		},
+		{
+			name: "omitted when empty",
+			in:   nil,
+			want: nil,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			stub := newStub()
+			server := stub.newServer(t)
+
+			defer server.Close()
+
+			client := keycloak.NewAdminClient(server.URL, testRealm, "svc", "sec")
+
+			_, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{ //nolint:exhaustruct
+				Username:        testUserName,
+				Email:           testUserEmail,
+				Password:        testPassword,
+				RequiredActions: tt.in,
+			})
+			require.NoError(t, err)
+
+			body := stub.lastCreatedUser()
+			require.NotNil(t, body)
+
+			got, found := body["requiredActions"]
+
+			if tt.want == nil {
+				assert.False(t, found, "requiredActions must be omitted when empty")
+
+				return
+			}
+
+			require.True(t, found, "requiredActions must be sent to Keycloak")
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestClient_CreateUser_SetPasswordFailureReturnsUserID(t *testing.T) {
@@ -189,7 +269,7 @@ func TestClient_CreateUser_SetPasswordFailureReturnsUserID(t *testing.T) {
 		Email:     testUserEmail,
 		FirstName: "Alice",
 		LastName:  "Liddell",
-		Password:  "s3cret",
+		Password:  testPassword,
 	})
 
 	require.Error(t, err)

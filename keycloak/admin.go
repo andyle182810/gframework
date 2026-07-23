@@ -98,13 +98,14 @@ func (c *AdminClient) InvalidateToken() {
 }
 
 type CreateUserParams struct {
-	Username      string
-	Email         string
-	FirstName     string
-	LastName      string
-	Password      string
-	Enabled       bool
-	EmailVerified bool
+	Username        string
+	Email           string
+	FirstName       string
+	LastName        string
+	Password        string
+	Enabled         bool
+	EmailVerified   bool
+	RequiredActions []string
 }
 
 func (c *AdminClient) CreateUser(ctx context.Context, params CreateUserParams) (string, error) {
@@ -118,12 +119,13 @@ func (c *AdminClient) CreateUser(ctx context.Context, params CreateUserParams) (
 	}
 
 	user := gocloak.User{ //nolint:exhaustruct
-		Username:      &params.Username,
-		Email:         &params.Email,
-		FirstName:     &params.FirstName,
-		LastName:      &params.LastName,
-		Enabled:       &params.Enabled,
-		EmailVerified: &params.EmailVerified,
+		Username:        &params.Username,
+		Email:           &params.Email,
+		FirstName:       &params.FirstName,
+		LastName:        &params.LastName,
+		Enabled:         &params.Enabled,
+		EmailVerified:   &params.EmailVerified,
+		RequiredActions: params.RequiredActions,
 	}
 
 	id, err := c.gocloak.CreateUser(ctx, token, c.realm, user)
