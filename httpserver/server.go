@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/andyle182810/gframework/i18n"
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/transformer"
 	"github.com/andyle182810/gframework/validator"
@@ -64,6 +65,10 @@ type Config struct {
 	Transformer       *transformer.Transformer
 	DisableTransform  bool
 	LogRequestBody    bool
+	// Messages translates the message codes this service's handlers raise. It
+	// is merged over i18n.BuiltinCatalog, so a service only carries its own
+	// domain messages.
+	Messages i18n.Catalog
 }
 
 type Server struct {
@@ -82,7 +87,12 @@ type Server struct {
 func New(cfg *Config) *Server {
 	e := echo.New()
 	e.Validator = validator.DefaultRestValidator()
-	e.HTTPErrorHandler = middleware.ErrorHandler(echo.DefaultHTTPErrorHandler(false))
+	e.HTTPErrorHandler = middleware.ErrorHandler(
+		echo.DefaultHTTPErrorHandler(false),
+		&middleware.ErrorHandlerConfig{ //nolint:exhaustruct
+			Messages: i18n.BuiltinCatalog().Merge(cfg.Messages),
+		},
+	)
 
 	tfm := cfg.Transformer
 	if tfm == nil {

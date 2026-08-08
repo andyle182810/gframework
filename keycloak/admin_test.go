@@ -176,7 +176,7 @@ func TestClient_CreateUser_Happy(t *testing.T) {
 
 	client := keycloak.NewAdminClient(server.URL, testRealm, "svc", "sec")
 
-	id, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{
+	id, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{ //nolint:exhaustruct
 		Username:  testUserName,
 		Email:     testUserEmail,
 		FirstName: "Alice",
@@ -264,7 +264,7 @@ func TestClient_CreateUser_SetPasswordFailureReturnsUserID(t *testing.T) {
 
 	client := keycloak.NewAdminClient(server.URL, testRealm, "svc", "sec")
 
-	id, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{
+	id, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{ //nolint:exhaustruct
 		Username:  testUserName,
 		Email:     testUserEmail,
 		FirstName: "Alice",
@@ -286,13 +286,13 @@ func TestClient_CreateUser_InvalidInput(t *testing.T) {
 	}{
 		{
 			name: "empty username",
-			in: keycloak.CreateUserParams{
+			in: keycloak.CreateUserParams{ //nolint:exhaustruct
 				Username: "", Email: "a@b", FirstName: "", LastName: "", Password: "p",
 			},
 		},
 		{
 			name: "empty email",
-			in: keycloak.CreateUserParams{
+			in: keycloak.CreateUserParams{ //nolint:exhaustruct
 				Username: "u", Email: "", FirstName: "", LastName: "", Password: "p",
 			},
 		},
@@ -374,7 +374,7 @@ func TestClient_Token_CachesAcrossCalls(t *testing.T) {
 	client := keycloak.NewAdminClient(server.URL, testRealm, "svc", "sec")
 
 	for range 5 {
-		_, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{
+		_, err := client.CreateUser(t.Context(), keycloak.CreateUserParams{ //nolint:exhaustruct
 			Username:  testUserName,
 			Email:     testUserEmail,
 			FirstName: "",

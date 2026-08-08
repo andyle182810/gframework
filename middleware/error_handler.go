@@ -4,9 +4,13 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/andyle182810/gframework/i18n"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
+
+// AcceptLanguageHeader names the locale the caller wants error messages in.
+const AcceptLanguageHeader = "Accept-Language"
 
 type ErrorHandlerConfig struct {
 	Logger    *zerolog.Logger
@@ -17,6 +21,9 @@ type ErrorHandlerConfig struct {
 	// development environments, never in production.
 	IncludeInternalErrors bool
 	CustomErrorResponse   func(*echo.Context, error, int) map[string]any
+	// Messages translates message codes raised by handlers. Errors carrying
+	// anything else are returned with their message untouched.
+	Messages i18n.Catalog
 }
 
 func ErrorHandler(next echo.HTTPErrorHandler, config ...*ErrorHandlerConfig) echo.HTTPErrorHandler {
@@ -65,13 +72,16 @@ func handleHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorHand
 		return
 	}
 
-	response := buildErrorResponse(httpErr, cfg)
+	response := buildErrorResponse(ectx, httpErr, cfg)
 	_ = ectx.JSON(httpErr.Code, response)
 }
 
-func buildErrorResponse(httpErr *echo.HTTPError, cfg *ErrorHandlerConfig) map[string]any {
+func buildErrorResponse(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorHandlerConfig) map[string]any {
+	code, message := resolveMessage(ectx, httpErr, cfg.Messages)
+
 	response := map[string]any{
-		"message": httpErr.Message,
+		"code":    code,
+		"message": message,
 	}
 
 	if cfg.IncludeInternalErrors {
@@ -81,6 +91,22 @@ func buildErrorResponse(httpErr *echo.HTTPError, cfg *ErrorHandlerConfig) map[st
 	}
 
 	return response
+}
+
+// resolveMessage splits an error message into the code a client branches on and
+// the text a person reads. A message registered in the catalog is a code: it is
+// reported as-is and the text comes from the catalog in the caller's locale.
+// Anything else is literal prose, kept verbatim under the generic code for the
+// status, so an unmigrated handler still answers with a usable code.
+func resolveMessage(ectx *echo.Context, httpErr *echo.HTTPError, catalog i18n.Catalog) (string, string) {
+	locale := i18n.Negotiate(ectx.Request().Header.Get(AcceptLanguageHeader))
+
+	text, registered := catalog.Lookup(httpErr.Message, locale)
+	if !registered {
+		return i18n.CodeForStatus(httpErr.Code), httpErr.Message
+	}
+
+	return httpErr.Message, text
 }
 
 func logHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, logger *zerolog.Logger) {

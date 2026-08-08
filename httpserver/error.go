@@ -3,20 +3,34 @@ package httpserver
 import (
 	"net/http"
 
+	"github.com/andyle182810/gframework/i18n"
 	"github.com/labstack/echo/v5"
 )
 
+// Generic message codes, kept as aliases of the i18n codes the error handler
+// reports so both packages cannot drift apart.
 const (
-	ErrCodeValidation     = "VALIDATION_ERROR"
-	ErrCodeNotFound       = "NOT_FOUND"
-	ErrCodeUnauthorized   = "UNAUTHORIZED"
-	ErrCodeForbidden      = "FORBIDDEN"
-	ErrCodeConflict       = "CONFLICT"
-	ErrCodeInternal       = "INTERNAL_ERROR"
-	ErrCodeBadRequest     = "BAD_REQUEST"
-	ErrCodeServiceUnavail = "SERVICE_UNAVAILABLE"
+	ErrCodeValidation     = i18n.CodeValidation
+	ErrCodeNotFound       = i18n.CodeNotFound
+	ErrCodeUnauthorized   = i18n.CodeUnauthorized
+	ErrCodeForbidden      = i18n.CodeForbidden
+	ErrCodeConflict       = i18n.CodeConflict
+	ErrCodeInternal       = i18n.CodeInternal
+	ErrCodeBadRequest     = i18n.CodeBadRequest
+	ErrCodeServiceUnavail = i18n.CodeServiceUnavailable
 )
 
+// HTTPError builds an echo error carrying the text shown to the caller.
+//
+// details is preferably a message code registered in the server's i18n catalog,
+// in which case the error handler reports it as the response code and renders
+// the text in the caller's locale:
+//
+//	httpserver.ConflictError(err, messages.PhoneNumberInUse)
+//
+// Any other value is treated as literal prose and returned verbatim under the
+// generic code for the status. Omitting details falls back to err.Error(),
+// which reaches the client as-is — pass a code for anything a user acts on.
 func HTTPError(code int, err error, details ...string) *echo.HTTPError {
 	message := http.StatusText(code)
 

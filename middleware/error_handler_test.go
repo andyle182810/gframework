@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/andyle182810/gframework/i18n"
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/testutil"
 	"github.com/labstack/echo/v5"
@@ -49,7 +50,7 @@ func TestErrorHandler_HTTPError(t *testing.T) {
 	}
 	errorHandler(ctx, httpErr)
 
-	expectedResponse := `{"message":"Bad Request"}` + "\n"
+	expectedResponse := `{"code":"BAD_REQUEST","message":"Bad Request"}` + "\n"
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.JSONEq(t, expectedResponse, rec.Body.String()) // Compare JSON
@@ -81,6 +82,73 @@ func TestErrorHandler_GenericError(t *testing.T) {
 	errorHandler(ctx, ErrGeneric)
 
 	require.True(t, nextCalled)
+}
+
+func TestErrorHandler_MessageCodes(t *testing.T) {
+	t.Parallel()
+
+	const code = "PHONE_NUMBER_IN_USE"
+
+	catalog := i18n.Catalog{
+		code: {
+			i18n.English:    "Phone number is already used",
+			i18n.Vietnamese: "Số điện thoại đã được sử dụng",
+		},
+	}
+
+	tests := []struct {
+		name           string
+		acceptLanguage string
+		message        string
+		want           string
+	}{
+		{
+			name:           "code renders in the requested locale",
+			acceptLanguage: "vi",
+			message:        code,
+			want:           `{"code":"PHONE_NUMBER_IN_USE","message":"Số điện thoại đã được sử dụng"}`,
+		},
+		{
+			name:           "no header falls back to english",
+			acceptLanguage: "",
+			message:        code,
+			want:           `{"code":"PHONE_NUMBER_IN_USE","message":"Phone number is already used"}`,
+		},
+		{
+			name:           "unsupported locale falls back to english",
+			acceptLanguage: "ja-JP",
+			message:        code,
+			want:           `{"code":"PHONE_NUMBER_IN_USE","message":"Phone number is already used"}`,
+		},
+		{
+			// An unmigrated handler keeps its prose and still answers with a
+			// code the client can branch on.
+			name:           "prose keeps its text under the generic code",
+			acceptLanguage: "vi",
+			message:        "Employee not found",
+			want:           `{"code":"CONFLICT","message":"Employee not found"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+				Method:  http.MethodPost,
+				Path:    testPath,
+				Headers: map[string]string{middleware.AcceptLanguageHeader: tt.acceptLanguage},
+			})
+
+			config := &middleware.ErrorHandlerConfig{Messages: catalog} //nolint:exhaustruct
+			errorHandler := middleware.ErrorHandler(nil, config)
+
+			errorHandler(ctx, &echo.HTTPError{Code: http.StatusConflict, Message: tt.message})
+
+			require.Equal(t, http.StatusConflict, rec.Code)
+			require.JSONEq(t, tt.want, rec.Body.String())
+		})
+	}
 }
 
 func BenchmarkErrorHandler_HTTPError(b *testing.B) {
