@@ -196,7 +196,7 @@ func TestNew_LocalizesRequestValidation(t *testing.T) {
 			name:           "labelled field in the requested locale",
 			body:           `{}`,
 			acceptLanguage: "vi",
-			want:           `{"code":"VALIDATION_ERROR","message":"Vui lòng nhập Tên"}`,
+			want:           `{"code":"VALIDATION_ERROR","message":"Tên là bắt buộc"}`,
 		},
 		{
 			name:           "no header falls back to english",
@@ -208,7 +208,7 @@ func TestNew_LocalizesRequestValidation(t *testing.T) {
 			name:           "the tag parameter survives translation",
 			body:           `{"name":"n","phoneNumber":"0903812447"}`,
 			acceptLanguage: "vi",
-			want:           `{"code":"VALIDATION_ERROR","message":"phoneNumber phải tối đa 5"}`,
+			want:           `{"code":"VALIDATION_ERROR","message":"phoneNumber không được vượt quá 5"}`,
 		},
 		{
 			name:           "a malformed body is a localized bad request",

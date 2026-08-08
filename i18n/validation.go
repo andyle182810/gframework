@@ -118,13 +118,15 @@ func validationCatalog() Catalog {
 			English:    placeholderField + " is invalid",
 			Vietnamese: placeholderField + " không hợp lệ",
 		},
+		// Neutral phrasing on purpose: a label may name a text box, a date, or
+		// a dropdown, and "please enter" only fits the first.
 		ValidationCode("required"): {
 			English:    placeholderField + " is required",
-			Vietnamese: "Vui lòng nhập " + placeholderField,
+			Vietnamese: placeholderField + " là bắt buộc",
 		},
 		ValidationCode("required_with"): {
 			English:    placeholderField + " is required",
-			Vietnamese: "Vui lòng nhập " + placeholderField,
+			Vietnamese: placeholderField + " là bắt buộc",
 		},
 		ValidationCode("email"): {
 			English:    placeholderField + " must be a valid email address",
@@ -160,11 +162,11 @@ func validationCatalog() Catalog {
 		},
 		ValidationCode("min"): {
 			English:    placeholderField + " must be at least " + placeholderParam,
-			Vietnamese: placeholderField + " phải tối thiểu " + placeholderParam,
+			Vietnamese: placeholderField + " phải từ " + placeholderParam + " trở lên",
 		},
 		ValidationCode("max"): {
 			English:    placeholderField + " must be at most " + placeholderParam,
-			Vietnamese: placeholderField + " phải tối đa " + placeholderParam,
+			Vietnamese: placeholderField + " không được vượt quá " + placeholderParam,
 		},
 		ValidationCode("len"): {
 			English:    placeholderField + " must be exactly " + placeholderParam + " characters",

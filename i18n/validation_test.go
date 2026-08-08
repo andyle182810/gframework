@@ -82,7 +82,7 @@ func validationMessageCases() []validationCase {
 			field:   fieldPhone,
 			tag:     tagRequired,
 			param:   "",
-			want:    "Vui lòng nhập " + fieldPhoneVI,
+			want:    fieldPhoneVI + " là bắt buộc",
 		},
 		{
 			name:    "labelled field in english",
@@ -100,7 +100,7 @@ func validationMessageCases() []validationCase {
 			field:   "internalCode",
 			tag:     tagRequired,
 			param:   "",
-			want:    "Vui lòng nhập internalCode",
+			want:    "internalCode là bắt buộc",
 		},
 		{
 			name:    "the tag parameter is substituted",
@@ -109,7 +109,7 @@ func validationMessageCases() []validationCase {
 			field:   fieldPhone,
 			tag:     "max",
 			param:   "50",
-			want:    fieldPhoneVI + " phải tối đa 50",
+			want:    fieldPhoneVI + " không được vượt quá 50",
 		},
 		{
 			name:    "oneof keeps its list",
