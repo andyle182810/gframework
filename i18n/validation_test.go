@@ -43,9 +43,16 @@ func TestFieldCode(t *testing.T) {
 		{name: "camel case splits", field: fieldPhone, want: "FIELD_PHONE_NUMBER"},
 		{name: "three words", field: "weekStartDate", want: "FIELD_WEEK_START_DATE"},
 		{name: "digits stay attached", field: "line1Total", want: "FIELD_LINE1_TOTAL"},
-		{name: "already upper", field: "ID", want: "FIELD_I_D"},
 		{name: "nested path separates", field: "lines.productId", want: "FIELD_LINES_PRODUCT_ID"},
 		{name: "empty", field: "", want: "FIELD_"},
+		// Query and path parameters carry no json tag, so the validator reports
+		// the Go field name and these are the shapes that actually arrive.
+		{name: "go field name", field: "PageSize", want: "FIELD_PAGE_SIZE"},
+		{name: "bare acronym", field: "ID", want: "FIELD_ID"},
+		{name: "trailing acronym", field: "vendorID", want: "FIELD_VENDOR_ID"},
+		{name: "exported trailing acronym", field: "VendorID", want: "FIELD_VENDOR_ID"},
+		{name: "plural acronym", field: "CooperationIDs", want: "FIELD_COOPERATION_IDS"},
+		{name: "acronym then word", field: "IDList", want: "FIELD_ID_LIST"},
 	}
 
 	for _, tt := range tests {

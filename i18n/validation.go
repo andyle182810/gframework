@@ -31,8 +31,12 @@ func ValidationCode(tag string) string {
 }
 
 // FieldCode returns the catalog code for a request field, so `phoneNumber`
-// resolves to FIELD_PHONE_NUMBER. The name is the one the client sent — the
-// json, query, or param tag — not the Go field name.
+// resolves to FIELD_PHONE_NUMBER. The name is whichever one the validator
+// reports: the json tag when a field has one, and the Go field name otherwise,
+// which is what query and path parameters fall back to.
+//
+// Acronyms stay whole, so `vendorID` and `VendorID` both resolve to
+// FIELD_VENDOR_ID rather than splitting every capital.
 func FieldCode(field string) string {
 	var builder strings.Builder
 
@@ -40,10 +44,12 @@ func FieldCode(field string) string {
 	builder.Grow(len(fieldCodePrefix) + 2*len(field))
 	builder.WriteString(fieldCodePrefix)
 
-	for index, char := range field {
+	chars := []rune(field)
+
+	for index, char := range chars {
 		switch {
 		case unicode.IsUpper(char):
-			if index > 0 {
+			if index > 0 && startsWord(chars, index) {
 				builder.WriteRune('_')
 			}
 
@@ -56,6 +62,27 @@ func FieldCode(field string) string {
 	}
 
 	return builder.String()
+}
+
+// startsWord reports whether the upper-case rune at index opens a new word. It
+// does when the character before it is not a capital, or when it is the last
+// capital of a run and a word follows it: IDList splits into ID and List.
+//
+// A word is two or more lower-case runes, which is what separates the plural
+// suffix in IDs from the word in IDList.
+func startsWord(chars []rune, index int) bool {
+	if !unicode.IsUpper(chars[index-1]) {
+		return true
+	}
+
+	const wordLen = 2
+
+	rest := chars[min(index+1, len(chars)):]
+	if len(rest) < wordLen {
+		return false
+	}
+
+	return unicode.IsLower(rest[0]) && unicode.IsLower(rest[1])
 }
 
 // ValidationMessage renders one field failure in locale. The template comes
