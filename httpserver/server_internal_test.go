@@ -1,11 +1,13 @@
 package httpserver
 
 import (
+	"io"
 	"net"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/andyle182810/gframework/i18n"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -75,6 +77,82 @@ func TestStart_ReturnsErrorWhenPortInUse(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to bind")
+}
+
+// Covers the wiring rather than the lookup: a catalog set on Config must reach
+// the error handler, and the builtin codes must survive being merged with it.
+func TestNew_RendersMessageCodesFromConfig(t *testing.T) {
+	t.Parallel()
+
+	const code = "EMPLOYEE_NOT_FOUND"
+
+	srv := New(&Config{ //nolint:exhaustruct
+		Host: loopbackHost,
+		Port: 0,
+		Messages: i18n.Catalog{
+			code: {
+				i18n.English:    "Employee not found",
+				i18n.Vietnamese: "Không tìm thấy nhân viên",
+			},
+		},
+	})
+
+	srv.Root.GET("/missing", func(_ *echo.Context) error {
+		return NotFoundError(nil, code)
+	})
+	srv.Root.GET("/denied", func(_ *echo.Context) error {
+		return ForbiddenError(nil, i18n.CodeForbidden)
+	})
+
+	require.NoError(t, srv.Start(t.Context()))
+
+	t.Cleanup(func() { _ = srv.Stop() })
+
+	tests := []struct {
+		name           string
+		path           string
+		acceptLanguage string
+		want           string
+	}{
+		{
+			name:           "service catalog in the requested locale",
+			path:           "/missing",
+			acceptLanguage: "vi",
+			want:           `{"code":"EMPLOYEE_NOT_FOUND","message":"Không tìm thấy nhân viên"}`,
+		},
+		{
+			name:           "service catalog falls back to english",
+			path:           "/missing",
+			acceptLanguage: "",
+			want:           `{"code":"EMPLOYEE_NOT_FOUND","message":"Employee not found"}`,
+		},
+		{
+			name:           "builtin catalog survives the merge",
+			path:           "/denied",
+			acceptLanguage: "vi",
+			want:           `{"code":"FORBIDDEN","message":"Bạn không có quyền thực hiện thao tác này"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req, err := http.NewRequestWithContext(
+				t.Context(), http.MethodGet, "http://"+srv.Address()+tt.path, nil)
+			require.NoError(t, err)
+			req.Header.Set("Accept-Language", tt.acceptLanguage)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.JSONEq(t, tt.want, string(body))
+		})
+	}
 }
 
 func TestStart_ServesRequests(t *testing.T) {
