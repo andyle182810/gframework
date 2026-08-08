@@ -37,8 +37,11 @@ type Validator struct {
 }
 
 type ValidationError struct {
-	Field   string `json:"field"`
-	Tag     string `json:"tag"`
+	Field string `json:"field"`
+	Tag   string `json:"tag"`
+	// Param is the tag's argument, so `max=50` reports "50". It is what a
+	// localized template substitutes for its {param} placeholder.
+	Param   string `json:"param,omitempty"`
 	Value   string `json:"value"`
 	Message string `json:"message"`
 }
@@ -119,6 +122,7 @@ func (v *Validator) formatValidationErrors(errs validator.ValidationErrors) Vali
 		validationErrs = append(validationErrs, ValidationError{
 			Field:   field,
 			Tag:     err.Tag(),
+			Param:   err.Param(),
 			Value:   fmt.Sprintf("%v", err.Value()),
 			Message: v.generateErrorMessage(field, err),
 		})

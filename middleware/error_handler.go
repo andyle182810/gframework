@@ -3,8 +3,10 @@ package middleware
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/andyle182810/gframework/i18n"
+	"github.com/andyle182810/gframework/validator"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
@@ -98,8 +100,17 @@ func buildErrorResponse(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorH
 // reported as-is and the text comes from the catalog in the caller's locale.
 // Anything else is literal prose, kept verbatim under the generic code for the
 // status, so an unmigrated handler still answers with a usable code.
+//
+// Request validation is the exception: it fails before any handler runs, so its
+// message is rebuilt here from the field failures the validator recorded rather
+// than read off the error.
 func resolveMessage(ectx *echo.Context, httpErr *echo.HTTPError, catalog i18n.Catalog) (string, string) {
 	locale := i18n.Negotiate(ectx.Request().Header.Get(AcceptLanguageHeader))
+
+	var validationErrs validator.ValidationErrors
+	if errors.As(httpErr, &validationErrs) && len(validationErrs) > 0 {
+		return i18n.CodeValidation, localizeValidation(validationErrs, catalog, locale)
+	}
 
 	text, registered := catalog.Lookup(httpErr.Message, locale)
 	if !registered {
@@ -107,6 +118,21 @@ func resolveMessage(ectx *echo.Context, httpErr *echo.HTTPError, catalog i18n.Ca
 	}
 
 	return httpErr.Message, text
+}
+
+// localizeValidation renders every field failure and joins them the way
+// validator.ValidationErrors does, so the message reads the same in either
+// language and the English original still reaches the log untouched.
+func localizeValidation(
+	errs validator.ValidationErrors, catalog i18n.Catalog, locale i18n.Locale,
+) string {
+	messages := make([]string, 0, len(errs))
+
+	for _, err := range errs {
+		messages = append(messages, i18n.ValidationMessage(catalog, locale, err.Field, err.Tag, err.Param))
+	}
+
+	return strings.Join(messages, "; ")
 }
 
 func logHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, logger *zerolog.Logger) {

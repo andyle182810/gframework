@@ -695,9 +695,15 @@ func TestValidationError_ErrorMethod(t *testing.T) {
 	t.Parallel()
 
 	validationErrs := validator.ValidationErrors{
-		{Field: fieldName, Tag: "required", Value: "", Message: "name is required"},
-		{Field: "email", Tag: "email", Value: "invalid", Message: "email must be a valid email address"},
-		{Field: "age", Tag: tagGte, Value: "17", Message: "age must be greater than or equal to 18"},
+		{Field: fieldName, Tag: "required", Param: "", Value: "", Message: "name is required"},
+		{
+			Field: "email", Tag: "email", Param: "", Value: "invalid",
+			Message: "email must be a valid email address",
+		},
+		{
+			Field: "age", Tag: tagGte, Param: "18", Value: "17",
+			Message: "age must be greater than or equal to 18",
+		},
 	}
 
 	errorMsg := validationErrs.Error()

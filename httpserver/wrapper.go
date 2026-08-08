@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/andyle182810/gframework/i18n"
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/transformer"
 	"github.com/andyle182810/gframework/validator"
@@ -59,21 +60,17 @@ func bindAndValidate[TREQ any](c *echo.Context) (*TREQ, *echo.HTTPError) {
 	var req TREQ
 
 	if err := c.Bind(&req); err != nil {
-		httpErr := BadRequestError(err, "Invalid request body")
-		_ = httpErr.Wrap(err)
-
-		return nil, httpErr
+		return nil, BadRequestError(err, i18n.CodeBadRequest)
 	}
 
 	if t := transformerFromContext(c); t != nil && transformer.IsTransformable(&req) {
 		if err := t.Transform(c.Request().Context(), &req); err != nil {
-			httpErr := BadRequestError(err, "Failed to transform request")
-			_ = httpErr.Wrap(err)
-
-			return nil, httpErr
+			return nil, BadRequestError(err, i18n.CodeBadRequest)
 		}
 	}
 
+	// The English sentence stays on the error for the log; the error handler
+	// rebuilds it in the caller's locale from the wrapped field failures.
 	if err := c.Validate(&req); err != nil {
 		message := "Failed to validate request"
 
@@ -82,10 +79,7 @@ func bindAndValidate[TREQ any](c *echo.Context) (*TREQ, *echo.HTTPError) {
 			message = validationErrs.Error()
 		}
 
-		httpErr := BadRequestError(err, message)
-		_ = httpErr.Wrap(err)
-
-		return nil, httpErr
+		return nil, BadRequestError(err, message)
 	}
 
 	return &req, nil

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/andyle182810/gframework/i18n"
@@ -44,11 +45,18 @@ func HTTPError(code int, err error, details ...string) *echo.HTTPError {
 
 	httpErr := echo.NewHTTPError(code, message)
 
-	if err != nil {
-		_ = httpErr.Wrap(err)
+	if err == nil {
+		return httpErr
 	}
 
-	return httpErr
+	// Wrap takes a value receiver and returns a new error instead of mutating,
+	// so the result is the only one carrying the cause.
+	var wrapped *echo.HTTPError
+	if !errors.As(httpErr.Wrap(err), &wrapped) {
+		return httpErr
+	}
+
+	return wrapped
 }
 
 func BadRequestError(err error, details ...string) *echo.HTTPError {

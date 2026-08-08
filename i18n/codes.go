@@ -17,11 +17,12 @@ const (
 	CodeServiceUnavailable = "SERVICE_UNAVAILABLE"
 )
 
-// BuiltinCatalog returns text for the generic codes. Services merge their own
-// domain catalog over it; a service that wants a plain localized "not found"
-// can raise CodeNotFound directly instead of inventing a code.
+// BuiltinCatalog returns text for the generic codes plus a template for every
+// validate tag. Services merge their own domain catalog over it; a service that
+// wants a plain localized "not found" can raise CodeNotFound directly instead
+// of inventing a code.
 func BuiltinCatalog() Catalog {
-	return Catalog{
+	return validationCatalog().Merge(Catalog{
 		CodeBadRequest: {
 			English:    "Invalid request",
 			Vietnamese: "Yêu cầu không hợp lệ",
@@ -54,7 +55,7 @@ func BuiltinCatalog() Catalog {
 			English:    "The service is temporarily unavailable",
 			Vietnamese: "Dịch vụ tạm thời không khả dụng",
 		},
-	}
+	})
 }
 
 // CodeForStatus is the generic code reported for an HTTP status.

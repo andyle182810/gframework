@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -150,6 +151,92 @@ func TestNew_RendersMessageCodesFromConfig(t *testing.T) {
 
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
+			require.JSONEq(t, tt.want, string(body))
+		})
+	}
+}
+
+type localizedRequest struct {
+	Name        string `json:"name"        validate:"required"`
+	PhoneNumber string `json:"phoneNumber" validate:"omitempty,max=5"`
+}
+
+// Request validation fails inside Wrapper, before any handler runs, so this
+// covers the one error path a service cannot key itself: the codes come from
+// the validate tags and the field names from the catalog.
+func TestNew_LocalizesRequestValidation(t *testing.T) {
+	t.Parallel()
+
+	srv := New(&Config{ //nolint:exhaustruct
+		Host: loopbackHost,
+		Port: 0,
+		Messages: i18n.Catalog{
+			i18n.FieldCode("name"): {
+				i18n.English:    "Name",
+				i18n.Vietnamese: "Tên",
+			},
+		},
+	})
+
+	srv.Root.POST("/things", Wrapper(
+		func(_ *echo.Context, req *localizedRequest) (any, *echo.HTTPError) { return req, nil },
+	))
+
+	require.NoError(t, srv.Start(t.Context()))
+
+	t.Cleanup(func() { _ = srv.Stop() })
+
+	tests := []struct {
+		name           string
+		body           string
+		acceptLanguage string
+		want           string
+	}{
+		{
+			name:           "labelled field in the requested locale",
+			body:           `{}`,
+			acceptLanguage: "vi",
+			want:           `{"code":"VALIDATION_ERROR","message":"Vui lòng nhập Tên"}`,
+		},
+		{
+			name:           "no header falls back to english",
+			body:           `{}`,
+			acceptLanguage: "",
+			want:           `{"code":"VALIDATION_ERROR","message":"Name is required"}`,
+		},
+		{
+			name:           "the tag parameter survives translation",
+			body:           `{"name":"n","phoneNumber":"0903812447"}`,
+			acceptLanguage: "vi",
+			want:           `{"code":"VALIDATION_ERROR","message":"phoneNumber phải tối đa 5"}`,
+		},
+		{
+			name:           "a malformed body is a localized bad request",
+			body:           `{`,
+			acceptLanguage: "vi",
+			want:           `{"code":"BAD_REQUEST","message":"Yêu cầu không hợp lệ"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req, err := http.NewRequestWithContext(
+				t.Context(), http.MethodPost, "http://"+srv.Address()+"/things",
+				strings.NewReader(tt.body))
+			require.NoError(t, err)
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			req.Header.Set("Accept-Language", tt.acceptLanguage)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			require.JSONEq(t, tt.want, string(body))
 		})
 	}
