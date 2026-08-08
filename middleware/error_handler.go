@@ -98,12 +98,16 @@ func buildErrorResponse(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorH
 // resolveMessage splits an error message into the code a client branches on and
 // the text a person reads. A message registered in the catalog is a code: it is
 // reported as-is and the text comes from the catalog in the caller's locale.
-// Anything else is literal prose, kept verbatim under the generic code for the
-// status, so an unmigrated handler still answers with a usable code.
 //
-// Request validation is the exception: it fails before any handler runs, so its
-// message is rebuilt here from the field failures the validator recorded rather
-// than read off the error.
+// Anything else is literal prose. Below 500 it is kept verbatim under the
+// generic code for the status, so an unmigrated handler still answers with a
+// usable code. At 500 and above it is dropped: a server-fault message is a
+// diagnostic no caller can act on, and it routinely names queries, hosts and
+// internal state. It reaches the log through logHTTPError either way.
+//
+// Request validation is the exception to all of this: it fails before any
+// handler runs, so its message is rebuilt from the field failures the validator
+// recorded rather than read off the error.
 func resolveMessage(ectx *echo.Context, httpErr *echo.HTTPError, catalog i18n.Catalog) (string, string) {
 	locale := i18n.Negotiate(ectx.Request().Header.Get(AcceptLanguageHeader))
 
@@ -112,12 +116,29 @@ func resolveMessage(ectx *echo.Context, httpErr *echo.HTTPError, catalog i18n.Ca
 		return i18n.CodeValidation, localizeValidation(validationErrs, catalog, locale)
 	}
 
-	text, registered := catalog.Lookup(httpErr.Message, locale)
-	if !registered {
-		return i18n.CodeForStatus(httpErr.Code), httpErr.Message
+	if text, registered := catalog.Lookup(httpErr.Message, locale); registered {
+		return httpErr.Message, text
 	}
 
-	return httpErr.Message, text
+	code := i18n.CodeForStatus(httpErr.Code)
+
+	if httpErr.Code < http.StatusInternalServerError {
+		return code, httpErr.Message
+	}
+
+	return code, genericText(code, catalog, locale)
+}
+
+// genericText renders a generic code, falling back to the builtin catalog so a
+// server that registered no messages still answers with a sentence.
+func genericText(code string, catalog i18n.Catalog, locale i18n.Locale) string {
+	if text, ok := catalog.Lookup(code, locale); ok {
+		return text
+	}
+
+	text, _ := i18n.BuiltinCatalog().Lookup(code, locale)
+
+	return text
 }
 
 // localizeValidation renders every field failure and joins them the way

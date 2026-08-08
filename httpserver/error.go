@@ -21,6 +21,17 @@ const (
 	ErrCodeServiceUnavail = i18n.CodeServiceUnavailable
 )
 
+// ErrorResponse is the body every error answers with. It exists so handlers can
+// name the real shape in their @Failure annotations — echo.HTTPError declares
+// only a message and would document the response as missing its code.
+//
+// The code is the contract a client branches on; the message is presentation
+// and changes with the caller's Accept-Language, so nothing may depend on it.
+type ErrorResponse struct {
+	Code    string `example:"EMPLOYEE_NOT_FOUND" json:"code"`
+	Message string `example:"Employee not found" json:"message"`
+}
+
 // HTTPError builds an echo error carrying the text shown to the caller.
 //
 // details is preferably a message code registered in the server's i18n catalog,

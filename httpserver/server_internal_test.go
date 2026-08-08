@@ -242,6 +242,76 @@ func TestNew_LocalizesRequestValidation(t *testing.T) {
 	}
 }
 
+// A 5xx message names internals ("failed to marshal snapshot_before") and no
+// caller can act on it, so it must not reach the response. A 4xx one still
+// does, which is what lets a handler migrate to codes gradually.
+func TestNew_WithholdsServerFaultDetail(t *testing.T) {
+	t.Parallel()
+
+	const leak = "failed to marshal snapshot_before"
+
+	srv := New(&Config{ //nolint:exhaustruct
+		Host: loopbackHost,
+		Port: 0,
+	})
+
+	srv.Root.GET("/boom", func(_ *echo.Context) error {
+		return InternalError(nil, leak)
+	})
+	srv.Root.GET("/unmigrated", func(_ *echo.Context) error {
+		return BadRequestError(nil, "pick a date in the current week")
+	})
+
+	require.NoError(t, srv.Start(t.Context()))
+
+	t.Cleanup(func() { _ = srv.Stop() })
+
+	tests := []struct {
+		name           string
+		path           string
+		acceptLanguage string
+		wantStatus     int
+		want           string
+	}{
+		{
+			name:           "server fault detail is replaced",
+			path:           "/boom",
+			acceptLanguage: "vi",
+			wantStatus:     http.StatusInternalServerError,
+			want:           `{"code":"INTERNAL_ERROR","message":"Đã xảy ra lỗi, vui lòng thử lại"}`,
+		},
+		{
+			name:           "client error prose is still passed through",
+			path:           "/unmigrated",
+			acceptLanguage: "vi",
+			wantStatus:     http.StatusBadRequest,
+			want:           `{"code":"BAD_REQUEST","message":"pick a date in the current week"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req, err := http.NewRequestWithContext(
+				t.Context(), http.MethodGet, "http://"+srv.Address()+tt.path, nil)
+			require.NoError(t, err)
+			req.Header.Set("Accept-Language", tt.acceptLanguage)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantStatus, resp.StatusCode)
+			require.JSONEq(t, tt.want, string(body))
+			require.NotContains(t, string(body), leak)
+		})
+	}
+}
+
 func TestStart_ServesRequests(t *testing.T) {
 	t.Parallel()
 

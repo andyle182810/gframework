@@ -244,7 +244,10 @@ func TestErrorHandler_WithWrappedError(t *testing.T) {
 	errorHandler(ctx, httpErr)
 
 	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
-	require.Contains(t, rec.Body.String(), "Service Unavailable")
+	// The handler's own prose is withheld at 5xx; the caller gets the generic
+	// text for the status, and the cause only because IncludeInternalErrors is on.
+	require.Contains(t, rec.Body.String(), "The service is temporarily unavailable")
+	require.NotContains(t, rec.Body.String(), "Service Unavailable")
 	require.Contains(t, rec.Body.String(), "database connection failed")
 }
 
