@@ -69,20 +69,22 @@ type taskItem struct {
 }
 
 type Queue struct {
-	client        redis.UniversalClient
-	queueKey      string
-	processingKey string
-	payloadKey    string
-	executor      Executor
-	workerCount   int
-	bufferSize    int
-	execTimeout   time.Duration
-	pollInterval  time.Duration
-	taskChan      chan taskItem
-	wg            sync.WaitGroup
-	cancel        context.CancelFunc
-	mu            sync.Mutex
-	running       atomic.Bool
+	client         redis.UniversalClient
+	queueKey       string
+	processingKey  string
+	payloadKey     string
+	executor       Executor
+	workerCount    int
+	bufferSize     int
+	execTimeout    time.Duration
+	pollInterval   time.Duration
+	metricsEnabled bool
+	metrics        *queueMetrics
+	taskChan       chan taskItem
+	wg             sync.WaitGroup
+	cancel         context.CancelFunc
+	mu             sync.Mutex
+	running        atomic.Bool
 }
 
 type Option func(*Queue)
@@ -101,23 +103,28 @@ func New(client redis.UniversalClient, queueKey string, executor Executor, opts 
 	}
 
 	queue := &Queue{ //nolint:exhaustruct
-		client:        client,
-		queueKey:      queueKey,
-		processingKey: queueKey + ":processing",
-		payloadKey:    queueKey + ":payloads",
-		executor:      executor,
-		workerCount:   defaultWorkerCount,
-		bufferSize:    defaultBufferSize,
-		execTimeout:   defaultExecTimeout,
-		pollInterval:  defaultPollInterval,
-		taskChan:      make(chan taskItem, defaultBufferSize),
-		wg:            sync.WaitGroup{},
-		cancel:        nil,
-		mu:            sync.Mutex{},
+		client:         client,
+		queueKey:       queueKey,
+		processingKey:  queueKey + ":processing",
+		payloadKey:     queueKey + ":payloads",
+		executor:       executor,
+		workerCount:    defaultWorkerCount,
+		bufferSize:     defaultBufferSize,
+		execTimeout:    defaultExecTimeout,
+		pollInterval:   defaultPollInterval,
+		metricsEnabled: true,
+		taskChan:       make(chan taskItem, defaultBufferSize),
+		wg:             sync.WaitGroup{},
+		cancel:         nil,
+		mu:             sync.Mutex{},
 	}
 
 	for _, opt := range opts {
 		opt(queue)
+	}
+
+	if queue.metricsEnabled {
+		queue.metrics = newQueueMetrics()
 	}
 
 	return queue, nil
@@ -156,6 +163,12 @@ func WithPollInterval(interval time.Duration) Option {
 	}
 }
 
+func WithoutMetrics() Option {
+	return func(q *Queue) {
+		q.metricsEnabled = false
+	}
+}
+
 func (q *Queue) Push(ctx context.Context, tasks ...Task) error {
 	if len(tasks) == 0 {
 		return nil
@@ -177,6 +190,8 @@ func (q *Queue) Push(ctx context.Context, tasks ...Task) error {
 
 		return nil
 	})
+	q.recordPush(len(tasks), err)
+	q.updateQueueGauges(ctx)
 
 	return err
 }
@@ -188,6 +203,9 @@ func (q *Queue) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	q.cancel = cancel
+	q.recordWorkers(q.workerCount)
+	q.recordRunning(1)
+	q.updateQueueGauges(ctx)
 
 	for i := range q.workerCount {
 		q.wg.Add(1)
@@ -221,6 +239,7 @@ func (q *Queue) Stop() error {
 	}
 
 	q.wg.Wait()
+	q.recordRunning(0)
 
 	log.Info().Str("source", "gframework").Str("queue", q.queueKey).Msg("Task queue stopped")
 
@@ -270,6 +289,10 @@ func (q *Queue) fetcher(ctx context.Context) {
 func (q *Queue) fetchTask(ctx context.Context) (taskItem, error) {
 	result, err := q.client.BRPop(ctx, q.pollInterval, q.queueKey).Result()
 	if err != nil {
+		if !errors.Is(err, redis.Nil) {
+			q.recordFetched(err)
+		}
+
 		return taskItem{}, err
 	}
 
@@ -279,6 +302,7 @@ func (q *Queue) fetchTask(ctx context.Context) (taskItem, error) {
 	payloadBytes, err := q.client.HGet(ctx, q.payloadKey, taskID).Bytes()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		q.returnTask(ctx, taskID)
+		q.recordFetched(err)
 
 		return taskItem{}, fmt.Errorf("failed to get payload: %w", err)
 	}
@@ -291,9 +315,13 @@ func (q *Queue) fetchTask(ctx context.Context) (taskItem, error) {
 	}).Err()
 	if err != nil {
 		q.returnTask(ctx, taskID)
+		q.recordFetched(err)
 
 		return taskItem{}, fmt.Errorf("failed to add task to processing set: %w", err)
 	}
+
+	q.recordFetched(nil)
+	q.updateQueueGauges(ctx)
 
 	return taskItem{
 		id:      taskID,
@@ -305,6 +333,8 @@ func (q *Queue) returnTask(ctx context.Context, taskID string) {
 	if err := q.client.LPush(ctx, q.queueKey, taskID).Err(); err != nil {
 		log.Error().Str("source", "gframework").Err(err).Str("task_id", taskID).Msg("Failed to return task to queue")
 	}
+
+	q.updateQueueGauges(ctx)
 }
 
 func (q *Queue) worker(ctx context.Context, id int) {
@@ -340,9 +370,16 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 	execCtx, cancel := context.WithTimeout(ctx, q.execTimeout)
 	defer cancel()
 
+	startedAt := time.Now()
+
+	q.incInFlight()
 	err := q.executor.Execute(execCtx, task.id, task.payload)
+	q.decInFlight()
+
 	if err != nil {
 		if errors.Is(execCtx.Err(), context.DeadlineExceeded) {
+			err = context.DeadlineExceeded
+
 			log.Error().
 				Str("source", "gframework").
 				Int("worker_id", workerID).
@@ -365,6 +402,8 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 			Msg("Task completed successfully")
 	}
 
+	q.recordProcessed(time.Since(startedAt), err)
+
 	// Clean up: remove from processing set and delete payload
 	if err := q.client.ZRem(ctx, q.processingKey, task.id).Err(); err != nil {
 		log.Error().Str("source", "gframework").Err(err).Str("task_id", task.id).Msg("Failed to remove task from processing set")
@@ -375,6 +414,8 @@ func (q *Queue) processTask(ctx context.Context, workerID int, task taskItem) {
 			log.Error().Str("source", "gframework").Err(err).Str("task_id", task.id).Msg("Failed to delete payload")
 		}
 	}
+
+	q.updateQueueGauges(ctx)
 }
 
 func (q *Queue) QueueLength(ctx context.Context) (int64, error) {
@@ -403,6 +444,7 @@ func (q *Queue) RecoverStale(ctx context.Context, maxAge time.Duration) (int, er
 	}
 
 	recovered := 0
+	failed := 0
 
 	for _, taskID := range staleTasks {
 		_, err := q.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
@@ -414,6 +456,8 @@ func (q *Queue) RecoverStale(ctx context.Context, maxAge time.Duration) (int, er
 		if err != nil {
 			log.Error().Str("source", "gframework").Err(err).Str("task_id", taskID).Msg("Failed to recover stale task")
 
+			failed++
+
 			continue
 		}
 
@@ -422,9 +466,82 @@ func (q *Queue) RecoverStale(ctx context.Context, maxAge time.Duration) (int, er
 		recovered++
 	}
 
+	q.recordRecovered(recovered, failed)
+	q.updateQueueGauges(ctx)
+
 	return recovered, nil
 }
 
 func (q *Queue) Name() string {
 	return "taskqueue:" + q.queueKey
+}
+
+func (q *Queue) updateQueueGauges(ctx context.Context) {
+	if length, err := q.QueueLength(ctx); err == nil {
+		q.recordQueueLength(length)
+	}
+
+	if count, err := q.ProcessingCount(ctx); err == nil {
+		q.recordProcessingCount(count)
+	}
+}
+
+func (q *Queue) recordWorkers(workers int) {
+	if q.metricsEnabled {
+		q.metrics.recordWorkers(q.queueKey, workers)
+	}
+}
+
+func (q *Queue) recordPush(count int, err error) {
+	if q.metricsEnabled {
+		q.metrics.recordPush(q.queueKey, count, err)
+	}
+}
+
+func (q *Queue) recordFetched(err error) {
+	if q.metricsEnabled {
+		q.metrics.recordFetched(q.queueKey, err)
+	}
+}
+
+func (q *Queue) recordProcessed(duration time.Duration, err error) {
+	if q.metricsEnabled {
+		q.metrics.recordProcessed(q.queueKey, duration, err)
+	}
+}
+
+func (q *Queue) recordRecovered(recovered, failed int) {
+	if q.metricsEnabled {
+		q.metrics.recordRecovered(q.queueKey, recovered, failed)
+	}
+}
+
+func (q *Queue) recordRunning(value float64) {
+	if q.metricsEnabled {
+		q.metrics.recordRunning(q.queueKey, value)
+	}
+}
+
+func (q *Queue) incInFlight() {
+	if q.metricsEnabled {
+		q.metrics.incInFlight(q.queueKey)
+	}
+}
+
+func (q *Queue) decInFlight() {
+	if q.metricsEnabled {
+		q.metrics.decInFlight(q.queueKey)
+	}
+}
+
+func (q *Queue) recordQueueLength(value int64) {
+	if q.metricsEnabled {
+		q.metrics.recordQueueLength(q.queueKey, value)
+	}
+}
+
+func (q *Queue) recordProcessingCount(value int64) {
+	if q.metricsEnabled {
+		q.metrics.recordProcessingCount(q.queueKey, value)
+	}
 }

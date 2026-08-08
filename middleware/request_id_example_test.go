@@ -18,6 +18,8 @@ const (
 	userListMessage = "User list"
 )
 
+var errRequestIDEmpty = errors.New("request ID cannot be empty")
+
 func ExampleRequestID() {
 	e := echo.New()
 
@@ -86,7 +88,7 @@ func ExampleRequestIDWithConfig_custom() {
 		},
 		Validator: func(id string) error {
 			if len(id) == 0 {
-				return errors.New("request ID cannot be empty") //nolint:err113
+				return errRequestIDEmpty
 			}
 
 			return nil

@@ -30,9 +30,11 @@ import (
 	"strconv"
 	"time"
 
+	frameworkmetrics "github.com/andyle182810/gframework/metrics"
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	pgxzerolog "github.com/jackc/pgx-zerolog"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/multitracer"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/rs/zerolog/log"
@@ -59,10 +61,13 @@ type Config struct {
 	StatementTimeout         time.Duration
 	LockTimeout              time.Duration
 	IdleInTransactionTimeout time.Duration
+	SlowQueryThreshold       time.Duration
+	DisableMetrics           bool
 }
 
 type Postgres struct {
 	DBPool
+	metricsPool *pgxpool.Pool
 }
 
 func New(cfg *Config) (*Postgres, error) {
@@ -84,7 +89,11 @@ func New(cfg *Config) (*Postgres, error) {
 		Config:   nil,
 	}
 
-	pgConfig.ConnConfig.Tracer = tracer
+	if cfg.DisableMetrics || !frameworkmetrics.Enabled() {
+		pgConfig.ConnConfig.Tracer = tracer
+	} else {
+		pgConfig.ConnConfig.Tracer = multitracer.New(tracer, newMetricsTracer(cfg.SlowQueryThreshold))
+	}
 
 	applyPoolTuning(pgConfig, cfg)
 
@@ -101,8 +110,13 @@ func New(cfg *Config) (*Postgres, error) {
 		return nil, err
 	}
 
+	if !cfg.DisableMetrics {
+		registerPoolMetrics(pool)
+	}
+
 	return &Postgres{
-		DBPool: pool,
+		DBPool:      pool,
+		metricsPool: pool,
 	}, nil
 }
 
@@ -167,6 +181,8 @@ func (p *Postgres) Stop() error {
 		Str("source", "gframework").
 		Str("service_name", p.Name()).
 		Msg("The PostgreSQL connection pool is being closed")
+
+	unregisterPoolMetrics(p.metricsPool)
 	p.Close()
 
 	log.Info().

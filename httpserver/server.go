@@ -64,6 +64,7 @@ type Config struct {
 	GracePeriod       time.Duration
 	Transformer       *transformer.Transformer
 	DisableTransform  bool
+	DisableMetrics    bool
 	LogRequestBody    bool
 	// Messages translates the message codes this service's handlers raise. It
 	// is merged over i18n.BuiltinCatalog, so a service only carries its own
@@ -107,6 +108,10 @@ func New(cfg *Config) *Server {
 
 	e.Pre(middleware.RequestLogger(log.Logger, logExtractors...))
 	e.Pre(echomiddleware.BodyLimit(parseBodyLimit(cfg.BodyLimit)))
+
+	if !cfg.DisableMetrics {
+		e.Use(middleware.HTTPMetrics())
+	}
 
 	if !cfg.DisableTransform {
 		e.Use(injectTransformer(tfm))

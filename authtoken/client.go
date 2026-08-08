@@ -31,30 +31,37 @@ var ErrNoAccessToken = errors.New("authtoken: no access token in response")
 const tokenExpiryBuffer = 30 * time.Second
 
 type Client struct {
-	gocloak      *gocloak.GoCloak
-	realm        string
-	clientID     string
-	clientSecret string
-	expiryBuffer time.Duration
-	mu           sync.RWMutex
-	accessToken  string
-	expiresAt    time.Time
+	gocloak        *gocloak.GoCloak
+	realm          string
+	clientID       string
+	clientSecret   string
+	expiryBuffer   time.Duration
+	mu             sync.RWMutex
+	accessToken    string
+	expiresAt      time.Time
+	metricsEnabled bool
+	metrics        *tokenMetrics
 }
 
 func New(baseURL, realm, clientID, clientSecret string, opts ...Option) *Client {
 	client := &Client{ //nolint:exhaustruct
-		gocloak:      gocloak.NewClient(baseURL),
-		realm:        realm,
-		clientID:     clientID,
-		clientSecret: clientSecret,
-		expiryBuffer: tokenExpiryBuffer,
-		mu:           sync.RWMutex{},
+		gocloak:        gocloak.NewClient(baseURL),
+		realm:          realm,
+		clientID:       clientID,
+		clientSecret:   clientSecret,
+		expiryBuffer:   tokenExpiryBuffer,
+		mu:             sync.RWMutex{},
+		metricsEnabled: true,
 	}
 
 	for _, opt := range opts {
 		if opt != nil {
 			opt(client)
 		}
+	}
+
+	if client.metricsEnabled {
+		client.metrics = newTokenMetrics()
 	}
 
 	return client
@@ -66,6 +73,7 @@ func (c *Client) GetToken(ctx context.Context) (string, error) {
 	if c.accessToken != "" && time.Now().Before(c.expiresAt) {
 		token := c.accessToken
 		c.mu.RUnlock()
+		c.recordTokenRequest("hit")
 
 		return token, nil
 	}
@@ -80,15 +88,25 @@ func (c *Client) getToken(ctx context.Context) (string, error) {
 	defer c.mu.Unlock()
 
 	if c.accessToken != "" && time.Now().Before(c.expiresAt) {
+		c.recordTokenRequest("hit")
+
 		return c.accessToken, nil
 	}
 
+	startedAt := time.Now()
+
 	jwt, err := c.gocloak.LoginClient(ctx, c.clientID, c.clientSecret, c.realm)
 	if err != nil {
+		c.recordTokenRequest("error")
+		c.recordTokenFetch("error", time.Since(startedAt))
+
 		return "", fmt.Errorf("failed to fetch token: %w", err)
 	}
 
 	if jwt == nil || jwt.AccessToken == "" {
+		c.recordTokenRequest("error")
+		c.recordTokenFetch("error", time.Since(startedAt))
+
 		return "", ErrNoAccessToken
 	}
 
@@ -104,6 +122,8 @@ func (c *Client) getToken(ctx context.Context) (string, error) {
 
 	c.accessToken = jwt.AccessToken
 	c.expiresAt = time.Now().Add(cacheFor)
+	c.recordTokenRequest("miss")
+	c.recordTokenFetch("success", time.Since(startedAt))
 
 	return c.accessToken, nil
 }
@@ -114,4 +134,5 @@ func (c *Client) InvalidateToken() {
 
 	c.accessToken = ""
 	c.expiresAt = time.Time{}
+	c.recordTokenInvalidation()
 }

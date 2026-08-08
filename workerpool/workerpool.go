@@ -38,35 +38,42 @@ type Executor interface {
 }
 
 type WorkerPool struct {
-	name         string
-	executor     Executor
-	workerCount  int
-	tickInterval time.Duration
-	execTimeout  time.Duration
-	jobChan      chan struct{}
-	cancel       context.CancelFunc
-	wg           sync.WaitGroup
-	mu           sync.Mutex
-	running      atomic.Bool
+	name           string
+	executor       Executor
+	workerCount    int
+	tickInterval   time.Duration
+	execTimeout    time.Duration
+	metricsEnabled bool
+	metrics        *workerMetrics
+	jobChan        chan struct{}
+	cancel         context.CancelFunc
+	wg             sync.WaitGroup
+	mu             sync.Mutex
+	running        atomic.Bool
 }
 
 type Option func(*WorkerPool)
 
 func New(executor Executor, opts ...Option) *WorkerPool {
 	pool := &WorkerPool{ //nolint:exhaustruct
-		name:         "worker-pool",
-		executor:     executor,
-		workerCount:  1,
-		tickInterval: time.Second,
-		execTimeout:  0,
-		jobChan:      nil,
-		cancel:       nil,
-		wg:           sync.WaitGroup{},
-		mu:           sync.Mutex{},
+		name:           "worker-pool",
+		executor:       executor,
+		workerCount:    1,
+		tickInterval:   time.Second,
+		execTimeout:    0,
+		metricsEnabled: true,
+		jobChan:        nil,
+		cancel:         nil,
+		wg:             sync.WaitGroup{},
+		mu:             sync.Mutex{},
 	}
 
 	for _, opt := range opts {
 		opt(pool)
+	}
+
+	if pool.metricsEnabled {
+		pool.metrics = newWorkerMetrics()
 	}
 
 	return pool
@@ -104,6 +111,12 @@ func WithName(name string) Option {
 	}
 }
 
+func WithoutMetrics() Option {
+	return func(pool *WorkerPool) {
+		pool.metricsEnabled = false
+	}
+}
+
 func (pool *WorkerPool) Name() string {
 	return pool.name
 }
@@ -126,6 +139,9 @@ func (pool *WorkerPool) Start(ctx context.Context) error {
 		Dur("tick_interval", pool.tickInterval).
 		Dur("exec_timeout", pool.execTimeout).
 		Msg("Worker pool is starting")
+
+	pool.recordWorkers(pool.workerCount)
+	pool.recordRunning(1)
 
 	for workerID := range pool.workerCount {
 		pool.wg.Add(1)
@@ -152,6 +168,7 @@ func (pool *WorkerPool) Stop() error {
 	}
 
 	pool.wg.Wait()
+	pool.recordRunning(0)
 
 	log.Info().Str("source", "gframework").Msg("Worker pool has stopped")
 
@@ -239,12 +256,49 @@ func (pool *WorkerPool) executeWithTimeout(ctx context.Context, workerID int) {
 		Dur("timeout", pool.execTimeout).
 		Msg("Starting execution for worker")
 
+	startedAt := time.Now()
+
+	pool.incInFlight()
+
 	err := pool.executor.Execute(execCtx)
+	pool.decInFlight()
+	pool.recordExecution(time.Since(startedAt), err)
+
 	if err != nil {
 		log.Error().
 			Str("source", "gframework").
 			Err(err).
 			Int("worker_id", workerID).
 			Msg("Executor failed")
+	}
+}
+
+func (pool *WorkerPool) recordWorkers(workers int) {
+	if pool.metricsEnabled {
+		pool.metrics.recordWorkers(pool.name, workers)
+	}
+}
+
+func (pool *WorkerPool) recordRunning(value float64) {
+	if pool.metricsEnabled {
+		pool.metrics.recordRunning(pool.name, value)
+	}
+}
+
+func (pool *WorkerPool) incInFlight() {
+	if pool.metricsEnabled {
+		pool.metrics.incInFlight(pool.name)
+	}
+}
+
+func (pool *WorkerPool) decInFlight() {
+	if pool.metricsEnabled {
+		pool.metrics.decInFlight(pool.name)
+	}
+}
+
+func (pool *WorkerPool) recordExecution(duration time.Duration, err error) {
+	if pool.metricsEnabled {
+		pool.metrics.recordExecution(pool.name, duration, err)
 	}
 }
