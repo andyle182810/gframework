@@ -1,4 +1,3 @@
-//nolint:exhaustruct
 package postgres_test
 
 import (
@@ -37,12 +36,19 @@ func setupTransactionTestPostgres(t *testing.T) (*postgres.Postgres, context.Con
 	)
 
 	opts := &postgres.Config{
-		URL:                   dbURL,
-		MaxConnection:         5,
-		MinConnection:         1,
-		MaxConnectionIdleTime: 60 * time.Second,
-		HealthCheckPeriod:     10 * time.Second,
-		LogLevel:              tracelog.LogLevelTrace,
+		URL:                      dbURL,
+		MaxConnection:            5,
+		MinConnection:            1,
+		MaxConnectionIdleTime:    60 * time.Second,
+		HealthCheckPeriod:        10 * time.Second,
+		LogLevel:                 tracelog.LogLevelTrace,
+		MaxConnectionLifetime:    0,
+		ConnectTimeout:           0,
+		StatementTimeout:         0,
+		LockTimeout:              0,
+		IdleInTransactionTimeout: 0,
+		SlowQueryThreshold:       0,
+		DisableMetrics:           false,
 	}
 
 	pg, err := postgres.New(opts)
@@ -119,7 +125,7 @@ func TestWithTransaction_NilConnectionPool(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	pg := &postgres.Postgres{}
+	pg := &postgres.Postgres{DBPool: nil}
 
 	err := pg.WithTransaction(ctx, func(_ context.Context, _ pgx.Tx) error {
 		return nil
@@ -314,6 +320,8 @@ func TestWithTransactionOptions_CustomOptions(t *testing.T) {
 		IsoLevel:       pgx.ReadCommitted,
 		AccessMode:     pgx.ReadWrite,
 		DeferrableMode: pgx.NotDeferrable,
+		BeginQuery:     "",
+		CommitQuery:    "",
 	}
 
 	err = pg.WithTransactionOptions(ctx, customOpts, func(ctx context.Context, tx pgx.Tx) error {

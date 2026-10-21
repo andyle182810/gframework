@@ -52,12 +52,13 @@ var (
 )
 
 type Options struct {
-	Region    string
-	Endpoint  string
-	Bucket    string
-	KeyPrefix string // empty, or ends with "/"
-	AccessKey string
-	SecretKey string
+	Region         string
+	Endpoint       string
+	Bucket         string
+	KeyPrefix      string // empty, or ends with "/"
+	AccessKey      string
+	SecretKey      string
+	DisableMetrics bool
 }
 
 func (o Options) validate() error {
@@ -78,10 +79,11 @@ func (o Options) validate() error {
 }
 
 type Client struct {
-	s3        *s3.Client
-	presigner *s3.PresignClient
-	bucket    string
-	prefix    string
+	s3             *s3.Client
+	presigner      *s3.PresignClient
+	bucket         string
+	prefix         string
+	metricsEnabled bool
 }
 
 func New(ctx context.Context, opts Options) (*Client, error) {
@@ -110,10 +112,11 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 	})
 
 	return &Client{
-		s3:        s3Client,
-		presigner: s3.NewPresignClient(s3Client),
-		bucket:    opts.Bucket,
-		prefix:    opts.KeyPrefix,
+		s3:             s3Client,
+		presigner:      s3.NewPresignClient(s3Client),
+		bucket:         opts.Bucket,
+		prefix:         opts.KeyPrefix,
+		metricsEnabled: !opts.DisableMetrics,
 	}, nil
 }
 
@@ -156,7 +159,32 @@ func (c *Client) fullKey(logicalKey string) string {
 	return c.prefix + logicalKey
 }
 
+func (c *Client) recordSpaceOperation(operation string, duration time.Duration, err error) {
+	if c.metricsEnabled {
+		recordSpaceOperation(c.bucket, operation, duration, err)
+	}
+}
+
+func (c *Client) recordBytesRead(operation string, bytes int) {
+	if c.metricsEnabled {
+		recordBytesRead(c.bucket, operation, bytes)
+	}
+}
+
 func (c *Client) PresignPut(
+	ctx context.Context,
+	logicalKey, contentType string,
+	contentLength int64,
+	ttl time.Duration,
+) (string, error) {
+	startedAt := time.Now()
+	url, err := c.presignPut(ctx, logicalKey, contentType, contentLength, ttl)
+	c.recordSpaceOperation("presign_put", time.Since(startedAt), err)
+
+	return url, err
+}
+
+func (c *Client) presignPut(
 	ctx context.Context,
 	logicalKey, contentType string,
 	contentLength int64,
@@ -191,6 +219,14 @@ func (c *Client) PresignPut(
 }
 
 func (c *Client) PresignGet(ctx context.Context, logicalKey string, ttl time.Duration) (string, error) {
+	startedAt := time.Now()
+	url, err := c.presignGet(ctx, logicalKey, ttl)
+	c.recordSpaceOperation("presign_get", time.Since(startedAt), err)
+
+	return url, err
+}
+
+func (c *Client) presignGet(ctx context.Context, logicalKey string, ttl time.Duration) (string, error) {
 	if err := validateKey(logicalKey); err != nil {
 		return "", err
 	}
@@ -219,6 +255,14 @@ type HeadResult struct {
 }
 
 func (c *Client) Head(ctx context.Context, logicalKey string) (*HeadResult, error) {
+	startedAt := time.Now()
+	result, err := c.head(ctx, logicalKey)
+	c.recordSpaceOperation("head", time.Since(startedAt), err)
+
+	return result, err
+}
+
+func (c *Client) head(ctx context.Context, logicalKey string) (*HeadResult, error) {
 	if err := validateKey(logicalKey); err != nil {
 		return nil, err
 	}
@@ -253,6 +297,16 @@ func (c *Client) Head(ctx context.Context, logicalKey string) (*HeadResult, erro
 }
 
 func (c *Client) RangeGet(ctx context.Context, logicalKey string, maxBytes int64) ([]byte, error) {
+	startedAt := time.Now()
+	data, err := c.rangeGet(ctx, logicalKey, maxBytes)
+
+	c.recordSpaceOperation("range_get", time.Since(startedAt), err)
+	c.recordBytesRead("range_get", len(data))
+
+	return data, err
+}
+
+func (c *Client) rangeGet(ctx context.Context, logicalKey string, maxBytes int64) ([]byte, error) {
 	if err := validateKey(logicalKey); err != nil {
 		return nil, err
 	}
@@ -284,6 +338,14 @@ func (c *Client) RangeGet(ctx context.Context, logicalKey string, maxBytes int64
 }
 
 func (c *Client) Delete(ctx context.Context, logicalKey string) error {
+	startedAt := time.Now()
+	err := c.delete(ctx, logicalKey)
+	c.recordSpaceOperation("delete", time.Since(startedAt), err)
+
+	return err
+}
+
+func (c *Client) delete(ctx context.Context, logicalKey string) error {
 	if err := validateKey(logicalKey); err != nil {
 		return err
 	}

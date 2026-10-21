@@ -25,6 +25,12 @@ func WithRestyClient(restyClient *resty.Client) AdminOption {
 	}
 }
 
+func WithoutMetrics() AdminOption {
+	return func(c *AdminClient) {
+		c.metricsEnabled = false
+	}
+}
+
 type UMAOption func(*UMAClient)
 
 func WithUMAHTTPClient(httpClient *http.Client) UMAOption {
@@ -32,5 +38,11 @@ func WithUMAHTTPClient(httpClient *http.Client) UMAOption {
 		if httpClient != nil {
 			c.httpClient = httpClient
 		}
+	}
+}
+
+func WithoutUMAMetrics() UMAOption {
+	return func(c *UMAClient) {
+		c.metricsEnabled = false
 	}
 }

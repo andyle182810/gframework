@@ -1,4 +1,3 @@
-//nolint:exhaustruct
 package postgres_test
 
 import (
@@ -146,7 +145,13 @@ func TestGetPoolStats_UpdatesAfterQueries(t *testing.T) {
 func TestWithHealthCheckTimeout_SetsTimeout(t *testing.T) {
 	t.Parallel()
 
-	opts := &postgres.HealthCheckOptions{}
+	opts := &postgres.HealthCheckOptions{
+		Timeout:              0,
+		RequireActiveConns:   false,
+		MinIdleConns:         0,
+		CheckQueryExecution:  false,
+		CustomHealthCheckSQL: "",
+	}
 	postgres.WithHealthCheckTimeout(3 * time.Second)(opts)
 
 	require.Equal(t, 3*time.Second, opts.Timeout)
@@ -155,7 +160,13 @@ func TestWithHealthCheckTimeout_SetsTimeout(t *testing.T) {
 func TestWithRequireActiveConns_SetsFlag(t *testing.T) {
 	t.Parallel()
 
-	opts := &postgres.HealthCheckOptions{}
+	opts := &postgres.HealthCheckOptions{
+		Timeout:              0,
+		RequireActiveConns:   false,
+		MinIdleConns:         0,
+		CheckQueryExecution:  false,
+		CustomHealthCheckSQL: "",
+	}
 	postgres.WithRequireActiveConns()(opts)
 
 	require.True(t, opts.RequireActiveConns)
@@ -164,7 +175,13 @@ func TestWithRequireActiveConns_SetsFlag(t *testing.T) {
 func TestWithMinIdleConns_SetsMinimum(t *testing.T) {
 	t.Parallel()
 
-	opts := &postgres.HealthCheckOptions{}
+	opts := &postgres.HealthCheckOptions{
+		Timeout:              0,
+		RequireActiveConns:   false,
+		MinIdleConns:         0,
+		CheckQueryExecution:  false,
+		CustomHealthCheckSQL: "",
+	}
 	postgres.WithMinIdleConns(5)(opts)
 
 	require.Equal(t, int32(5), opts.MinIdleConns)
@@ -173,7 +190,13 @@ func TestWithMinIdleConns_SetsMinimum(t *testing.T) {
 func TestWithCustomHealthCheckSQL_SetsQueryAndEnablesCheck(t *testing.T) {
 	t.Parallel()
 
-	opts := &postgres.HealthCheckOptions{}
+	opts := &postgres.HealthCheckOptions{
+		Timeout:              0,
+		RequireActiveConns:   false,
+		MinIdleConns:         0,
+		CheckQueryExecution:  false,
+		CustomHealthCheckSQL: "",
+	}
 	postgres.WithCustomHealthCheckSQL("SELECT version()")(opts)
 
 	require.True(t, opts.CheckQueryExecution)

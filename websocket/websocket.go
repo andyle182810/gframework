@@ -71,6 +71,7 @@ type Config struct {
 	WriteTimeout    time.Duration
 	ReadLimit       int64
 	AllowedOrigins  []string
+	DisableMetrics  bool
 }
 
 func (cfg *Config) WithDefaults() *Config {
@@ -113,8 +114,9 @@ func (cfg *Config) validate() error {
 }
 
 type WebSocket struct {
-	cfg      *Config
-	upgrader gws.Upgrader
+	cfg            *Config
+	upgrader       gws.Upgrader
+	metricsEnabled bool
 }
 
 func New(cfg *Config) (*WebSocket, error) {
@@ -129,8 +131,9 @@ func New(cfg *Config) (*WebSocket, error) {
 	cfg = cfg.WithDefaults()
 
 	return &WebSocket{
-		cfg:      cfg,
-		upgrader: buildUpgrader(cfg),
+		cfg:            cfg,
+		upgrader:       buildUpgrader(cfg),
+		metricsEnabled: !cfg.DisableMetrics,
 	}, nil
 }
 
@@ -147,10 +150,15 @@ func (p Payload) Unpack(v any) error {
 func (ws *WebSocket) Upgrade(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 	wsConn, err := ws.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		ws.recordConnectionAttempt("server", err)
+
 		return nil, err
 	}
 
-	return ws.adopt(wsConn)
+	conn, err := ws.adopt(wsConn, "server")
+	ws.recordConnectionAttempt("server", err)
+
+	return conn, err
 }
 
 func (ws *WebSocket) Dial(ctx context.Context, url string) (*Conn, error) {
@@ -166,13 +174,18 @@ func (ws *WebSocket) Dial(ctx context.Context, url string) (*Conn, error) {
 	}
 
 	if err != nil {
+		ws.recordConnectionAttempt("client", err)
+
 		return nil, err
 	}
 
-	return ws.adopt(wsConn)
+	conn, err := ws.adopt(wsConn, "client")
+	ws.recordConnectionAttempt("client", err)
+
+	return conn, err
 }
 
-func (ws *WebSocket) adopt(wsConn *gws.Conn) (*Conn, error) {
+func (ws *WebSocket) adopt(wsConn *gws.Conn, direction string) (*Conn, error) {
 	wsConn.SetReadLimit(ws.cfg.ReadLimit)
 
 	pingDeadline := ws.cfg.PingInterval + ws.cfg.PingTimeout
@@ -182,7 +195,10 @@ func (ws *WebSocket) adopt(wsConn *gws.Conn) (*Conn, error) {
 		return nil, setErr
 	}
 
-	conn := newConn(wsConn, ws.cfg.WriteTimeout, pingDeadline)
+	conn := newConn(wsConn, ws.cfg.WriteTimeout, pingDeadline, direction, ws.metricsEnabled)
+	if ws.metricsEnabled {
+		incActiveConnection(direction)
+	}
 
 	go conn.pingLoop(ws.cfg.PingInterval)
 

@@ -86,6 +86,12 @@ func WithInternalAuthHeader() Option {
 	}
 }
 
+func WithoutMetrics() Option {
+	return func(c *Client) {
+		c.metricsEnabled = false
+	}
+}
+
 func WithMaxResponseSize(size int64) Option {
 	return func(c *Client) {
 		c.maxResponseSize = size
@@ -95,10 +101,11 @@ func WithMaxResponseSize(size int64) Option {
 type RequestOption func(*requestConfig)
 
 type requestConfig struct {
-	headers   map[string]string
-	query     map[string]string
-	timeout   time.Duration
-	requestID string
+	headers     map[string]string
+	query       map[string]string
+	timeout     time.Duration
+	requestID   string
+	metricsPath string
 }
 
 func WithRequestHeader(key, value string) RequestOption {
@@ -140,5 +147,11 @@ func WithQueryParams(params map[string]string) RequestOption {
 		}
 
 		maps.Copy(rc.query, params)
+	}
+}
+
+func WithMetricsPath(path string) RequestOption {
+	return func(rc *requestConfig) {
+		rc.metricsPath = path
 	}
 }

@@ -98,67 +98,105 @@ func New[K any, V any](
 }
 
 func (c *Cache[K, V]) Get(ctx context.Context, key K) (*V, error) {
+	startedAt := time.Now()
+
 	encodedKey, err := c.keyEncoder.Encode(key)
 	if err != nil {
+		recordOperation(c.hashKey, "get", "error", time.Since(startedAt))
+
 		return nil, err
 	}
 
 	data, err := c.client.HGet(ctx, c.hashKey, encodedKey).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
+			recordOperation(c.hashKey, "get", "miss", time.Since(startedAt))
+
 			return nil, ErrKeyNotFound
 		}
+
+		recordOperation(c.hashKey, "get", "error", time.Since(startedAt))
 
 		return nil, fmt.Errorf("%w: %w", ErrCacheGet, err)
 	}
 
 	var value V
 	if err := json.Unmarshal([]byte(data), &value); err != nil {
+		recordOperation(c.hashKey, "get", "error", time.Since(startedAt))
+
 		return nil, fmt.Errorf("%w: %w", ErrCacheUnmarshal, err)
 	}
+
+	recordOperation(c.hashKey, "get", "hit", time.Since(startedAt))
 
 	return &value, nil
 }
 
 func (c *Cache[K, V]) Set(ctx context.Context, key K, value *V) error {
+	startedAt := time.Now()
+
 	encodedKey, err := c.keyEncoder.Encode(key)
 	if err != nil {
+		recordOperation(c.hashKey, "set", "error", time.Since(startedAt))
+
 		return err
 	}
 
 	data, err := json.Marshal(value)
 	if err != nil {
+		recordOperation(c.hashKey, "set", "error", time.Since(startedAt))
+
 		return fmt.Errorf("%w: %w", ErrCacheMarshal, err)
 	}
 
 	if err := c.client.HSet(ctx, c.hashKey, encodedKey, data).Err(); err != nil {
+		recordOperation(c.hashKey, "set", "error", time.Since(startedAt))
+
 		return fmt.Errorf("%w: %w", ErrCacheSet, err)
 	}
 
 	if err := c.client.Expire(ctx, c.hashKey, c.ttl).Err(); err != nil {
+		recordOperation(c.hashKey, "set", "error", time.Since(startedAt))
+
 		return fmt.Errorf("%w: %w", ErrCacheTTL, err)
 	}
+
+	recordOperation(c.hashKey, "set", "success", time.Since(startedAt))
 
 	return nil
 }
 
 func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
+	startedAt := time.Now()
+
 	encodedKey, err := c.keyEncoder.Encode(key)
 	if err != nil {
+		recordOperation(c.hashKey, "delete", "error", time.Since(startedAt))
+
 		return err
 	}
 
 	if err := c.client.HDel(ctx, c.hashKey, encodedKey).Err(); err != nil {
+		recordOperation(c.hashKey, "delete", "error", time.Since(startedAt))
+
 		return fmt.Errorf("%w: %w", ErrCacheDelete, err)
 	}
+
+	recordOperation(c.hashKey, "delete", "success", time.Since(startedAt))
 
 	return nil
 }
 
 func (c *Cache[K, V]) Invalidate(ctx context.Context) error {
+	startedAt := time.Now()
+
 	if err := c.client.Del(ctx, c.hashKey).Err(); err != nil {
+		recordOperation(c.hashKey, "invalidate", "error", time.Since(startedAt))
+
 		return fmt.Errorf("%w: %w", ErrCacheInvalidate, err)
 	}
+
+	recordOperation(c.hashKey, "invalidate", "success", time.Since(startedAt))
 
 	return nil
 }

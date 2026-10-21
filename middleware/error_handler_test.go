@@ -15,6 +15,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var errDatabaseConnectionFailed = errors.New("database connection failed")
+
+func echoTestOptions(method string) *testutil.Options {
+	return &testutil.Options{
+		Method:        method,
+		Path:          testPath,
+		Body:          nil,
+		Headers:       nil,
+		QueryParams:   nil,
+		PathParams:    nil,
+		ContentType:   "",
+		SkipRequestID: false,
+	}
+}
+
+func errorHandlerConfig(
+	logger *zerolog.Logger,
+	logErrors bool,
+	includeInternalErrors bool,
+	customResponse func(*echo.Context, error, int) map[string]any,
+) *middleware.ErrorHandlerConfig {
+	return &middleware.ErrorHandlerConfig{
+		Logger:                logger,
+		LogErrors:             logErrors,
+		IncludeInternalErrors: includeInternalErrors,
+		CustomErrorResponse:   customResponse,
+	}
+}
+
 const (
 	testPath          = "/test"
 	badRequestMessage = "Bad Request"
@@ -195,15 +224,9 @@ func TestErrorHandler_WithLogging(t *testing.T) {
 
 	logger := zerolog.New(&buf)
 
-	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
-		Method: http.MethodGet,
-		Path:   testPath,
-	})
+	ctx, rec, _ := testutil.SetupEchoContext(t, echoTestOptions(http.MethodGet))
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		Logger:    &logger,
-		LogErrors: true,
-	}
+	config := errorHandlerConfig(&logger, true, false, nil)
 	errorHandler := middleware.ErrorHandler(nil, config)
 
 	httpErr := &echo.HTTPError{
@@ -221,17 +244,12 @@ func TestErrorHandler_WithLogging(t *testing.T) {
 func TestErrorHandler_WithWrappedError(t *testing.T) {
 	t.Parallel()
 
-	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
-		Method: http.MethodPost,
-		Path:   testPath,
-	})
+	ctx, rec, _ := testutil.SetupEchoContext(t, echoTestOptions(http.MethodPost))
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		IncludeInternalErrors: true,
-	}
+	config := errorHandlerConfig(nil, false, true, nil)
 	errorHandler := middleware.ErrorHandler(nil, config)
 
-	internalErr := errors.New("database connection failed") //nolint:err113
+	internalErr := errDatabaseConnectionFailed
 	baseErr := echo.NewHTTPError(http.StatusServiceUnavailable, "Service Unavailable")
 
 	wrappedErr := baseErr.Wrap(internalErr)
@@ -254,20 +272,20 @@ func TestErrorHandler_WithWrappedError(t *testing.T) {
 func TestErrorHandler_CustomErrorResponse(t *testing.T) {
 	t.Parallel()
 
-	ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
-		Method: http.MethodGet,
-		Path:   testPath,
-	})
+	ctx, rec, _ := testutil.SetupEchoContext(t, echoTestOptions(http.MethodGet))
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		CustomErrorResponse: func(_ *echo.Context, err error, code int) map[string]any {
+	config := errorHandlerConfig(
+		nil,
+		false,
+		false,
+		func(_ *echo.Context, err error, code int) map[string]any {
 			return map[string]any{
 				"error":  err.Error(),
 				"status": code,
 				"custom": "field",
 			}
 		},
-	}
+	)
 	errorHandler := middleware.ErrorHandler(nil, config)
 
 	httpErr := &echo.HTTPError{
@@ -288,10 +306,7 @@ func TestErrorHandler_NonHTTPError_WithLogging(t *testing.T) {
 
 	logger := zerolog.New(&buf)
 
-	ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
-		Method: http.MethodPost,
-		Path:   testPath,
-	})
+	ctx, _, _ := testutil.SetupEchoContext(t, echoTestOptions(http.MethodPost))
 
 	var nextCalled bool
 
@@ -299,10 +314,7 @@ func TestErrorHandler_NonHTTPError_WithLogging(t *testing.T) {
 		nextCalled = true
 	}
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		Logger:    &logger,
-		LogErrors: true,
-	}
+	config := errorHandlerConfig(&logger, true, false, nil)
 	errorHandler := middleware.ErrorHandler(next, config)
 
 	errorHandler(ctx, ErrGeneric)

@@ -37,6 +37,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -61,6 +62,7 @@ type Client struct {
 	tokenProvider          TokenProvider
 	maxResponseSize        int64 // 0 means no limit
 	sendInternalAuthHeader bool
+	metricsEnabled         bool
 }
 
 func New(baseURL string, opts ...Option) *Client {
@@ -77,6 +79,7 @@ func New(baseURL string, opts ...Option) *Client {
 		tokenProvider:          nil,
 		maxResponseSize:        0,
 		sendInternalAuthHeader: false,
+		metricsEnabled:         true,
 	}
 
 	for _, opt := range opts {
@@ -153,7 +156,14 @@ func (c *Client) do(
 	response any,
 	opts ...RequestOption,
 ) error {
+	startedAt := time.Now()
+	metricsPath := pathLabel(path)
+	upstream := upstreamLabel(c.baseURL)
 	cfg := c.buildRequestConfig(ctx, opts...)
+
+	if cfg.metricsPath != "" {
+		metricsPath = cfg.metricsPath
+	}
 
 	reqCtx := ctx
 
@@ -167,7 +177,10 @@ func (c *Client) do(
 	if c.tokenProvider != nil {
 		token, err := c.tokenProvider.GetToken(reqCtx)
 		if err != nil {
-			return fmt.Errorf("%w: %w", ErrAuthFailed, err)
+			err = fmt.Errorf("%w: %w", ErrAuthFailed, err)
+			c.recordRequest(upstream, method, metricsPath, 0, time.Since(startedAt), err)
+
+			return err
 		}
 
 		cfg.headers[HeaderAuthorization] = "Bearer " + token
@@ -179,24 +192,33 @@ func (c *Client) do(
 
 	req, err := c.buildRequest(reqCtx, method, path, body, cfg)
 	if err != nil {
+		c.recordRequest(upstream, method, metricsPath, 0, time.Since(startedAt), err)
+
 		return err
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		err = fmt.Errorf("%w: %w", ErrRequestFailed, err)
+		c.recordRequest(upstream, method, metricsPath, 0, time.Since(startedAt), err)
+
+		return err
 	}
 	defer resp.Body.Close()
 
-	return c.handleResponse(resp, response, cfg.requestID)
+	err = c.handleResponse(resp, response, cfg.requestID)
+	c.recordRequest(upstream, method, metricsPath, resp.StatusCode, time.Since(startedAt), err)
+
+	return err
 }
 
 func (c *Client) buildRequestConfig(ctx context.Context, opts ...RequestOption) *requestConfig {
 	cfg := &requestConfig{
-		headers:   make(map[string]string),
-		query:     nil,
-		timeout:   0,
-		requestID: "",
+		headers:     make(map[string]string),
+		query:       nil,
+		timeout:     0,
+		requestID:   "",
+		metricsPath: "",
 	}
 
 	for _, opt := range opts {

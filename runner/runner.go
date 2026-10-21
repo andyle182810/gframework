@@ -135,19 +135,19 @@ func (r *Runner) RunContext(ctx context.Context) error {
 
 	log.Info().Str("source", "gframework").Msg("Starting infrastructure services")
 
-	if err := r.startServices(ctx, r.infrastructureServices, infraErrCh); err != nil {
+	if err := r.startServices(ctx, "infrastructure", r.infrastructureServices, infraErrCh); err != nil {
 		log.Error().Str("source", "gframework").Err(err).Msg("Infrastructure services failed to start")
-		r.shutdownWithTimeout(r.infrastructureServices)
+		r.shutdownWithTimeout("infrastructure", r.infrastructureServices)
 
 		return err
 	}
 
 	log.Info().Str("source", "gframework").Msg("Starting core services")
 
-	if err := r.startServices(ctx, r.coreServices, coreErrCh); err != nil {
+	if err := r.startServices(ctx, "core", r.coreServices, coreErrCh); err != nil {
 		log.Error().Str("source", "gframework").Err(err).Msg("Core services failed to start")
-		r.shutdownWithTimeout(r.coreServices)
-		r.shutdownWithTimeout(r.infrastructureServices)
+		r.shutdownWithTimeout("core", r.coreServices)
+		r.shutdownWithTimeout("infrastructure", r.infrastructureServices)
 
 		return err
 	}
@@ -170,13 +170,13 @@ func (r *Runner) RunContext(ctx context.Context) error {
 		log.Error().Str("source", "gframework").Err(runErr).Msg("Core service failed, shutting down")
 	}
 
-	r.shutdownWithTimeout(r.coreServices)
-	r.shutdownWithTimeout(r.infrastructureServices)
+	r.shutdownWithTimeout("core", r.coreServices)
+	r.shutdownWithTimeout("infrastructure", r.infrastructureServices)
 
 	return runErr
 }
 
-func (r *Runner) startServices(ctx context.Context, services []Service, errCh chan error) error {
+func (r *Runner) startServices(ctx context.Context, tier string, services []Service, errCh chan error) error {
 	if len(services) == 0 {
 		return nil
 	}
@@ -191,7 +191,11 @@ func (r *Runner) startServices(ctx context.Context, services []Service, errCh ch
 
 			log.Info().Str("source", "gframework").Str("service_name", service.Name()).Msg("Starting service")
 
-			if err := service.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			startedAt := time.Now()
+			err := service.Start(ctx)
+			recordLifecycle(tier, service.Name(), "start", time.Since(startedAt), err)
+
+			if err != nil && !errors.Is(err, context.Canceled) {
 				errCh <- fmt.Errorf("%w: %s: %w", ErrServiceFailed, service.Name(), err)
 			}
 		}(svc)
@@ -207,7 +211,7 @@ func (r *Runner) startServices(ctx context.Context, services []Service, errCh ch
 	}
 }
 
-func (r *Runner) shutdownWithTimeout(services []Service) {
+func (r *Runner) shutdownWithTimeout(tier string, services []Service) {
 	if len(services) == 0 {
 		return
 	}
@@ -215,7 +219,7 @@ func (r *Runner) shutdownWithTimeout(services []Service) {
 	done := make(chan struct{})
 
 	go func() {
-		r.concurrentStop(services)
+		r.concurrentStop(tier, services)
 		close(done)
 	}()
 
@@ -223,6 +227,7 @@ func (r *Runner) shutdownWithTimeout(services []Service) {
 	case <-done:
 		return
 	case <-time.After(r.shutdownTimeout):
+		recordShutdownTimeout()
 		log.Error().
 			Str("source", "gframework").
 			Dur("timeout", r.shutdownTimeout).
@@ -230,7 +235,7 @@ func (r *Runner) shutdownWithTimeout(services []Service) {
 	}
 }
 
-func (r *Runner) concurrentStop(services []Service) {
+func (r *Runner) concurrentStop(tier string, services []Service) {
 	var wg sync.WaitGroup
 
 	for _, svc := range services {
@@ -241,7 +246,11 @@ func (r *Runner) concurrentStop(services []Service) {
 
 			log.Info().Str("source", "gframework").Str("service_name", service.Name()).Msg("Stopping service")
 
-			if err := service.Stop(); err != nil {
+			startedAt := time.Now()
+			err := service.Stop()
+			recordLifecycle(tier, service.Name(), "stop", time.Since(startedAt), err)
+
+			if err != nil {
 				log.Error().
 					Str("source", "gframework").
 					Err(err).

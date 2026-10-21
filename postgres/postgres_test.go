@@ -1,4 +1,3 @@
-//nolint:exhaustruct
 package postgres_test
 
 import (
@@ -30,12 +29,19 @@ func TestPostgresConnection(t *testing.T) {
 
 	// Define options
 	opts := &postgres.Config{
-		URL:                   dbURL,
-		MaxConnection:         5,
-		MinConnection:         1,
-		MaxConnectionIdleTime: 60 * time.Second,
-		HealthCheckPeriod:     10 * time.Second,
-		LogLevel:              tracelog.LogLevelTrace,
+		URL:                      dbURL,
+		MaxConnection:            5,
+		MinConnection:            1,
+		MaxConnectionIdleTime:    60 * time.Second,
+		HealthCheckPeriod:        10 * time.Second,
+		LogLevel:                 tracelog.LogLevelTrace,
+		MaxConnectionLifetime:    0,
+		ConnectTimeout:           0,
+		StatementTimeout:         0,
+		LockTimeout:              0,
+		IdleInTransactionTimeout: 0,
+		SlowQueryThreshold:       0,
+		DisableMetrics:           false,
 	}
 
 	// Create Postgres instance

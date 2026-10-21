@@ -11,12 +11,13 @@ import (
 
 func validOptions() spaces.Options {
 	return spaces.Options{
-		Region:    "nyc3",
-		Endpoint:  "https://nyc3.digitaloceanspaces.com",
-		Bucket:    "test-bucket",
-		KeyPrefix: "tenant-1/",
-		AccessKey: "test-access-key",
-		SecretKey: "test-secret-key",
+		Region:         "nyc3",
+		Endpoint:       "https://nyc3.digitaloceanspaces.com",
+		Bucket:         "test-bucket",
+		KeyPrefix:      "tenant-1/",
+		AccessKey:      "test-access-key",
+		SecretKey:      "test-secret-key",
+		DisableMetrics: false,
 	}
 }
 

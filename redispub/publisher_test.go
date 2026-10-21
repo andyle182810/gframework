@@ -52,6 +52,7 @@ func setupTestClient(t *testing.T) *valkey.Valkey {
 		TLSCertFile:     "",
 		TLSKeyFile:      "",
 		TLSCAFile:       "",
+		DisableMetrics:  false,
 	}
 
 	client, err := valkey.New(cfg)
@@ -71,6 +72,7 @@ func TestNew_WithNilRedisClient(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	if !errors.Is(err, redispub.ErrNilRedisClient) {
 		t.Errorf("expected ErrNilRedisClient, got %v", err)
@@ -86,6 +88,7 @@ func TestNew_WithNegativeMaxStreamEntries(t *testing.T) {
 		MaxStreamEntries: -1,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	if !errors.Is(err, redispub.ErrInvalidMaxStreamEntries) {
 		t.Errorf("expected ErrInvalidMaxStreamEntries, got %v", err)
@@ -101,6 +104,7 @@ func TestNew_WithZeroMaxStreamEntries(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, publisher)
@@ -117,6 +121,7 @@ func TestNew_WithPositiveMaxStreamEntries(t *testing.T) {
 		MaxStreamEntries: 1000,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, publisher)
@@ -132,6 +137,7 @@ func TestNew_WithCustomTimeout(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          10 * time.Second,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, publisher)
@@ -148,6 +154,7 @@ func TestNew_WithZeroTimeoutUsesDefault(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, publisher)
@@ -164,6 +171,7 @@ func TestNew_WithNegativeTimeoutUsesDefault(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          -1 * time.Second,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, publisher)
@@ -180,6 +188,7 @@ func TestRedisPublisher_CloseIsIdempotent(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -196,6 +205,7 @@ func TestRedisPublisher_ImplementsPublisherInterface(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -214,6 +224,7 @@ func TestRedisPublisher_PublishToTopicWithNoMessages(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -235,6 +246,7 @@ func TestRedisPublisher_PublishToTopicWithSingleMessage(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -256,6 +268,7 @@ func TestRedisPublisher_PublishToTopicWithMultipleMessages(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -277,6 +290,7 @@ func TestRedisPublisher_PublishToTopicRespectsExistingContextDeadline(t *testing
 		MaxStreamEntries: 0,
 		Timeout:          1 * time.Second,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -301,6 +315,7 @@ func TestRedisPublisher_PublishToTopicWithAlreadyCancelledContext(t *testing.T) 
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -325,6 +340,7 @@ func TestRedisPublisher_PublishToTopicAppliesDefaultTimeoutWhenNoDeadline(t *tes
 		MaxStreamEntries: 0,
 		Timeout:          5 * time.Second,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -346,6 +362,7 @@ func TestRedisPublisher_PublishToMultipleTopics(t *testing.T) {
 		MaxStreamEntries: 0,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 
@@ -370,6 +387,7 @@ func TestRedisPublisher_PublishWithMaxStreamEntries(t *testing.T) {
 		MaxStreamEntries: 10,
 		Timeout:          0,
 		Logger:           nil,
+		DisableMetrics:   false,
 	})
 	require.NoError(t, err)
 

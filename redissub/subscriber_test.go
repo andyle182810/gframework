@@ -1,4 +1,3 @@
-//nolint:exhaustruct,paralleltest,tparallel
 package redissub_test
 
 import (
@@ -37,8 +36,26 @@ func setupTestClient(t *testing.T) *valkey.Valkey {
 	require.NoError(t, err)
 
 	valkeyClient, err := valkey.New(&valkey.Config{
-		Host: container.Host,
-		Port: port,
+		Host:            container.Host,
+		Port:            port,
+		Password:        "",
+		DB:              0,
+		DialTimeout:     0,
+		MaxIdleConns:    0,
+		MinIdleConns:    0,
+		PingTimeout:     0,
+		PoolSize:        0,
+		ReadTimeout:     0,
+		WriteTimeout:    0,
+		MaxRetries:      0,
+		MinRetryBackoff: 0,
+		MaxRetryBackoff: 0,
+		TLSEnabled:      false,
+		TLSSkipVerify:   false,
+		TLSCertFile:     "",
+		TLSKeyFile:      "",
+		TLSCAFile:       "",
+		DisableMetrics:  false,
 	})
 	require.NoError(t, err)
 
@@ -52,7 +69,12 @@ func setupTestClient(t *testing.T) *valkey.Valkey {
 func setupTestPublisher(t *testing.T, client *valkey.Valkey) *redispub.RedisPublisher {
 	t.Helper()
 
-	publisher, err := redispub.New(client.Client, redispub.Options{})
+	publisher, err := redispub.New(client.Client, redispub.Options{
+		MaxStreamEntries: 0,
+		Timeout:          0,
+		Logger:           nil,
+		DisableMetrics:   false,
+	})
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -132,6 +154,8 @@ func TestNewSubscriber(t *testing.T) {
 
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			subscriber, err := redissub.NewSubscriber(
 				testCase.client(),
 				testCase.consumerGroup,
@@ -446,7 +470,13 @@ func TestSubscriberWithMetrics(t *testing.T) {
 	valkeyClient := setupTestClient(t)
 	publisher := setupTestPublisher(t, valkeyClient)
 
-	metrics := &mockMetrics{}
+	metrics := &mockMetrics{
+		receivedCount:  atomic.Int32{},
+		processedCount: atomic.Int32{},
+		ackedCount:     atomic.Int32{},
+		nackedCount:    atomic.Int32{},
+		dlqCount:       atomic.Int32{},
+	}
 
 	handler := func(_ context.Context, _ message.Payload) error {
 		return nil
@@ -985,7 +1015,13 @@ func TestSubscriberMetricsAfterRetryExhaustion(t *testing.T) {
 
 	const maxRetries = 2
 
-	metrics := &mockMetrics{}
+	metrics := &mockMetrics{
+		receivedCount:  atomic.Int32{},
+		processedCount: atomic.Int32{},
+		ackedCount:     atomic.Int32{},
+		nackedCount:    atomic.Int32{},
+		dlqCount:       atomic.Int32{},
+	}
 
 	handler := func(_ context.Context, _ message.Payload) error {
 		return errAlwaysFail
@@ -1052,7 +1088,13 @@ func TestSubscriberDLQWriteFailureDoesNotLoseMessage(t *testing.T) {
 	// simulating a DLQ write failure.
 	require.NoError(t, valkeyClient.Client.Set(ctx, dlqTopic, "not-a-stream", 0).Err())
 
-	metrics := &mockMetrics{}
+	metrics := &mockMetrics{
+		receivedCount:  atomic.Int32{},
+		processedCount: atomic.Int32{},
+		ackedCount:     atomic.Int32{},
+		nackedCount:    atomic.Int32{},
+		dlqCount:       atomic.Int32{},
+	}
 
 	subscriber, err := redissub.NewSubscriber(
 		valkeyClient.Client,

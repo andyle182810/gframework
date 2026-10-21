@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var errExampleDatabaseConnectionTimeout = errors.New("database connection timeout")
+
 const messageKey = "message"
 
 func Example_errorHandlerBasic() {
@@ -37,10 +39,7 @@ func Example_errorHandlerWithLogging() {
 	e.Logger = slog.New(slog.DiscardHandler)
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		Logger:    &logger,
-		LogErrors: true,
-	}
+	config := errorHandlerConfig(&logger, true, false, nil)
 	e.HTTPErrorHandler = middleware.ErrorHandler(e.HTTPErrorHandler, config)
 
 	e.GET("/users/:id", func(_ *echo.Context) error {
@@ -60,15 +59,11 @@ func Example_errorHandlerWithInternalErrors() {
 	e.Logger = slog.New(slog.DiscardHandler)
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		Logger:                &logger,
-		LogErrors:             true,
-		IncludeInternalErrors: true, // WARNING: Only use in development!
-	}
+	config := errorHandlerConfig(&logger, true, true, nil)
 	e.HTTPErrorHandler = middleware.ErrorHandler(e.HTTPErrorHandler, config)
 
 	e.GET("/users/:id", func(_ *echo.Context) error {
-		dbErr := errors.New("database connection timeout") //nolint:err113
+		dbErr := errExampleDatabaseConnectionTimeout
 		baseErr := echo.NewHTTPError(http.StatusServiceUnavailable, "Service temporarily unavailable")
 
 		return baseErr.Wrap(dbErr)
@@ -86,19 +81,17 @@ func Example_errorHandlerCustomResponse() {
 	e := echo.New()
 	e.Logger = slog.New(slog.DiscardHandler)
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		CustomErrorResponse: func(ctx *echo.Context, err error, code int) map[string]any {
-			return map[string]any{
-				"success": false,
-				"error": map[string]any{
-					"code":     code,
-					messageKey: err.Error(),
-				},
-				"path":      ctx.Request().URL.Path,
-				"timestamp": "2024-01-01T00:00:00Z",
-			}
-		},
-	}
+	config := errorHandlerConfig(nil, false, false, func(ctx *echo.Context, err error, code int) map[string]any {
+		return map[string]any{
+			"success": false,
+			"error": map[string]any{
+				"code":     code,
+				messageKey: err.Error(),
+			},
+			"path":      ctx.Request().URL.Path,
+			"timestamp": "2024-01-01T00:00:00Z",
+		}
+	})
 	e.HTTPErrorHandler = middleware.ErrorHandler(e.HTTPErrorHandler, config)
 
 	e.GET("/users/:id", func(_ *echo.Context) error {
@@ -118,15 +111,11 @@ func Example_errorHandlerProduction() {
 	e.Logger = slog.New(slog.DiscardHandler)
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-	config := &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-		Logger:                &logger,
-		LogErrors:             true,
-		IncludeInternalErrors: false,
-	}
+	config := errorHandlerConfig(&logger, true, false, nil)
 	e.HTTPErrorHandler = middleware.ErrorHandler(e.HTTPErrorHandler, config)
 
 	e.GET("/users/:id", func(_ *echo.Context) error {
-		dbErr := errors.New("database connection timeout") //nolint:err113
+		dbErr := errExampleDatabaseConnectionTimeout
 		baseErr := echo.NewHTTPError(http.StatusServiceUnavailable, "Service temporarily unavailable")
 
 		return baseErr.Wrap(dbErr)

@@ -332,6 +332,8 @@ func (s *Subscriber) Start(ctx context.Context) error { //nolint:cyclop
 				s.config.Metrics.MessageReceived(s.Topic())
 			}
 
+			recordMessageReceived(s.Topic(), s.ConsumerGroup())
+
 			if err := s.handleMessage(ctx, msg); err != nil {
 				log.Error().
 					Str("source", "gframework").
@@ -357,6 +359,9 @@ func (s *Subscriber) handleMessage(ctx context.Context, msg *message.Message) er
 		s.config.Metrics.MessageProcessed(s.Topic(), duration, processingErr)
 	}
 
+	result := messageResult(processingErr)
+	recordMessageProcessed(s.Topic(), s.ConsumerGroup(), result, duration.Seconds())
+
 	if processingErr != nil {
 		s.handleFailedMessage(ctx, msg, processingErr)
 
@@ -379,6 +384,8 @@ func (s *Subscriber) processWithRetry(ctx context.Context, msg *message.Message)
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		processingErr = s.executeWithTimeout(ctx, msg)
+		recordMessageAttempt(s.Topic(), s.ConsumerGroup(), messageResult(processingErr))
+
 		if processingErr == nil {
 			return nil
 		}
@@ -473,6 +480,8 @@ func (s *Subscriber) handleFailedMessage(ctx context.Context, msg *message.Messa
 			s.config.Metrics.MessageSentToDLQ(s.Topic())
 		}
 
+		recordMessageSentToDLQ(s.Topic(), s.ConsumerGroup())
+
 		s.ackFailedMessage(msg)
 
 		return
@@ -495,6 +504,8 @@ func (s *Subscriber) notifyNacked() {
 	if s.config.Metrics != nil {
 		s.config.Metrics.MessageNacked(s.Topic())
 	}
+
+	recordMessageNack(s.Topic(), s.ConsumerGroup())
 }
 
 func (s *Subscriber) acknowledgeMessage(msg *message.Message) {
@@ -515,6 +526,8 @@ func (s *Subscriber) acknowledgeMessage(msg *message.Message) {
 	if s.config.Metrics != nil {
 		s.config.Metrics.MessageAcked(s.Topic())
 	}
+
+	recordMessageAck(s.Topic(), s.ConsumerGroup())
 }
 
 func (s *Subscriber) sendToDLQ(ctx context.Context, msg *message.Message, processingErr error) error {

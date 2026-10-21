@@ -27,9 +27,10 @@ var (
 )
 
 type UMAClient struct {
-	tokenEndpoint string
-	audience      string
-	httpClient    *http.Client
+	tokenEndpoint  string
+	audience       string
+	httpClient     *http.Client
+	metricsEnabled bool
 }
 
 func NewUMAClient(
@@ -38,9 +39,10 @@ func NewUMAClient(
 	opts ...UMAOption,
 ) *UMAClient {
 	c := &UMAClient{
-		tokenEndpoint: tokenEndpoint,
-		audience:      audience,
-		httpClient:    &http.Client{Timeout: defaultUMATimeout}, //nolint:exhaustruct
+		tokenEndpoint:  tokenEndpoint,
+		audience:       audience,
+		httpClient:     &http.Client{Timeout: defaultUMATimeout}, //nolint:exhaustruct
+		metricsEnabled: true,
 	}
 
 	for _, opt := range opts {
@@ -51,6 +53,20 @@ func NewUMAClient(
 }
 
 func (c *UMAClient) Check(ctx context.Context, userToken, resource, scope string) (bool, error) {
+	startedAt := time.Now()
+	allowed, err := c.check(ctx, userToken, resource, scope)
+
+	result := operationResult(err)
+	if err == nil && !allowed {
+		result = "denied"
+	}
+
+	c.recordOperation("uma_check", result, time.Since(startedAt))
+
+	return allowed, err
+}
+
+func (c *UMAClient) check(ctx context.Context, userToken, resource, scope string) (bool, error) {
 	if userToken == "" || resource == "" || scope == "" {
 		return false, fmt.Errorf("%w: Check requires userToken, resource and scope", ErrInvalidInput)
 	}
@@ -80,15 +96,12 @@ func (c *UMAClient) Check(ctx context.Context, userToken, resource, scope string
 
 	defer func() { _ = resp.Body.Close() }()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
+	return permissionDecision(resp)
+}
 
-	case http.StatusForbidden:
-		return false, nil
-
-	default:
-		return false, unexpectedStatus(resp)
+func (c *UMAClient) recordOperation(operation, result string, duration time.Duration) {
+	if c.metricsEnabled {
+		recordOperation(operation, result, duration)
 	}
 }
 
@@ -101,4 +114,17 @@ func unexpectedStatus(resp *http.Response) error {
 
 	return fmt.Errorf("%w: status=%d body=%s",
 		ErrUMAResponseInvalid, resp.StatusCode, strings.TrimSpace(string(body)))
+}
+
+func permissionDecision(resp *http.Response) (bool, error) {
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+
+	case http.StatusForbidden:
+		return false, nil
+
+	default:
+		return false, unexpectedStatus(resp)
+	}
 }

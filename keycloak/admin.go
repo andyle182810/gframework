@@ -56,6 +56,7 @@ type AdminClient struct {
 	realm             string
 	tokenSafetyBuffer time.Duration
 	tokenProvider     *authtoken.Client
+	metricsEnabled    bool
 }
 
 func NewAdminClient(
@@ -71,20 +72,22 @@ func NewAdminClient(
 		gocloak:           gocloakClient,
 		realm:             realm,
 		tokenSafetyBuffer: defaultTokenSafetyBuffer,
+		metricsEnabled:    true,
 	}
 
 	for _, opt := range opts {
 		opt(c)
 	}
 
-	c.tokenProvider = authtoken.New(
-		baseURL,
-		realm,
-		clientID,
-		clientSecret,
+	tokenOptions := []authtoken.Option{
 		authtoken.WithGoCloakClient(c.gocloak),
 		authtoken.WithTokenExpiryBuffer(c.tokenSafetyBuffer),
-	)
+	}
+	if !c.metricsEnabled {
+		tokenOptions = append(tokenOptions, authtoken.WithoutMetrics())
+	}
+
+	c.tokenProvider = authtoken.New(baseURL, realm, clientID, clientSecret, tokenOptions...)
 
 	return c
 }
@@ -95,6 +98,12 @@ func (c *AdminClient) token(ctx context.Context) (string, error) {
 
 func (c *AdminClient) InvalidateToken() {
 	c.tokenProvider.InvalidateToken()
+}
+
+func (c *AdminClient) recordOperation(operation, result string, duration time.Duration) {
+	if c.metricsEnabled {
+		recordOperation(operation, result, duration)
+	}
 }
 
 type CreateUserParams struct {
@@ -109,6 +118,14 @@ type CreateUserParams struct {
 }
 
 func (c *AdminClient) CreateUser(ctx context.Context, params CreateUserParams) (string, error) {
+	startedAt := time.Now()
+	id, err := c.createUser(ctx, params)
+	c.recordOperation("create_user", operationResult(err), time.Since(startedAt))
+
+	return id, err
+}
+
+func (c *AdminClient) createUser(ctx context.Context, params CreateUserParams) (string, error) {
 	if params.Username == "" || params.Email == "" {
 		return "", fmt.Errorf("%w: CreateUser requires Username and Email", ErrInvalidInput)
 	}
@@ -149,6 +166,14 @@ type UpdateUserParams struct {
 }
 
 func (c *AdminClient) UpdateUser(ctx context.Context, id string, params UpdateUserParams) error {
+	startedAt := time.Now()
+	err := c.updateUser(ctx, id, params)
+	c.recordOperation("update_user", operationResult(err), time.Since(startedAt))
+
+	return err
+}
+
+func (c *AdminClient) updateUser(ctx context.Context, id string, params UpdateUserParams) error {
 	if id == "" {
 		return fmt.Errorf("%w: UpdateUser requires id", ErrInvalidInput)
 	}
@@ -173,6 +198,14 @@ func (c *AdminClient) UpdateUser(ctx context.Context, id string, params UpdateUs
 }
 
 func (c *AdminClient) SetEnabled(ctx context.Context, id string, enabled bool) error {
+	startedAt := time.Now()
+	err := c.setEnabled(ctx, id, enabled)
+	c.recordOperation("set_enabled", operationResult(err), time.Since(startedAt))
+
+	return err
+}
+
+func (c *AdminClient) setEnabled(ctx context.Context, id string, enabled bool) error {
 	if id == "" {
 		return fmt.Errorf("%w: SetEnabled requires id", ErrInvalidInput)
 	}
@@ -196,6 +229,14 @@ func (c *AdminClient) SetEnabled(ctx context.Context, id string, enabled bool) e
 }
 
 func (c *AdminClient) GetUser(ctx context.Context, id string) (*gocloak.User, error) {
+	startedAt := time.Now()
+	user, err := c.getUser(ctx, id)
+	c.recordOperation("get_user", operationResult(err), time.Since(startedAt))
+
+	return user, err
+}
+
+func (c *AdminClient) getUser(ctx context.Context, id string) (*gocloak.User, error) {
 	if id == "" {
 		return nil, fmt.Errorf("%w: GetUser requires id", ErrInvalidInput)
 	}
@@ -214,6 +255,14 @@ func (c *AdminClient) GetUser(ctx context.Context, id string) (*gocloak.User, er
 }
 
 func (c *AdminClient) ListUsers(ctx context.Context, offset, limit int) ([]*gocloak.User, error) {
+	startedAt := time.Now()
+	users, err := c.listUsers(ctx, offset, limit)
+	c.recordOperation("list_users", operationResult(err), time.Since(startedAt))
+
+	return users, err
+}
+
+func (c *AdminClient) listUsers(ctx context.Context, offset, limit int) ([]*gocloak.User, error) {
 	if offset < 0 || limit <= 0 {
 		return nil, fmt.Errorf("%w: ListUsers requires offset>=0 and limit>0", ErrInvalidInput)
 	}
@@ -237,6 +286,14 @@ func (c *AdminClient) ListUsers(ctx context.Context, offset, limit int) ([]*gocl
 }
 
 func (c *AdminClient) UserRoles(ctx context.Context, id string) ([]*gocloak.Role, error) {
+	startedAt := time.Now()
+	roles, err := c.userRoles(ctx, id)
+	c.recordOperation("user_roles", operationResult(err), time.Since(startedAt))
+
+	return roles, err
+}
+
+func (c *AdminClient) userRoles(ctx context.Context, id string) ([]*gocloak.Role, error) {
 	if id == "" {
 		return nil, fmt.Errorf("%w: UserRoles requires id", ErrInvalidInput)
 	}
@@ -255,11 +312,19 @@ func (c *AdminClient) UserRoles(ctx context.Context, id string) ([]*gocloak.Role
 }
 
 func (c *AdminClient) AddRole(ctx context.Context, id, name string) error {
-	return c.applyRole(ctx, id, name, "add", c.gocloak.AddRealmRoleToUser)
+	startedAt := time.Now()
+	err := c.applyRole(ctx, id, name, "add", c.gocloak.AddRealmRoleToUser)
+	c.recordOperation("add_role", operationResult(err), time.Since(startedAt))
+
+	return err
 }
 
 func (c *AdminClient) RemoveRole(ctx context.Context, id, name string) error {
-	return c.applyRole(ctx, id, name, "remove", c.gocloak.DeleteRealmRoleFromUser)
+	startedAt := time.Now()
+	err := c.applyRole(ctx, id, name, "remove", c.gocloak.DeleteRealmRoleFromUser)
+	c.recordOperation("remove_role", operationResult(err), time.Since(startedAt))
+
+	return err
 }
 
 type realmRoleOp func(ctx context.Context, token, realm, userID string, roles []gocloak.Role) error
@@ -296,6 +361,14 @@ func (c *AdminClient) applyRole(
 }
 
 func (c *AdminClient) Roles(ctx context.Context) ([]*gocloak.Role, error) {
+	startedAt := time.Now()
+	roles, err := c.roles(ctx)
+	c.recordOperation("roles", operationResult(err), time.Since(startedAt))
+
+	return roles, err
+}
+
+func (c *AdminClient) roles(ctx context.Context) ([]*gocloak.Role, error) {
 	token, err := c.token(ctx)
 	if err != nil {
 		return nil, err
@@ -310,6 +383,14 @@ func (c *AdminClient) Roles(ctx context.Context) ([]*gocloak.Role, error) {
 }
 
 func (c *AdminClient) SendActionsEmail(ctx context.Context, id string, actions []string) error {
+	startedAt := time.Now()
+	err := c.sendActionsEmail(ctx, id, actions)
+	c.recordOperation("send_actions_email", operationResult(err), time.Since(startedAt))
+
+	return err
+}
+
+func (c *AdminClient) sendActionsEmail(ctx context.Context, id string, actions []string) error {
 	if id == "" || len(actions) == 0 {
 		return fmt.Errorf("%w: SendActionsEmail requires id and at least one action", ErrInvalidInput)
 	}

@@ -1,4 +1,3 @@
-//nolint:exhaustruct
 package postgres_test
 
 import (
@@ -51,12 +50,19 @@ func setupTestPostgres(t *testing.T) *postgres.Postgres {
 	)
 
 	opts := &postgres.Config{
-		URL:                   dbURL,
-		MaxConnection:         5,
-		MinConnection:         1,
-		MaxConnectionIdleTime: 60 * time.Second,
-		HealthCheckPeriod:     10 * time.Second,
-		LogLevel:              tracelog.LogLevelTrace,
+		URL:                      dbURL,
+		MaxConnection:            5,
+		MinConnection:            1,
+		MaxConnectionIdleTime:    60 * time.Second,
+		HealthCheckPeriod:        10 * time.Second,
+		LogLevel:                 tracelog.LogLevelTrace,
+		MaxConnectionLifetime:    0,
+		ConnectTimeout:           0,
+		StatementTimeout:         0,
+		LockTimeout:              0,
+		IdleInTransactionTimeout: 0,
+		SlowQueryThreshold:       0,
+		DisableMetrics:           false,
 	}
 
 	pg, err := postgres.New(opts)
@@ -147,7 +153,7 @@ func TestBulkInsert_NilConnectionPool(t *testing.T) {
 
 	ctx := t.Context()
 
-	pg := &postgres.Postgres{}
+	pg := &postgres.Postgres{DBPool: nil}
 
 	columns := []string{columnName}
 	rows := [][]any{{"test"}}

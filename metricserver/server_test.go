@@ -16,7 +16,7 @@ func startServer(t *testing.T) *metricserver.Server {
 
 	opts := &metricserver.Config{
 		Host:              "127.0.0.1",
-		Port:              9090,
+		Port:              0,
 		ReadHeaderTimeout: 2 * time.Second,
 		ReadTimeout:       2 * time.Second,
 		WriteTimeout:      2 * time.Second,
@@ -27,12 +27,7 @@ func startServer(t *testing.T) *metricserver.Server {
 	server := metricserver.New(opts)
 	require.NotNil(t, server)
 
-	go func() {
-		_ = server.Start(t.Context())
-	}()
-
-	// Allow server to start
-	time.Sleep(500 * time.Millisecond)
+	require.NoError(t, server.Start(t.Context()))
 
 	return server
 }
@@ -64,7 +59,7 @@ func testEndpoint(t *testing.T, url string, expectedStatus int, expectedBody str
 	_ = resp.Body.Close()
 }
 
-func shutdownServer(t *testing.T, server *metricserver.Server) {
+func shutdownServer(t *testing.T, server *metricserver.Server, address string) {
 	t.Helper()
 
 	err := server.Stop()
@@ -83,7 +78,7 @@ func shutdownServer(t *testing.T, server *metricserver.Server) {
 	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:9090/status", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/status", nil)
 	require.NoError(t, err)
 
 	//nolint:bodyclose
@@ -96,9 +91,10 @@ func TestMetricServer(t *testing.T) {
 	t.Parallel()
 
 	server := startServer(t)
+	address := server.Address()
 
-	testEndpoint(t, "http://127.0.0.1:9090/status", http.StatusOK, `"status":"ok"`)
-	testEndpoint(t, "http://127.0.0.1:9090/metrics", http.StatusOK, "")
+	testEndpoint(t, "http://"+address+"/status", http.StatusOK, `"status":"ok"`)
+	testEndpoint(t, "http://"+address+"/metrics", http.StatusOK, "")
 
-	shutdownServer(t, server)
+	shutdownServer(t, server, address)
 }

@@ -61,7 +61,7 @@ func (m *mockKeyfunc) Storage() jwkset.Storage {
 }
 
 func (m *mockKeyfunc) VerificationKeySet(_ context.Context) (jwt.VerificationKeySet, error) {
-	return jwt.VerificationKeySet{}, nil //nolint:exhaustruct
+	return jwt.VerificationKeySet{Keys: nil}, nil
 }
 
 func createTestToken(t *testing.T, key *rsa.PrivateKey, claims jwt.Claims) string {
@@ -75,18 +75,51 @@ func createTestToken(t *testing.T, key *rsa.PrivateKey, claims jwt.Claims) strin
 	return tokenString
 }
 
+func testRegisteredClaims(
+	issuer string,
+	audience jwt.ClaimStrings,
+	expiresAt *jwt.NumericDate,
+	issuedAt *jwt.NumericDate,
+) jwt.RegisteredClaims {
+	return jwt.RegisteredClaims{
+		Issuer:    issuer,
+		Subject:   "",
+		Audience:  audience,
+		ExpiresAt: expiresAt,
+		NotBefore: nil,
+		IssuedAt:  issuedAt,
+		ID:        "",
+	}
+}
+
+func testExtendedClaims(azp string, registeredClaims jwt.RegisteredClaims) *middleware.ExtendedClaims {
+	return &middleware.ExtendedClaims{
+		Typ:               "",
+		Azp:               azp,
+		Sid:               "",
+		Acr:               "",
+		Scope:             "",
+		RealmAccess:       middleware.RoleAccess{Roles: nil},
+		ResourceAccess:    nil,
+		AllowedOrigins:    nil,
+		Name:              "",
+		PreferredUsername: "",
+		GivenName:         "",
+		FamilyName:        "",
+		Email:             "",
+		EmailVerified:     false,
+		RegisteredClaims:  registeredClaims,
+	}
+}
+
 func TestJWT_ValidToken(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: clientAppName,
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
+	claims := testExtendedClaims(
+		clientAppName,
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), jwt.NewNumericDate(time.Now())),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
@@ -174,14 +207,10 @@ func TestJWT_ExpiredToken(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: clientAppName,
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
-		},
-	}
+	claims := testExtendedClaims(
+		clientAppName,
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(-time.Hour)), jwt.NewNumericDate(time.Now().Add(-2*time.Hour))),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	ctx, _, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
@@ -250,14 +279,10 @@ func TestJWTWithConfig_CustomLogger(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: clientAppName,
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
+	claims := testExtendedClaims(
+		clientAppName,
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), jwt.NewNumericDate(time.Now())),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	logger := zerolog.Nop()
@@ -299,14 +324,10 @@ func TestJWTWithConfig_CustomContextKey(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: clientAppName,
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
+	claims := testExtendedClaims(
+		clientAppName,
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), jwt.NewNumericDate(time.Now())),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
@@ -371,11 +392,10 @@ func TestDefaultJWTConfig(t *testing.T) {
 func TestExtendedClaims_Getters(t *testing.T) {
 	t.Parallel()
 
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: "my-authorized-party",
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{},
-	}
+	claims := testExtendedClaims(
+		"my-authorized-party",
+		testRegisteredClaims("", nil, nil, nil),
+	)
 
 	require.Equal(t, "my-authorized-party", claims.GetAzp())
 }
@@ -384,14 +404,10 @@ func TestJWTWithConfig_NilDefaults(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		Azp: clientAppName,
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
+	claims := testExtendedClaims(
+		clientAppName,
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), jwt.NewNumericDate(time.Now())),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	ctx, rec, _ := testutil.SetupEchoContextWithAuth(t, &testutil.Options{
@@ -512,12 +528,10 @@ func TestJWT_RejectsHS256Token(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-		},
-	}
+	claims := testExtendedClaims(
+		"",
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), nil),
+	)
 
 	hsToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := hsToken.SignedString([]byte("attacker-controlled-secret"))
@@ -535,12 +549,10 @@ func TestJWT_RejectsTokenWithoutExpiry(t *testing.T) {
 	t.Parallel()
 
 	mock := newMockKeyfunc(t)
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			IssuedAt: jwt.NewNumericDate(time.Now()),
-		},
-	}
+	claims := testExtendedClaims(
+		"",
+		testRegisteredClaims("", nil, nil, jwt.NewNumericDate(time.Now())),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	ctx := authContext(t, token)
@@ -571,13 +583,10 @@ func TestJWTWithConfig_IssuerValidation(t *testing.T) {
 			t.Parallel()
 
 			mock := newMockKeyfunc(t)
-			claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-				//nolint:exhaustruct
-				RegisteredClaims: jwt.RegisteredClaims{
-					Issuer:    testCase.issuer,
-					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-				},
-			}
+			claims := testExtendedClaims(
+				"",
+				testRegisteredClaims(testCase.issuer, nil, jwt.NewNumericDate(time.Now().Add(time.Hour)), nil),
+			)
 			token := createTestToken(t, mock.key, claims)
 
 			ctx := authContext(t, token)
@@ -613,13 +622,10 @@ func TestJWTWithConfig_AudienceValidation(t *testing.T) {
 			t.Parallel()
 
 			mock := newMockKeyfunc(t)
-			claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-				//nolint:exhaustruct
-				RegisteredClaims: jwt.RegisteredClaims{
-					Audience:  testCase.tokenAud,
-					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-				},
-			}
+			claims := testExtendedClaims(
+				"",
+				testRegisteredClaims("", testCase.tokenAud, jwt.NewNumericDate(time.Now().Add(time.Hour)), nil),
+			)
 			token := createTestToken(t, mock.key, claims)
 
 			ctx := authContext(t, token)
@@ -642,12 +648,10 @@ func TestJWTWithConfig_LeewayAllowsClockSkew(t *testing.T) {
 	mock := newMockKeyfunc(t)
 	// Token expired 10 seconds ago: rejected without leeway, accepted with the
 	// default 30-second leeway.
-	claims := &middleware.ExtendedClaims{ //nolint:exhaustruct
-		//nolint:exhaustruct
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-10 * time.Second)),
-		},
-	}
+	claims := testExtendedClaims(
+		"",
+		testRegisteredClaims("", nil, jwt.NewNumericDate(time.Now().Add(-10*time.Second)), nil),
+	)
 	token := createTestToken(t, mock.key, claims)
 
 	ctx := authContext(t, token)
