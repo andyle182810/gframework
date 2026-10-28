@@ -131,3 +131,97 @@ func TestInternalAuth_EmptyAllowlistRejects(t *testing.T) {
 	require.ErrorAs(t, err, &httpErr)
 	require.Equal(t, http.StatusForbidden, httpErr.Code)
 }
+
+func TestInternalAuthWithRealmRole(t *testing.T) {
+	t.Parallel()
+
+	const internalService = "internal_service"
+
+	tests := []struct {
+		name           string
+		realmRoles     []string
+		allowedClients []string
+		azp            string
+		wantCode       int
+	}{
+		{
+			name:           "holds the role",
+			realmRoles:     []string{internalService},
+			allowedClients: nil,
+			azp:            permissionClient,
+			wantCode:       0,
+		},
+		{
+			name:           "missing the role",
+			realmRoles:     []string{"administrator"},
+			allowedClients: nil,
+			azp:            "operations-portal",
+			wantCode:       http.StatusForbidden,
+		},
+		{
+			name:           "role and allowlist both required",
+			realmRoles:     []string{internalService},
+			allowedClients: []string{apiGatewayService},
+			azp:            permissionClient,
+			wantCode:       http.StatusForbidden,
+		},
+		{
+			name:           "role and allowlist both met",
+			realmRoles:     []string{internalService},
+			allowedClients: []string{apiGatewayService},
+			azp:            apiGatewayService,
+			wantCode:       0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock := newMockKeyfunc(t)
+			token := createTestToken(t, mock.key, &middleware.ExtendedClaims{ //nolint:exhaustruct
+				Azp:         tt.azp,
+				RealmAccess: middleware.RoleAccess{Roles: tt.realmRoles},
+				RegisteredClaims: jwt.RegisteredClaims{ //nolint:exhaustruct
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+				},
+			})
+			ctx := internalAuthContext(t, "Bearer "+token)
+
+			config := middleware.DefaultInternalAuthConfig()
+			config.Keyfunc = mock
+			config.RequiredRealmRole = internalService
+			config.AllowedClients = tt.allowedClients
+
+			err := middleware.InternalAuthWithConfig(config)(echoSuccessHandler)(ctx)
+
+			if tt.wantCode == 0 {
+				require.NoError(t, err)
+
+				return
+			}
+
+			var httpErr *echo.HTTPError
+
+			require.ErrorAs(t, err, &httpErr)
+			require.Equal(t, tt.wantCode, httpErr.Code)
+		})
+	}
+}
+
+func TestInternalAuthWithRealmRole_Constructor(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockKeyfunc(t)
+	token := createTestToken(t, mock.key, &middleware.ExtendedClaims{ //nolint:exhaustruct
+		Azp:         permissionClient,
+		RealmAccess: middleware.RoleAccess{Roles: []string{"internal_service"}},
+		RegisteredClaims: jwt.RegisteredClaims{ //nolint:exhaustruct
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	})
+	ctx := internalAuthContext(t, "Bearer "+token)
+
+	require.NoError(t, middleware.InternalAuthWithRealmRole(mock, "internal_service")(echoSuccessHandler)(ctx))
+}

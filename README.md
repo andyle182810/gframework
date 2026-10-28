@@ -97,7 +97,9 @@ e.Use(middleware.JWTWithConfig(config))
 
 **CORS**: `EnableCors` with an empty `AllowOrigins` allows every origin (and logs a warning). Always set `AllowOrigins` in production.
 
-**Internal service-to-service auth**: protect internal endpoints with `middleware.InternalAuth(kf, allowedClients)`; on the calling side, use `httpclient` with `WithInternalAuthHeader()` (the internal header is _not_ sent by default — see Breaking changes below).
+**Internal service-to-service auth**: protect internal endpoints with `middleware.InternalAuth(kf, allowedClients)`; on the calling side, use `httpclient` with `WithInternalAuthHeader()` (the internal header is _not_ sent by default — see Breaking changes below). `middleware.InternalAuthWithRealmRole(kf, role)` accepts any caller whose token carries that realm role instead of an azp allowlist.
+
+**Permissions**: `middleware.RequirePermission(client, permission)` / `RequireAnyPermission(client, permissions...)` require a client role on `client` (Keycloak `resource_access`), e.g. `api.GET("/vendors", h, middleware.RequirePermission("vendor-service", "vendors:read"))`. 401 without claims, 403 without the role.
 
 **Error responses**: never enable `ErrorHandlerConfig.IncludeInternalErrors` in production — it exposes internal error strings to clients.
 

@@ -24,6 +24,10 @@ type InternalAuthConfig struct {
 	Header         string
 	AllowedClients []string
 
+	// RequiredRealmRole, when non-empty, requires the token to carry this realm role.
+	// AllowedClients then applies only when it is non-empty too.
+	RequiredRealmRole string
+
 	// ValidMethods lists the accepted JWT signing algorithms. Empty means
 	// DefaultValidMethods(). Never include HS* methods when keys come from a JWKS.
 	ValidMethods []string
@@ -38,13 +42,14 @@ type InternalAuthConfig struct {
 
 func DefaultInternalAuthConfig() InternalAuthConfig {
 	return InternalAuthConfig{
-		Skipper:        middleware.DefaultSkipper,
-		Keyfunc:        nil,
-		Header:         HeaderXInternalAuthorization,
-		AllowedClients: nil,
-		ValidMethods:   DefaultValidMethods(),
-		Issuer:         "",
-		Leeway:         DefaultJWTLeeway,
+		Skipper:           middleware.DefaultSkipper,
+		Keyfunc:           nil,
+		Header:            HeaderXInternalAuthorization,
+		AllowedClients:    nil,
+		RequiredRealmRole: "",
+		ValidMethods:      DefaultValidMethods(),
+		Issuer:            "",
+		Leeway:            DefaultJWTLeeway,
 	}
 }
 
@@ -52,6 +57,14 @@ func InternalAuth(kf keyfunc.Keyfunc, allowedClients []string) echo.MiddlewareFu
 	config := DefaultInternalAuthConfig()
 	config.Keyfunc = kf
 	config.AllowedClients = allowedClients
+
+	return InternalAuthWithConfig(config)
+}
+
+func InternalAuthWithRealmRole(kf keyfunc.Keyfunc, realmRole string) echo.MiddlewareFunc {
+	config := DefaultInternalAuthConfig()
+	config.Keyfunc = kf
+	config.RequiredRealmRole = realmRole
 
 	return InternalAuthWithConfig(config)
 }
@@ -93,13 +106,25 @@ func InternalAuthWithConfig(config InternalAuthConfig) echo.MiddlewareFunc {
 				return ErrInternalTokenInvalid
 			}
 
-			if !slices.Contains(config.AllowedClients, claims.Azp) {
+			if !internalCallerAllowed(config, claims) {
 				return ErrInternalClientForbidden
 			}
 
 			return next(ctx)
 		}
 	}
+}
+
+func internalCallerAllowed(config InternalAuthConfig, claims *ExtendedClaims) bool {
+	if config.RequiredRealmRole != "" && !claims.HasRealmRole(config.RequiredRealmRole) {
+		return false
+	}
+
+	if len(config.AllowedClients) > 0 {
+		return slices.Contains(config.AllowedClients, claims.Azp)
+	}
+
+	return config.RequiredRealmRole != ""
 }
 
 func stripBearer(header string) string {
