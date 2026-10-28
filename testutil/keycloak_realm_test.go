@@ -1,11 +1,14 @@
 package testutil_test
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/testutil"
+	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,6 +47,8 @@ const testRealm = `{
   }
 }`
 
+const staffRole = "staff"
+
 func loadTestRealm(t *testing.T) *testutil.KeycloakRealm {
 	t.Helper()
 
@@ -56,7 +61,7 @@ func loadTestRealm(t *testing.T) *testutil.KeycloakRealm {
 func TestKeycloakRealm_UserClaimsExpandComposites(t *testing.T) {
 	t.Parallel()
 
-	claims := loadTestRealm(t).UserClaims("user-1", "staff")
+	claims := loadTestRealm(t).UserClaims("user-1", staffRole)
 
 	require.Equal(t, "user-1", claims.Subject)
 	require.Equal(t, []string{"staff", "viewer"}, claims.GetRealmRoles())
@@ -105,4 +110,28 @@ func TestKeycloakRealm_ClientRoles(t *testing.T) {
 	t.Parallel()
 
 	require.Equal(t, []string{"vendors:read", "vendors:write"}, loadTestRealm(t).ClientRoles("vendor-service"))
+}
+
+func TestAssertRouteAccess(t *testing.T) {
+	t.Parallel()
+
+	realm := loadTestRealm(t)
+
+	register := func(api *echo.Group) {
+		api.GET("/vendors", func(ctx *echo.Context) error {
+			return ctx.NoContent(http.StatusOK)
+		}, middleware.RequirePermission("vendor-service", "vendors:read"))
+		api.POST("/vendors", func(*echo.Context) error {
+			panic("handler reached")
+		}, middleware.RequirePermission("vendor-service", "vendors:write"))
+	}
+
+	testutil.AssertRouteAccess(t, register, []testutil.Principal{
+		realm.UserPrincipal(staffRole),
+		realm.UserPrincipal("viewer"),
+		realm.ServiceAccountPrincipal(t, "sync-service"),
+	}, []testutil.RouteAccess{
+		{Method: http.MethodGet, Path: "/api/vendors", Allowed: []string{staffRole, "viewer"}},
+		{Method: http.MethodPost, Path: "/api/vendors", Allowed: []string{staffRole}},
+	})
 }
