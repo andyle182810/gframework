@@ -1,4 +1,4 @@
-package testutil_test
+package keycloaktest_test
 
 import (
 	"net/http"
@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/andyle182810/gframework/keycloaktest"
 	"github.com/andyle182810/gframework/middleware"
-	"github.com/andyle182810/gframework/testutil"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -49,16 +49,16 @@ const testRealm = `{
 
 const staffRole = "staff"
 
-func loadTestRealm(t *testing.T) *testutil.KeycloakRealm {
+func loadTestRealm(t *testing.T) *keycloaktest.Realm {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "realm.json")
 	require.NoError(t, os.WriteFile(path, []byte(testRealm), 0o600))
 
-	return testutil.LoadKeycloakRealm(t, path)
+	return keycloaktest.LoadRealm(t, path)
 }
 
-func TestKeycloakRealm_UserClaimsExpandComposites(t *testing.T) {
+func TestRealm_UserClaimsExpandComposites(t *testing.T) {
 	t.Parallel()
 
 	claims := loadTestRealm(t).UserClaims("user-1", staffRole)
@@ -68,7 +68,7 @@ func TestKeycloakRealm_UserClaimsExpandComposites(t *testing.T) {
 	require.Equal(t, []string{"vendors:read", "vendors:write"}, claims.GetResourceRoles("vendor-service"))
 }
 
-func TestKeycloakRealm_ServiceAccountClaims(t *testing.T) {
+func TestRealm_ServiceAccountClaims(t *testing.T) {
 	t.Parallel()
 
 	realm := loadTestRealm(t)
@@ -106,7 +106,7 @@ func TestKeycloakRealm_ServiceAccountClaims(t *testing.T) {
 	}
 }
 
-func TestKeycloakRealm_ClientRoles(t *testing.T) {
+func TestRealm_ClientRoles(t *testing.T) {
 	t.Parallel()
 
 	require.Equal(t, []string{"vendors:read", "vendors:write"}, loadTestRealm(t).ClientRoles("vendor-service"))
@@ -126,11 +126,11 @@ func TestAssertRouteAccess(t *testing.T) {
 		}, middleware.RequirePermission("vendor-service", "vendors:write"))
 	}
 
-	testutil.AssertRouteAccess(t, register, []testutil.Principal{
+	keycloaktest.AssertRouteAccess(t, register, []keycloaktest.Principal{
 		realm.UserPrincipal(staffRole),
 		realm.UserPrincipal("viewer"),
 		realm.ServiceAccountPrincipal(t, "sync-service"),
-	}, []testutil.RouteAccess{
+	}, []keycloaktest.RouteAccess{
 		{Method: http.MethodGet, Path: "/api/vendors", Allowed: []string{staffRole, "viewer"}},
 		{Method: http.MethodPost, Path: "/api/vendors", Allowed: []string{staffRole}},
 	})

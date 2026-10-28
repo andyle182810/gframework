@@ -1,4 +1,4 @@
-package testutil
+package keycloaktest
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type KeycloakRealm struct {
+type Realm struct {
 	realmRoles  map[string]realmRole
 	clientRoles map[string]map[string]realmRole
 	clients     map[string]realmClient
@@ -62,7 +62,7 @@ type realmExport struct {
 	ClientScopeMappings map[string][]realmScopeMapping `json:"clientScopeMappings"`
 }
 
-func LoadKeycloakRealm(t *testing.T, path string) *KeycloakRealm {
+func LoadRealm(t *testing.T, path string) *Realm {
 	t.Helper()
 
 	raw, err := os.ReadFile(path)
@@ -72,7 +72,7 @@ func LoadKeycloakRealm(t *testing.T, path string) *KeycloakRealm {
 
 	require.NoError(t, json.Unmarshal(raw, &export))
 
-	realm := &KeycloakRealm{
+	realm := &Realm{
 		realmRoles:  map[string]realmRole{},
 		clientRoles: map[string]map[string]realmRole{},
 		clients:     map[string]realmClient{},
@@ -114,7 +114,7 @@ func LoadKeycloakRealm(t *testing.T, path string) *KeycloakRealm {
 	return realm
 }
 
-func (r *KeycloakRealm) ClientRoles(client string) []string {
+func (r *Realm) ClientRoles(client string) []string {
 	roles := make([]string, 0, len(r.clientRoles[client]))
 	for name := range r.clientRoles[client] {
 		roles = append(roles, name)
@@ -125,11 +125,11 @@ func (r *KeycloakRealm) ClientRoles(client string) []string {
 	return roles
 }
 
-func (r *KeycloakRealm) UserClaims(subject string, realmRoles ...string) *middleware.ExtendedClaims {
+func (r *Realm) UserClaims(subject string, realmRoles ...string) *middleware.ExtendedClaims {
 	return r.claims(subject, "", realmRoles, nil)
 }
 
-func (r *KeycloakRealm) ServiceAccountClaims(t *testing.T, clientID string) *middleware.ExtendedClaims {
+func (r *Realm) ServiceAccountClaims(t *testing.T, clientID string) *middleware.ExtendedClaims {
 	t.Helper()
 
 	for _, user := range r.users {
@@ -143,7 +143,7 @@ func (r *KeycloakRealm) ServiceAccountClaims(t *testing.T, clientID string) *mid
 	return nil
 }
 
-func (r *KeycloakRealm) claims(
+func (r *Realm) claims(
 	subject, azp string,
 	realmRoles []string,
 	clientRoles map[string][]string,
@@ -181,7 +181,7 @@ func (r *KeycloakRealm) claims(
 	return claims
 }
 
-func (r *KeycloakRealm) narrowToScope(azp string, realmSet map[string]bool, clientSet map[string]map[string]bool) {
+func (r *Realm) narrowToScope(azp string, realmSet map[string]bool, clientSet map[string]map[string]bool) {
 	for role := range realmSet {
 		if !slices.Contains(r.scope.realm[azp], role) {
 			delete(realmSet, role)
@@ -197,7 +197,7 @@ func (r *KeycloakRealm) narrowToScope(azp string, realmSet map[string]bool, clie
 	}
 }
 
-func (r *KeycloakRealm) expandRealmRole(name string, realmSet map[string]bool, clientSet map[string]map[string]bool) {
+func (r *Realm) expandRealmRole(name string, realmSet map[string]bool, clientSet map[string]map[string]bool) {
 	role, ok := r.realmRoles[name]
 	if !ok || realmSet[name] {
 		return
@@ -208,7 +208,7 @@ func (r *KeycloakRealm) expandRealmRole(name string, realmSet map[string]bool, c
 	r.expandComposites(role.Composites, realmSet, clientSet)
 }
 
-func (r *KeycloakRealm) expandClientRole(
+func (r *Realm) expandClientRole(
 	client, name string,
 	realmSet map[string]bool,
 	clientSet map[string]map[string]bool,
@@ -227,7 +227,7 @@ func (r *KeycloakRealm) expandClientRole(
 	r.expandComposites(role.Composites, realmSet, clientSet)
 }
 
-func (r *KeycloakRealm) expandComposites(
+func (r *Realm) expandComposites(
 	composites realmComposites,
 	realmSet map[string]bool,
 	clientSet map[string]map[string]bool,

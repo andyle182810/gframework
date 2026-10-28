@@ -1,4 +1,4 @@
-package testutil
+package keycloaktest
 
 import (
 	"net/http"
@@ -24,14 +24,14 @@ type RouteAccess struct {
 	Allowed []string
 }
 
-func (r *KeycloakRealm) UserPrincipal(realmRoles ...string) Principal {
+func (r *Realm) UserPrincipal(realmRoles ...string) Principal {
 	return Principal{
 		Name:   strings.Join(realmRoles, "+"),
 		Claims: r.UserClaims("user-"+strings.Join(realmRoles, "-"), realmRoles...),
 	}
 }
 
-func (r *KeycloakRealm) ServiceAccountPrincipal(t *testing.T, clientID string) Principal {
+func (r *Realm) ServiceAccountPrincipal(t *testing.T, clientID string) Principal {
 	t.Helper()
 
 	return Principal{Name: clientID, Claims: r.ServiceAccountClaims(t, clientID)}

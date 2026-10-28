@@ -99,7 +99,7 @@ e.Use(middleware.JWTWithConfig(config))
 
 **Internal service-to-service auth**: protect internal endpoints with `middleware.InternalAuth(kf, allowedClients)`; on the calling side, use `httpclient` with `WithInternalAuthHeader()` (the internal header is _not_ sent by default — see Breaking changes below). `middleware.InternalAuthWithRealmRole(kf, role)` accepts any caller whose token carries that realm role instead of an azp allowlist.
 
-**Permissions**: `middleware.RequirePermission(client, permission)` / `RequireAnyPermission(client, permissions...)` require a client role on `client` (Keycloak `resource_access`), e.g. `api.GET("/vendors", h, middleware.RequirePermission("vendor-service", "vendors:read"))`. 401 without claims, 403 without the role.
+**Permissions**: `middleware.RequirePermission(client, permission)` / `RequireAnyPermission(client, permissions...)` require a client role on `client` (Keycloak `resource_access`), e.g. `api.GET("/vendors", h, middleware.RequirePermission("vendor-service", "vendors:read"))`. 401 without claims, 403 without the role. In tests, `keycloaktest.LoadRealm` builds the claims a realm export would issue and `keycloaktest.AssertRouteAccess` checks every route per principal.
 
 **Error responses**: never enable `ErrorHandlerConfig.IncludeInternalErrors` in production — it exposes internal error strings to clients.
 
