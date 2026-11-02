@@ -522,5 +522,5 @@ func TestMultiSubscriberStartAlreadyRunning(t *testing.T) {
 	// Stop the first Start so the goroutine can deliver its result.
 	require.NoError(t, multiSub.Stop())
 
-	<-stopped
+	require.NoError(t, <-stopped)
 }

@@ -351,7 +351,7 @@ func TestWithRequestID_SetsRequestIDHeader(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "custom-request-id", req.Header.Get("X-Request-Id"))
+		assert.Equal(t, "custom-request-id", req.Header.Get("X-Request-ID"))
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -428,7 +428,7 @@ func TestWithRequestIDKey_ExtractsRequestIDFromContext(t *testing.T) {
 	key := ctxKey("request-id")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "ctx-request-id", r.Header.Get("X-Request-Id"))
+		assert.Equal(t, "ctx-request-id", r.Header.Get("X-Request-ID"))
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
