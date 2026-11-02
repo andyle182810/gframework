@@ -628,7 +628,7 @@ func TestSubscriberStartAlreadyRunning(t *testing.T) {
 
 	cancel()
 
-	<-stopped
+	require.ErrorIs(t, <-stopped, context.Canceled)
 }
 
 func TestSubscriberWithExecTimeout(t *testing.T) {
