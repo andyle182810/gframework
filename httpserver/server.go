@@ -90,7 +90,9 @@ func New(cfg *Config) *Server {
 	e.HTTPErrorHandler = middleware.ErrorHandler(
 		echo.DefaultHTTPErrorHandler(false),
 		&middleware.ErrorHandlerConfig{ //nolint:exhaustruct
-			Messages: i18n.BuiltinCatalog().Merge(cfg.Messages),
+			Logger:    &log.Logger,
+			LogErrors: true,
+			Messages:  i18n.BuiltinCatalog().Merge(cfg.Messages),
 		},
 	)
 

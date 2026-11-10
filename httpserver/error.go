@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/andyle182810/gframework/i18n"
+	"github.com/andyle182810/gframework/middleware"
 	"github.com/labstack/echo/v5"
 )
 
@@ -30,6 +31,16 @@ const (
 type ErrorResponse struct {
 	Code    string `example:"EMPLOYEE_NOT_FOUND" json:"code"`
 	Message string `example:"Employee not found" json:"message"`
+	Details any    `json:"details,omitempty"     swaggertype:"object"`
+}
+
+func WithDetails(httpErr *echo.HTTPError, details any) *echo.HTTPError {
+	var wrapped *echo.HTTPError
+	if !errors.As(httpErr.Wrap(&middleware.DetailsError{Err: httpErr.Unwrap(), Details: details}), &wrapped) {
+		return httpErr
+	}
+
+	return wrapped
 }
 
 // HTTPError builds an echo error carrying the text shown to the caller.

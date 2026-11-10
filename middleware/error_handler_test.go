@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/andyle182810/gframework/httpserver"
 	"github.com/andyle182810/gframework/i18n"
 	"github.com/andyle182810/gframework/middleware"
 	"github.com/andyle182810/gframework/testutil"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -311,4 +313,94 @@ func TestErrorHandler_NonHTTPError_WithLogging(t *testing.T) {
 
 	require.Contains(t, buf.String(), "Unhandled error")
 	require.Contains(t, buf.String(), "generic error")
+}
+
+func TestErrorHandler_Details(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		details  any
+		expected string
+	}{
+		{
+			name:     "details are returned beside code and message",
+			details:  map[string]any{"line": 3},
+			expected: `{"code":"BAD_REQUEST","message":"Bad Request","details":{"line":3}}`,
+		},
+		{
+			name:     "nil details are omitted",
+			details:  nil,
+			expected: `{"code":"BAD_REQUEST","message":"Bad Request"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, rec, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+				Method: http.MethodPost,
+				Path:   testPath,
+			})
+
+			errorHandler := middleware.ErrorHandler(nil)
+
+			httpErr := httpserver.WithDetails(httpserver.BadRequestError(ErrGeneric, badRequestMessage), tt.details)
+			errorHandler(ctx, httpErr)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			require.JSONEq(t, tt.expected, rec.Body.String())
+			require.ErrorIs(t, httpErr, ErrGeneric)
+		})
+	}
+}
+
+func TestErrorHandler_LogsUserID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		subject string
+		want    string
+	}{
+		{name: "authenticated request logs the subject", subject: "user-1", want: `"user_id":"user-1"`},
+		{name: "anonymous request logs no user", subject: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+
+			logger := zerolog.New(&buf)
+
+			ctx, _, _ := testutil.SetupEchoContext(t, &testutil.Options{ //nolint:exhaustruct
+				Method: http.MethodGet,
+				Path:   testPath,
+			})
+
+			if tt.subject != "" {
+				ctx.Set(middleware.ContextKeyClaims, &middleware.ExtendedClaims{ //nolint:exhaustruct
+					RegisteredClaims: jwt.RegisteredClaims{Subject: tt.subject}, //nolint:exhaustruct
+				})
+			}
+
+			errorHandler := middleware.ErrorHandler(nil, &middleware.ErrorHandlerConfig{ //nolint:exhaustruct
+				Logger:    &logger,
+				LogErrors: true,
+			})
+
+			errorHandler(ctx, httpserver.BadRequestError(ErrGeneric, badRequestMessage))
+
+			if tt.want == "" {
+				require.NotContains(t, buf.String(), "user_id")
+
+				return
+			}
+
+			require.Contains(t, buf.String(), tt.want)
+		})
+	}
 }

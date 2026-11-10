@@ -14,6 +14,23 @@ import (
 // AcceptLanguageHeader names the locale the caller wants error messages in.
 const AcceptLanguageHeader = "Accept-Language"
 
+type DetailsError struct {
+	Err     error
+	Details any
+}
+
+func (e *DetailsError) Error() string {
+	if e.Err == nil {
+		return "error details"
+	}
+
+	return e.Err.Error()
+}
+
+func (e *DetailsError) Unwrap() error {
+	return e.Err
+}
+
 type ErrorHandlerConfig struct {
 	Logger    *zerolog.Logger
 	LogErrors bool
@@ -84,6 +101,11 @@ func buildErrorResponse(ectx *echo.Context, httpErr *echo.HTTPError, cfg *ErrorH
 	response := map[string]any{
 		"code":    code,
 		"message": message,
+	}
+
+	var detailed *DetailsError
+	if errors.As(httpErr, &detailed) && detailed.Details != nil {
+		response["details"] = detailed.Details
 	}
 
 	if cfg.IncludeInternalErrors {
@@ -172,6 +194,10 @@ func logHTTPError(ectx *echo.Context, httpErr *echo.HTTPError, logger *zerolog.L
 		logFields["handler"] = handler
 	}
 
+	if userID, err := CurrentUserID(ectx); err == nil {
+		logFields["user_id"] = userID
+	}
+
 	loggerWithFields := logger.With().Fields(logFields).Logger()
 
 	if internal := httpErr.Unwrap(); internal != nil {
@@ -200,6 +226,10 @@ func logError(ectx *echo.Context, err error, logger *zerolog.Logger) {
 
 	if handler, ok := ectx.Get(ContextKeyHandler).(string); ok && handler != "" {
 		logFields["handler"] = handler
+	}
+
+	if userID, err := CurrentUserID(ectx); err == nil {
+		logFields["user_id"] = userID
 	}
 
 	logger.Error().
