@@ -51,21 +51,35 @@ func TestValidateDateRange(t *testing.T) {
 		{
 			name:    "exceeds max days",
 			from:    dateStart,
-			to:      "2026-04-05", // 94 days
+			to:      "2026-04-04", // 94 days, counting both ends
 			maxDays: 93,
 			wantErr: true,
 		},
 		{
 			name:    "exactly max days",
 			from:    dateStart,
-			to:      "2026-04-04", // 93 days
+			to:      "2026-04-03", // 93 days, counting both ends
 			maxDays: 93,
 			wantErr: false,
 		},
 		{
 			name:    "custom max days",
 			from:    dateStart,
-			to:      "2026-01-11", // 10 days
+			to:      "2026-01-11", // 11 days
+			maxDays: 7,
+			wantErr: true,
+		},
+		{
+			name:    "a week counting both ends",
+			from:    dateStart,
+			to:      "2026-01-07",
+			maxDays: 7,
+			wantErr: false,
+		},
+		{
+			name:    "one day past a week",
+			from:    dateStart,
+			to:      "2026-01-08",
 			maxDays: 7,
 			wantErr: true,
 		},
@@ -96,4 +110,13 @@ func TestDateRange_Validate(t *testing.T) {
 
 	dateRange = util.DateRange{From: day(dateStart), To: day("2026-01-10"), MaxDays: 7}
 	require.Error(t, dateRange.Validate())
+}
+
+func TestValidateDateRange_EndOfDay(t *testing.T) {
+	t.Parallel()
+
+	endOf := func(s string) time.Time { return day(s).Add(24*time.Hour - time.Nanosecond) }
+
+	require.NoError(t, util.ValidateDateRange(day(dateStart), endOf("2026-04-03"), 93))
+	require.ErrorIs(t, util.ValidateDateRange(day(dateStart), endOf("2026-04-04"), 93), util.ErrDateRangeExceeded)
 }

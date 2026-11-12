@@ -40,6 +40,8 @@ func ValidateSunday(value string) error {
 // MaxDateRangeDays is the default maximum span accepted by DateRange.Validate.
 const MaxDateRangeDays = 93
 
+const day = 24 * time.Hour
+
 // DateRange is an inclusive [From, To] interval. MaxDays bounds the span;
 // zero means MaxDateRangeDays.
 type DateRange struct {
@@ -58,13 +60,14 @@ func (dr DateRange) Validate() error {
 	return ValidateDateRange(dr.From, dr.To, maxDays)
 }
 
-// ValidateDateRange checks that from precedes to and the span does not exceed maxDays.
+// ValidateDateRange checks that from precedes to and that the range, counting both
+// ends, spans at most maxDays days. to may be the last day's midnight or its last instant.
 func ValidateDateRange(from, to time.Time, maxDays int) error {
 	if to.Before(from) {
 		return fmt.Errorf("from=%s is after to=%s: %w", from.Format("2006-01-02"), to.Format("2006-01-02"), ErrFromAfterTo)
 	}
 
-	if to.Sub(from) > time.Duration(maxDays)*24*time.Hour {
+	if days := int(to.Sub(from)/day) + 1; days > maxDays {
 		return fmt.Errorf("date range must not exceed %d days: %w", maxDays, ErrDateRangeExceeded)
 	}
 
